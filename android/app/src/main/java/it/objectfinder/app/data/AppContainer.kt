@@ -1,8 +1,30 @@
 package it.objectfinder.app.data
 
 import android.content.Context
+import it.objectfinder.app.data.local.ObjectDatabase
+import it.objectfinder.app.data.remote.AppConfig
+import it.objectfinder.app.data.remote.SupabaseAuthApi
+import it.objectfinder.app.data.remote.SupabaseHttp
+import it.objectfinder.app.data.remote.SupabaseRestApi
 
+/** Dependency container manuale: creato una sola volta in [it.objectfinder.app.ObjectFinderApplication]. */
 class AppContainer(context: Context) {
-    private val database = ObjectDatabase.create(context)
-    val repository = ObjectRepository(database.objectDao(), SupabaseApi(context))
+    private val appContext = context.applicationContext
+    val config = AppConfig.load(appContext)
+    private val database = ObjectDatabase.create(appContext)
+    private val http = SupabaseHttp(config)
+
+    val settings = SettingsStore(appContext)
+    val sessionStore = SessionStore(appContext)
+
+    val authRepository = AuthRepository(SupabaseAuthApi(http), sessionStore, settings)
+    private val restApi = SupabaseRestApi(http, authRepository)
+    val projectRepository = ProjectRepository(restApi, authRepository, settings, database.objectDao())
+    val objectRepository = ObjectRepository(
+        dao = database.objectDao(),
+        api = restApi,
+        auth = authRepository,
+        projects = projectRepository,
+        settings = settings
+    )
 }

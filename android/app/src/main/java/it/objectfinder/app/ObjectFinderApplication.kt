@@ -1,0 +1,17 @@
+package it.objectfinder.app
+
+import android.app.Application
+import it.objectfinder.app.data.AppContainer
+import it.objectfinder.app.sync.SyncScheduler
+
+class ObjectFinderApplication : Application() {
+    /** Unica istanza di database, client HTTP e repository per tutto il processo. */
+    lateinit var container: AppContainer
+        private set
+
+    override fun onCreate() {
+        super.onCreate()
+        container = AppContainer(this)
+        SyncScheduler.schedulePeriodic(this)
+    }
+}
