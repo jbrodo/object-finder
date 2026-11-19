@@ -1,3 +1,7 @@
+# ! cd ~/Downloads/ObjectFinder_MVP && gh secret set SUPABASE_URL --body "https://TUO-PROGETTO.supabase.co"
+# ! cd ~/Downloads/ObjectFinder_MVP && gh secret set SUPABASE_ANON_KEY --body "LA-TUA-ANON-KEY"
+
+
 SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_OR_PUBLISHABLE_KEY
 GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
