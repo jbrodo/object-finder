@@ -42,6 +42,10 @@
 - [x] "Portami lì" (navigazione verso l'oggetto)
 - [x] Password: autofill/Credential Manager, mostra password, robustezza
 
+## Distribuzione e qualità
+- [x] Export inventario CSV / PDF
+- [ ] Test interno su Google Play o Firebase App Distribution
+
 ## M4 — Tracking
 - [ ] BLE scan/connect
 - [ ] GPS tracker ingestion endpoint

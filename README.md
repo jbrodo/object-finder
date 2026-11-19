@@ -121,6 +121,9 @@ disinstallata l'app.
 - Eliminazione definitiva (owner/admin) con foto, codici e storico, propagata agli altri dispositivi
 - Sincronizzazione bidirezionale: push delle modifiche pending + pull incrementale con cursore,
   sync immediata dopo ogni modifica (appena c'è rete) e periodica ogni ora
+- Export dell'inventario (Impostazioni → Inventario): CSV per Excel/fogli di calcolo (separatore `;`,
+  UTF-8, formule neutralizzate) o PDF A4 stampabile con foto, codici e QR di ogni oggetto;
+  condivisione o salvataggio sul telefono
 - "Vicini": elenco ordinato per distanza dal telefono, con la distanza su ogni oggetto
 - Storico posizioni: ogni nuova posizione (oltre l'incertezza del GPS) viene registrata e sincronizzata
   (tabella `locations`, append-only); in scheda: data, coordinate, spostamento, apertura su mappa

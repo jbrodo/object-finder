@@ -95,6 +95,10 @@ fun SettingsScreen(
             }
         }
 
+        Section("Inventario") {
+            ExportSection(container.inventoryExporter)
+        }
+
         Section("Mappa predefinita") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MapEngine.entries.forEach { option ->

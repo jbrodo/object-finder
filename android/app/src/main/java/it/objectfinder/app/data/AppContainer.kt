@@ -1,6 +1,7 @@
 package it.objectfinder.app.data
 
 import android.content.Context
+import it.objectfinder.app.export.InventoryExporter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,6 +30,9 @@ class AppContainer(context: Context) {
     val photoRepository = PhotoRepository(appContext, database.photoDao(), restApi)
     val identifierRepository = IdentifierRepository(database.identifierDao(), restApi)
     val locationHistoryRepository = LocationHistoryRepository(database.locationHistoryDao(), restApi)
+    val inventoryExporter = InventoryExporter(
+        appContext, database.objectDao(), database.identifierDao(), database.photoDao(), settings,
+    )
     val objectRepository = ObjectRepository(
         dao = database.objectDao(),
         api = restApi,

@@ -17,6 +17,9 @@ interface ObjectDao {
     @Query("SELECT * FROM objects WHERE id = :id")
     suspend fun getById(id: String): ObjectEntity?
 
+    @Query("SELECT * FROM objects WHERE projectId = :projectId ORDER BY name COLLATE NOCASE")
+    suspend fun allByProject(projectId: String): List<ObjectEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(item: ObjectEntity)
 
