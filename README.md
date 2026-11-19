@@ -16,7 +16,8 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
    Facoltativo: aggiungere `GOOGLE_MAPS_API_KEY=...` nello stesso file.
 2. Copiare `android/app/src/main/assets/config.properties.example` in `config.properties`
    e impostare `SUPABASE_URL` e `SUPABASE_ANON_KEY` (anon/publishable key).
-3. In Supabase, SQL Editor, eseguire in ordine:
+3. Schema del database: automatico con la workflow *Database migrations* (vedi sotto), oppure a mano
+   da SQL Editor eseguendo in ordine:
    `backend/migrations/001_initial_schema.sql`, `002_storage_policies.sql`, `003_sync_support.sql`,
    `004_project_members_rpc.sql`, `005_object_photos.sql`, `006_object_identifiers.sql`,
    `007_project_invites.sql`.
@@ -25,6 +26,32 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
 4. In Supabase → Authentication → Providers abilitare Email/Password e **lasciare attivo
    "Confirm email"**: gli inviti a progetto vengono accettati solo per email confermate; con
    l'auto-conferma chiunque potrebbe registrarsi con l'email invitata.
+
+## Migration automatiche (GitHub Actions)
+La workflow `Database migrations` parte quando cambia un file in `backend/migrations/`:
+- **pull request**: applica tutte le migration su un Postgres+PostGIS temporaneo (con uno stub di
+  `auth`/`storage`), verifica che una seconda esecuzione non applichi nulla; non tocca il DB reale;
+- **push su `main`**: dopo la validazione applica al database Supabase **solo le migration pendenti**.
+
+Regole (`backend/scripts/migrate.sh`, usabile anche a mano con `DATABASE_URL=... backend/scripts/migrate.sh`):
+- registro in `ops.schema_migrations` (schema non esposto dalle API);
+- ogni file gira in una transazione insieme alla sua registrazione: se fallisce non resta nulla a metà;
+- una migration già applicata non si modifica (checksum): per cambiare qualcosa si crea `008_...sql`;
+- niente `begin`/`commit` dentro i file e niente comandi non transazionali (es. `create index concurrently`).
+
+Configurazione:
+1. Secret `SUPABASE_DB_URL`: in Supabase → **Connect** → **Session pooler** (i runner GitHub non
+   raggiungono la connessione diretta, solo IPv6). Formato
+   `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
+   ```bash
+   gh secret set SUPABASE_DB_URL   # incollare la stringa quando richiesto (non resta nella cronologia)
+   ```
+2. **Migration già eseguite a mano** dal SQL Editor: lanciare una volta la workflow da Actions →
+   *Database migrations* → *Run workflow* con `baseline` = ultima versione applicata (es. `007`) e
+   `dry_run` disattivato. Le segna come applicate senza rieseguirle. Senza baseline la workflow si
+   ferma con un messaggio invece di provare a ricreare lo schema.
+3. Consigliato: in Settings → Environments → `production` aggiungere un *required reviewer*, così
+   ogni applicazione al database attende un'approvazione.
 
 ## Build e test
 ```bash
