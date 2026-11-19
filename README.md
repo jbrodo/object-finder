@@ -69,6 +69,10 @@ disinstallata l'app.
 - Foto degli oggetti: scatto o galleria, ridimensionate (max 1920 px, JPEG) senza metadati EXIF,
   salvate in locale e caricate nel bucket privato `object-photos`; miniatura in elenco,
   visualizzatore a schermo intero, eliminazione sincronizzata, download delle foto degli altri membri
+- Etichette QR: ogni oggetto ha un QR (`objectfinder://object/<id>`, solo l'identificativo) da
+  condividere o stampare; scansione dall'app (scanner Google Play services, senza permesso
+  fotocamera) o con la fotocamera di sistema tramite deep link; se l'oggetto è in un altro progetto
+  l'app propone di passarci
 - Archiviazione/ripristino (soft delete sincronizzato)
 - Permessi posizione con spiegazione, gestione del rifiuto permanente e scorciatoia alle impostazioni
 - Acquisizione GPS ad alta precisione con fallback sull'ultima posizione nota

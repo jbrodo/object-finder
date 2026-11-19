@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.QrCode2
+import it.objectfinder.app.qr.QrLabelDialog
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -51,7 +53,13 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit, readOnly: Boolean = false) {
+fun ObjectEditorScreen(
+    viewModel: ObjectEditorViewModel,
+    onClose: () -> Unit,
+    readOnly: Boolean = false,
+    objectId: String? = null,
+) {
+    var showLabel by remember { mutableStateOf(false) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val photos by viewModel.photos.collectAsStateWithLifecycle()
     val photoBusy by viewModel.photoBusy.collectAsStateWithLifecycle()
@@ -80,6 +88,11 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit, re
                     }
                 },
                 actions = {
+                    if (objectId != null && state.loaded && !state.notFound) {
+                        IconButton(onClick = { showLabel = true }) {
+                            Icon(Icons.Default.QrCode2, contentDescription = "Etichetta QR")
+                        }
+                    }
                     if (!readOnly && !state.isNew && state.loaded && !state.notFound) {
                         IconButton(onClick = viewModel::toggleArchived) {
                             Icon(
@@ -93,6 +106,9 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit, re
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        if (showLabel && objectId != null) {
+            QrLabelDialog(objectId = objectId, title = state.name, onDismiss = { showLabel = false })
+        }
         if (state.notFound) {
             Column(Modifier.padding(padding).padding(24.dp)) {
                 Text("Oggetto non trovato.")

@@ -26,7 +26,8 @@
 ## M3 — Identification
 - [x] Foto oggetto: scatto (app fotocamera di sistema) e galleria, normalizzazione JPEG
 - [ ] CameraX capture in-app (inquadratura guidata per il riconoscimento)
-- [ ] QR scanning
+- [x] QR: etichetta per oggetto (condividi/stampa), scansione in-app, deep link `objectfinder://object/<id>`
+- [ ] Collegare codici esistenti (barcode prodotto, seriale) tramite `object_identifiers`
 - [ ] NFC read/write policy
 - [x] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`, migration 005)
 - [ ] Visual embeddings and similarity search
@@ -52,4 +53,7 @@
   da rivedere per progetti con molte foto.
 - Il file picker su emulatore API 30 non mostra file copiati via adb: l'import da galleria è stato
   verificato solo per la parte comune con lo scatto (stessa pipeline `addPhoto`).
+- Lo scanner QR in-app richiede Google Play services recente (modulo scaricato on-demand); sul
+  vecchio emulatore API 30 non è disponibile e l'app lo segnala. Verificati deep link (a freddo e a
+  caldo), generazione/decodifica del QR e risoluzione; la lettura reale va provata su dispositivo.
 - Nessuna eliminazione definitiva: l'archiviazione è il soft delete previsto per l'MVP.

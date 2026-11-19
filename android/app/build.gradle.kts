@@ -110,6 +110,12 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 
+    // Etichette QR: generazione (ZXing core), scansione (Google code scanner, senza permesso
+    // fotocamera: l'interfaccia è fornita da Play services), stampa.
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    implementation("androidx.print:print:1.0.0")
+
     // Google Maps Compose provider
     implementation("com.google.maps.android:maps-compose:6.4.1")
     implementation("com.google.android.gms:play-services-maps:19.0.0")

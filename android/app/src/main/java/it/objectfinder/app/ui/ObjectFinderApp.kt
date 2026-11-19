@@ -1,6 +1,24 @@
 package it.objectfinder.app.ui
 
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import it.objectfinder.app.qr.CodeScanner
+import it.objectfinder.app.qr.ScanOutcome
+import it.objectfinder.app.qr.ScanResolver
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Map
@@ -63,9 +81,60 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
 }
 
 @Composable
-fun ObjectFinderApp(container: AppContainer) {
+fun ObjectFinderApp(
+    container: AppContainer,
+    pendingLink: String? = null,
+    onLinkHandled: () -> Unit = {},
+) {
     val context = LocalContext.current.applicationContext
+    val activity = LocalActivity.current
     val nav = rememberNavController()
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val resolver = remember(container) {
+        ScanResolver(
+            findObject = { container.objectRepository.get(it) },
+            currentProjectId = { container.projectRepository.currentProjectId },
+            knownProjects = {
+                // A freddo l'elenco può non essere ancora caricato: si aggiorna (best-effort).
+                container.projectRepository.projects.value.ifEmpty {
+                    if (container.authRepository.session.value == null) emptyList()
+                    else runCatching { container.projectRepository.refreshProjects() }.getOrDefault(emptyList())
+                }
+            },
+        )
+    }
+
+    /** Gestisce un contenuto scansionato o un deep link: apre l'oggetto o spiega perché no. */
+    fun handleScanned(raw: String) {
+        scope.launch {
+            when (val outcome = resolver.resolve(raw)) {
+                is ScanOutcome.Open -> nav.openObject(outcome.objectId)
+                is ScanOutcome.Message -> snackbar.showSnackbar(outcome.text)
+                is ScanOutcome.SwitchProject -> {
+                    val result = snackbar.showSnackbar(
+                        message = "«${outcome.objectName}» è nel progetto «${outcome.project.name}»",
+                        actionLabel = "Apri",
+                        duration = SnackbarDuration.Long,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        container.projectRepository.selectProject(outcome.project)
+                        nav.openObject(outcome.objectId)
+                    }
+                }
+            }
+        }
+    }
+    val startScan: () -> Unit = {
+        (activity as? ComponentActivity)?.let { act ->
+            CodeScanner.scan(
+                act,
+            onResult = ::handleScanned,
+                onError = { msg -> scope.launch { snackbar.showSnackbar(msg, duration = SnackbarDuration.Long) } },
+            )
+        }
+        Unit
+    }
     val session by container.authRepository.session.collectAsStateWithLifecycle()
     val onboardingDone by container.settings.onboardingDone.collectAsStateWithLifecycle()
     val requestSync = remember(context) { { SyncScheduler.syncNow(context) } }
@@ -73,6 +142,15 @@ fun ObjectFinderApp(container: AppContainer) {
     // Primo avvio senza sessione → onboarding/login; poi l'app resta usabile anche offline.
     val start = remember { if (session == null && !onboardingDone) Routes.AUTH else Routes.OBJECTS }
 
+    // Deep link da etichetta QR (anche a freddo): si gestisce una volta pronta la navigazione.
+    LaunchedEffect(pendingLink) {
+        pendingLink?.let {
+            onLinkHandled()
+            handleScanned(it)
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
     NavHost(navController = nav, startDestination = start) {
         composable(Routes.AUTH) {
             AuthScreen(
@@ -90,7 +168,7 @@ fun ObjectFinderApp(container: AppContainer) {
         }
         composable(Routes.OBJECTS) {
             val vm = viewModel { ObjectListViewModel(container.objectRepository, container.photoRepository) }
-            MainShell(container, nav, Tab.OBJECTS, requestSync) { modifier ->
+            MainShell(container, nav, Tab.OBJECTS, requestSync, startScan) { modifier ->
                 val active by container.settings.activeProject.collectAsStateWithLifecycle()
                 ObjectListScreen(
                     viewModel = vm,
@@ -104,7 +182,7 @@ fun ObjectFinderApp(container: AppContainer) {
         composable(Routes.MAP) {
             val objects by container.objectRepository.observeObjects().collectAsStateWithLifecycle(emptyList())
             val engine by container.settings.mapEngine.collectAsStateWithLifecycle()
-            MainShell(container, nav, Tab.MAP, requestSync) { modifier ->
+            MainShell(container, nav, Tab.MAP, requestSync, startScan) { modifier ->
                 ObjectMapScreen(
                     objects = objects.filter { it.statusEnum != ObjectStatus.ARCHIVED },
                     preferredEngine = engine,
@@ -115,7 +193,7 @@ fun ObjectFinderApp(container: AppContainer) {
             }
         }
         composable(Routes.SETTINGS) {
-            MainShell(container, nav, Tab.SETTINGS, requestSync) { modifier ->
+            MainShell(container, nav, Tab.SETTINGS, requestSync, startScan) { modifier ->
                 SettingsScreen(
                     container = container,
                     onSignIn = { nav.navigate(Routes.AUTH) },
@@ -153,10 +231,24 @@ fun ObjectFinderApp(container: AppContainer) {
             ObjectEditorScreen(
                 viewModel = vm,
                 readOnly = active?.canEditObjects == false,
+                objectId = id,
                 onClose = { nav.popBackStack() },
             )
         }
     }
+    // Snackbar globale (scansioni/deep link) sopra qualsiasi schermata, sopra la barra di navigazione.
+    SnackbarHost(
+        snackbar,
+        modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 80.dp),
+    )
+    }
+}
+
+/** Apre l'editor dell'oggetto, senza duplicarlo se è già quello in primo piano. */
+private fun NavHostController.openObject(objectId: String) {
+    val top = currentBackStackEntry
+    if (top?.destination?.route == Routes.EDITOR && top.arguments?.getString("id") == objectId) return
+    navigate(Routes.editor(objectId))
 }
 
 private fun NavHostController.leaveAuth() {
@@ -172,6 +264,7 @@ private fun MainShell(
     nav: NavHostController,
     current: Tab,
     onSync: () -> Unit,
+    onScan: () -> Unit,
     content: @Composable (Modifier) -> Unit,
 ) {
     val project by container.settings.activeProject.collectAsStateWithLifecycle()
@@ -184,6 +277,11 @@ private fun MainShell(
             TopAppBar(
                 title = { Text(if (current == Tab.SETTINGS) "Impostazioni" else project?.name ?: "Object Finder") },
                 actions = {
+                    if (current != Tab.SETTINGS) {
+                        IconButton(onClick = onScan) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scansiona etichetta")
+                        }
+                    }
                     if (session != null) {
                         IconButton(onClick = onSync) {
                             BadgedBox(badge = { if (pending > 0) Badge { Text("$pending") } }) {

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Solo la cartella temporanea degli scatti è esposta all'app fotocamera. -->
+<!-- Esposte solo le cartelle temporanee: scatti (app fotocamera) ed etichette QR (condivisione). -->
 <paths>
     <cache-path name="camera" path="camera/" />
+    <cache-path name="labels" path="labels/" />
 </paths>
