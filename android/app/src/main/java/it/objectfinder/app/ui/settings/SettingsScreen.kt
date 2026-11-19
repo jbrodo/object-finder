@@ -81,7 +81,8 @@ fun SettingsScreen(
             }
         }
 
-        Section("Sincronizzazione") {
+        // Senza account non c'è nulla da inviare: niente contatori o pulsanti che promettono una sync.
+        if (session != null) Section("Sincronizzazione") {
             Text("Modifiche da inviare: $pending")
             if (conflicts > 0) {
                 Text(
@@ -90,7 +91,7 @@ fun SettingsScreen(
                 )
             }
             Text(describe(syncState), style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = onSyncNow, enabled = session != null && syncState !is SyncState.Running) {
+            Button(onClick = onSyncNow, enabled = syncState !is SyncState.Running) {
                 Text("Sincronizza ora")
             }
         }
@@ -99,25 +100,17 @@ fun SettingsScreen(
             ExportSection(container.inventoryExporter)
         }
 
-        Section("Mappa predefinita") {
+        // Scelta del motore solo se ce n'è più di uno disponibile in questo build.
+        if (MapEngine.available.size > 1) Section("Mappa predefinita") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MapEngine.entries.forEach { option ->
+                MapEngine.available.forEach { option ->
                     FilterChip(
                         selected = MapEngine.resolve(mapEngine) == option,
-                        enabled = option.isAvailable,
                         onClick = { container.settings.setMapEngine(option) },
                         label = { Text(option.label) },
                     )
                 }
             }
-            if (!MapEngine.GOOGLE_MAPS.isAvailable) {
-                Text("Google Maps richiede una API key nel build.", style = MaterialTheme.typography.bodySmall)
-            }
-            Text(
-                "I tile pubblici OpenStreetMap sono destinati a sviluppo/test.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
 
         Text(

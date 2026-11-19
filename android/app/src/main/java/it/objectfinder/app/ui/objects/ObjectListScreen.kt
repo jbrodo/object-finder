@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.objectfinder.app.data.local.ObjectEntity
+import it.objectfinder.app.data.local.categoryLabel
 import it.objectfinder.app.data.local.ObjectStatus
 import java.util.Locale
 
@@ -67,6 +68,8 @@ fun ObjectListScreen(
     onCreateObject: () -> Unit,
     modifier: Modifier = Modifier,
     canCreate: Boolean = true,
+    /** Stato di sincronizzazione visibile solo con un account: offline non c'è nulla da inviare. */
+    showSyncState: Boolean = true,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -145,6 +148,7 @@ fun ObjectListScreen(
                             item,
                             cover = state.covers[item.id],
                             distance = state.distanceTo(item),
+                            showSyncState = showSyncState,
                             onClick = { onOpenObject(item.id) },
                         )
                     }
@@ -161,7 +165,13 @@ fun ObjectListScreen(
 }
 
 @Composable
-private fun ObjectCard(item: ObjectEntity, cover: String?, distance: Double?, onClick: () -> Unit) {
+private fun ObjectCard(
+    item: ObjectEntity,
+    cover: String?,
+    distance: Double?,
+    showSyncState: Boolean,
+    onClick: () -> Unit,
+) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
       Row(Modifier.padding(start = if (cover != null) 12.dp else 0.dp), verticalAlignment = Alignment.CenterVertically) {
         if (cover != null) {
@@ -181,7 +191,7 @@ private fun ObjectCard(item: ObjectEntity, cover: String?, distance: Double?, on
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Icon(
+                if (item.isConflict || showSyncState) Icon(
                     when {
                         item.isConflict -> Icons.Default.Warning
                         item.isPending -> Icons.Default.CloudUpload
@@ -197,7 +207,7 @@ private fun ObjectCard(item: ObjectEntity, cover: String?, distance: Double?, on
                 )
             }
             Text(
-                "${item.category} · ${item.statusEnum.label}",
+                "${categoryLabel(item.category)} · ${item.statusEnum.label}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (item.statusEnum == ObjectStatus.ARCHIVED) MaterialTheme.colorScheme.outline
                 else MaterialTheme.colorScheme.onSurfaceVariant,

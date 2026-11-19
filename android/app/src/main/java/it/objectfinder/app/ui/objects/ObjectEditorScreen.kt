@@ -2,6 +2,8 @@ package it.objectfinder.app.ui.objects
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.QrCode2
 import it.objectfinder.app.qr.QrLabelDialog
@@ -26,6 +29,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -37,6 +41,7 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -67,6 +72,7 @@ fun ObjectEditorScreen(
 ) {
     var showLabel by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     val conflict by viewModel.conflict.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val photos by viewModel.photos.collectAsStateWithLifecycle()
@@ -104,11 +110,6 @@ fun ObjectEditorScreen(
                             Icon(Icons.Default.QrCode2, contentDescription = "Etichetta QR")
                         }
                     }
-                    if (canDelete && !readOnly && !state.isNew && state.loaded && !state.notFound) {
-                        IconButton(onClick = { confirmDelete = true }, enabled = !state.saving) {
-                            Icon(Icons.Default.DeleteForever, contentDescription = "Elimina definitivamente")
-                        }
-                    }
                     if (!readOnly && !state.isNew && state.loaded && !state.notFound) {
                         IconButton(onClick = viewModel::toggleArchived) {
                             Icon(
@@ -117,10 +118,52 @@ fun ObjectEditorScreen(
                             )
                         }
                     }
+                    // L'azione irreversibile sta in un menu, lontana da Archivia (un tocco sbagliato costa caro).
+                    if (canDelete && !readOnly && !state.isNew && state.loaded && !state.notFound) {
+                        Box {
+                            IconButton(onClick = { menuOpen = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "Altre azioni")
+                            }
+                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Elimina definitivamente", color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    },
+                                    enabled = !state.saving,
+                                    onClick = { menuOpen = false; confirmDelete = true },
+                                )
+                            }
+                        }
+                    }
                 },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
+        // Salva sempre raggiungibile (anche sopra la tastiera), senza scorrere tutto il form.
+        bottomBar = {
+            if (!readOnly && state.loaded && !state.notFound) {
+                Surface(tonalElevation = 3.dp, shadowElevation = 3.dp) {
+                    Button(
+                        onClick = viewModel::save,
+                        enabled = state.canSave,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .imePadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        Text(
+                            when {
+                                state.saving && state.locating -> "Attendo la posizione…"
+                                state.isNew -> "Registra oggetto"
+                                else -> "Salva modifiche"
+                            }
+                        )
+                    }
+                }
+            }
+        },
     ) { padding ->
         if (confirmDelete) {
             AlertDialog(
@@ -154,8 +197,7 @@ fun ObjectEditorScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .imePadding()
+                .padding(padding) // include la barra Salva, che segue già la tastiera
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -263,15 +305,6 @@ fun ObjectEditorScreen(
 
             LocationHistorySection(history)
 
-            if (!readOnly) Button(onClick = viewModel::save, enabled = state.canSave, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    when {
-                        state.saving && state.locating -> "Attendo la posizione…"
-                        state.isNew -> "Registra oggetto"
-                        else -> "Salva modifiche"
-                    }
-                )
-            }
         }
     }
 }

@@ -54,6 +54,7 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberUpdatedMarkerState
 import it.objectfinder.app.data.local.ObjectEntity
+import it.objectfinder.app.data.local.categoryLabel
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -63,7 +64,7 @@ import org.osmdroid.views.MapView
 fun List<ObjectEntity>.toMarkers(): List<MapMarker> = mapNotNull { item ->
     val lat = item.latitude ?: return@mapNotNull null
     val lon = item.longitude ?: return@mapNotNull null
-    MapMarker(item.id, item.name, "${item.category} · ${item.statusEnum.label}", lat, lon)
+    MapMarker(item.id, item.name, "${categoryLabel(item.category)} · ${item.statusEnum.label}", lat, lon)
 }
 
 @Composable
@@ -115,26 +116,21 @@ fun ObjectMapScreen(
     }
 
     Column(modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            MapEngine.entries.forEach { option ->
-                FilterChip(
-                    selected = engine == option,
-                    enabled = option.isAvailable,
-                    onClick = { onEngineChange(option) },
-                    label = { Text(option.label) },
-                )
+        // Il selettore compare solo se c'è davvero una scelta (build con API key Google).
+        if (MapEngine.available.size > 1) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MapEngine.available.forEach { option ->
+                    FilterChip(
+                        selected = engine == option,
+                        onClick = { onEngineChange(option) },
+                        label = { Text(option.label) },
+                    )
+                }
             }
-        }
-        if (!MapEngine.GOOGLE_MAPS.isAvailable) {
-            Text(
-                "Google Maps non configurato (API key assente): uso OpenStreetMap.",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-            )
         }
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
             when (engine) {

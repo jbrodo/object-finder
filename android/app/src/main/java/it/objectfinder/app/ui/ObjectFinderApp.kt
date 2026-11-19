@@ -56,6 +56,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import it.objectfinder.app.data.AppContainer
 import it.objectfinder.app.data.local.ObjectStatus
+import it.objectfinder.app.data.local.categoryLabel
 import it.objectfinder.app.location.LocationProvider
 import it.objectfinder.app.maps.ObjectMapScreen
 import it.objectfinder.app.sync.SyncScheduler
@@ -184,6 +185,7 @@ fun ObjectFinderApp(
                 ObjectListScreen(
                     viewModel = vm,
                     canCreate = active?.canEditObjects ?: true,
+                    showSyncState = session != null,
                     onOpenObject = { nav.navigate(Routes.editor(it)) },
                     onCreateObject = { nav.navigate(Routes.editor()) },
                     modifier = modifier,
@@ -263,7 +265,7 @@ fun ObjectFinderApp(
                 Column {
                     choice.objects.forEach { item ->
                         ListItem(
-                            supportingContent = { Text(item.category) },
+                            supportingContent = { Text(categoryLabel(item.category)) },
                             modifier = Modifier.clickable { choosing = null; nav.openObject(item.id) },
                         ) { Text(item.name) }
                     }

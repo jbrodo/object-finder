@@ -12,6 +12,7 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
+import it.objectfinder.app.data.local.categoryLabel
 import it.objectfinder.app.qr.QrCodes
 import java.io.OutputStream
 import java.text.DateFormat
@@ -114,7 +115,7 @@ object InventoryPdf {
         canvas.drawText(ellipsize(o.name, Paints.name, textWidth), textLeft, y, Paints.name)
         y += 15
         canvas.drawText(
-            ellipsize("${o.category} · ${o.statusEnum.label} · ${row.photoCount} foto", Paints.body, textWidth),
+            ellipsize("${categoryLabel(o.category)} · ${o.statusEnum.label} · ${row.photoCount} foto", Paints.body, textWidth),
             textLeft, y, Paints.body,
         )
         y += 13

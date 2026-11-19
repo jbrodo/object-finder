@@ -7,6 +7,8 @@ import android.net.Uri
 import it.objectfinder.app.data.ObjectRepository
 import it.objectfinder.app.data.SyncMerge
 import it.objectfinder.app.data.local.ConflictKind
+import it.objectfinder.app.data.local.DEFAULT_CATEGORY
+import it.objectfinder.app.data.local.categoryLabel
 import it.objectfinder.app.data.remote.ObjectReadDto
 import it.objectfinder.app.data.remote.SupabaseException
 import it.objectfinder.app.data.remote.supabaseJson
@@ -39,7 +41,7 @@ data class EditorState(
     val loaded: Boolean = false,
     val notFound: Boolean = false,
     val name: String = "",
-    val category: String = "general",
+    val category: String = DEFAULT_CATEGORY,
     val notes: String = "",
     val status: ObjectStatus = ObjectStatus.ACTIVE,
     val latitude: Double? = null,
@@ -175,7 +177,7 @@ class ObjectEditorViewModel(
             else it.copy(
                 loaded = true,
                 name = item.name,
-                category = item.category,
+                category = categoryLabel(item.category),
                 notes = item.notes,
                 status = item.statusEnum,
                 latitude = item.latitude,

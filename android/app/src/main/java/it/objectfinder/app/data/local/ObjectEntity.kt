@@ -8,6 +8,12 @@ import java.util.UUID
 /** Progetto locale usato prima del login: gli oggetti vengono riassegnati al progetto cloud al bootstrap. */
 const val LOCAL_PROJECT_ID = "default-project"
 
+/** Categoria predefinita. Gli oggetti creati prima della 1.1 hanno il valore legacy "general". */
+const val DEFAULT_CATEGORY = "Generale"
+
+/** Etichetta mostrata per una categoria (il valore legacy inglese viene localizzato). */
+fun categoryLabel(raw: String): String = if (raw.isBlank() || raw.equals("general", ignoreCase = true)) DEFAULT_CATEGORY else raw
+
 /** Valori allineati all'enum `public.object_status` della migration 001. */
 enum class ObjectStatus(val wire: String, val label: String) {
     ACTIVE("active", "Attivo"),

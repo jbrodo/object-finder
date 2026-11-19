@@ -2,6 +2,7 @@ package it.objectfinder.app.export
 
 import it.objectfinder.app.data.local.IdentifierType
 import it.objectfinder.app.data.local.ObjectEntity
+import it.objectfinder.app.data.local.categoryLabel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -40,7 +41,7 @@ object InventoryCsv {
             // Testo libero (neutralizzato contro le formule) e valori generati dall'app (numeri, date, id).
             val values = listOf(
                 field(o.name),
-                field(o.category),
+                field(categoryLabel(o.category)),
                 field(o.statusEnum.label),
                 field(o.notes),
                 number(o.latitude?.let { String.format(Locale.ROOT, "%.6f", it) }),

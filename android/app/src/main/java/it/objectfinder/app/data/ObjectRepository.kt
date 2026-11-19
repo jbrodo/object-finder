@@ -1,6 +1,7 @@
 package it.objectfinder.app.data
 
 import it.objectfinder.app.data.local.ConflictKind
+import it.objectfinder.app.data.local.DEFAULT_CATEGORY
 import it.objectfinder.app.data.local.LOCAL_PROJECT_ID
 import it.objectfinder.app.data.local.ObjectConflictDao
 import it.objectfinder.app.data.local.ObjectConflictEntity
@@ -79,7 +80,7 @@ class ObjectRepository(
             id = id,
             projectId = projects.currentProjectId,
             name = draft.name.trim(),
-            category = draft.category.trim().ifBlank { "general" },
+            category = draft.category.trim().ifBlank { DEFAULT_CATEGORY },
             notes = draft.notes.trim(),
             status = draft.status.wire,
             latitude = draft.latitude,
@@ -104,7 +105,7 @@ class ObjectRepository(
         val updated =
             existing.copy(
                 name = draft.name.trim(),
-                category = draft.category.trim().ifBlank { "general" },
+                category = draft.category.trim().ifBlank { DEFAULT_CATEGORY },
                 notes = draft.notes.trim(),
                 status = draft.status.wire,
                 latitude = draft.latitude,
