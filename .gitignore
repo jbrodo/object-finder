@@ -16,6 +16,8 @@ local.properties
 # Signing keys
 *.jks
 *.keystore
+# Chiave debug condivisa (non segreta): firma stabile per gli APK debug della CI.
+!android/app/debug.keystore
 
 # Operating system files
 .DS_Store

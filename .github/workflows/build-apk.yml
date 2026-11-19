@@ -33,7 +33,12 @@ jobs:
         working-directory: android
         env:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-        run: ./gradlew --no-daemon :app:assembleDebug -PGOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
+        # versionCode crescente a ogni run: l'APK nuovo è sempre un aggiornamento del precedente.
+        run: >
+          ./gradlew --no-daemon :app:assembleDebug
+          -PGOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
+          -PVERSION_CODE="${{ github.run_number }}"
+          -PVERSION_NAME="0.3.0-ci.${{ github.run_number }}"
 
       - name: Upload test and lint reports
         if: always()

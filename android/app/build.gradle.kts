@@ -42,6 +42,15 @@ android {
     }
 
     signingConfigs {
+        // Chiave debug fissa e versionata: tutte le build debug (CI e locali) hanno la stessa firma,
+        // quindi un APK nuovo si installa sopra il precedente. Non è un segreto: le release usano
+        // una chiave separata, fuori dal repo.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         if (releaseKeystore != null) {
             create("release") {
                 storeFile = releaseKeystore
