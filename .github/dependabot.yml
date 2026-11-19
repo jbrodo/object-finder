@@ -4,8 +4,40 @@ updates:
     directory: /android
     schedule:
       interval: weekly
+    # Le librerie che devono avere la stessa versione si aggiornano insieme, in una sola PR:
+    # aggiornarle una per volta produce build rotte (es. plugin Kotlin 2.4 con KSP 2.0) o
+    # crash a runtime (moduli Ktor/Room con versioni diverse).
+    groups:
+      kotlin-toolchain:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "com.google.devtools.ksp*"
+          - "org.jetbrains.kotlinx:kotlinx-serialization*"
+      kotlinx-coroutines:
+        patterns:
+          - "org.jetbrains.kotlinx:kotlinx-coroutines*"
+      ktor:
+        patterns:
+          - "io.ktor*"
+      androidx-room:
+        patterns:
+          - "androidx.room*"
+      androidx-lifecycle:
+        patterns:
+          - "androidx.lifecycle*"
+      android-gradle-plugin:
+        patterns:
+          - "com.android*"
+      play-services:
+        patterns:
+          - "com.google.android.gms*"
+          - "com.google.maps.android*"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"

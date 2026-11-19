@@ -51,7 +51,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/migrations_ci
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install psql
         run: command -v psql || (sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client)
@@ -86,7 +86,7 @@ jobs:
       DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check database secret
         id: secret
