@@ -24,14 +24,27 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
+
+      - name: Unit tests and lint
+        working-directory: android
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug
 
       - name: Assemble debug APK
         working-directory: android
         env:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-        run: gradle --no-daemon :app:assembleDebug -PGOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
+        run: ./gradlew --no-daemon :app:assembleDebug -PGOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
+
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            android/app/build/reports/
+            android/app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

@@ -1,51 +1,67 @@
 # Object Finder — Android MVP
 
-Base incrementale Android nativa: Kotlin, Jetpack Compose, Room, Supabase REST/PostgREST,
-Google Maps / OpenStreetMap predisposti tramite provider separati.
+App Android nativa per registrare oggetti fisici con posizione GPS e ritrovarli su mappa.
+Kotlin, Jetpack Compose, Room (offline-first), Supabase Auth + PostgREST, WorkManager,
+Google Maps / OpenStreetMap tramite provider intercambiabili.
 
 ## Requisiti
-- Android Studio Ladybug o successivo
-- JDK 17
-- Android SDK 35
-- Progetto Supabase
-- (Opzionale) Google Maps API key per la mappa Google
+- Android Studio Ladybug o successivo (oppure solo Android SDK da riga di comando)
+- JDK 17 o 21 per Gradle (Gradle 8.9 non supporta JDK 25)
+- Android SDK Platform 35 + Build-Tools 35
+- Progetto Supabase (facoltativo: senza, l'app funziona come archivio locale)
+- (Opzionale) Google Maps API key; senza, la mappa usa OpenStreetMap
 
-## Avvio
-1. Aprire la cartella `android/` in Android Studio.
-2. Copiare `android/local.properties.example` in `android/local.properties` e impostare `sdk.dir`.
-3. Copiare `android/app/src/main/assets/config.properties.example` in `config.properties`.
-4. Impostare `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_MAPS_API_KEY`.
-5. Eseguire la migration `backend/migrations/001_initial_schema.sql` nel SQL Editor di Supabase.
-6. Sincronizzare Gradle e avviare su un dispositivo Android con GPS.
+## Configurazione
+1. Copiare `android/local.properties.example` in `android/local.properties` e impostare `sdk.dir`.
+   Facoltativo: aggiungere `GOOGLE_MAPS_API_KEY=...` nello stesso file.
+2. Copiare `android/app/src/main/assets/config.properties.example` in `config.properties`
+   e impostare `SUPABASE_URL` e `SUPABASE_ANON_KEY` (anon/publishable key).
+3. In Supabase, SQL Editor, eseguire in ordine:
+   `backend/migrations/001_initial_schema.sql`, `002_storage_policies.sql`, `003_sync_support.sql`.
+4. In Supabase → Authentication → Providers abilitare Email/Password. Con "Confirm email" attivo,
+   l'app mostra il messaggio di conferma e chiede di accedere dopo aver confermato.
+
+## Build e test
+```bash
+cd android
+./gradlew :app:testDebugUnitTest   # test unitari (merge sync, cursore, filtri, sessione)
+./gradlew :app:lintDebug
+./gradlew :app:assembleDebug       # APK in app/build/outputs/apk/debug/
+```
+Se il JDK di default è il 25: `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew ...`.
 
 ## Build APK con GitHub Actions
-La workflow `Build APK` compila l'APK debug a ogni push e pull request; è possibile avviarla anche manualmente dalla scheda Actions.
-Al termine, scaricare l'artifact `object-finder-debug-apk` dalla run. La secret repository `GOOGLE_MAPS_API_KEY` è opzionale: senza, l'APK viene comunque compilato ma Google Maps non è configurato.
+La workflow `Build APK` esegue test unitari, lint e compila l'APK debug a ogni push e pull request;
+è possibile avviarla anche manualmente dalla scheda Actions.
+Al termine, scaricare l'artifact `object-finder-debug-apk` dalla run. La secret repository
+`GOOGLE_MAPS_API_KEY` è opzionale: senza, l'APK viene comunque compilato e usa OpenStreetMap.
 
-## Funzioni MVP incluse nel codice
-- Dashboard minimale
-- Creazione e lista oggetti
-- Acquisizione posizione GPS
-- Persistenza locale Room
-- Repository con sincronizzazione Supabase REST/PostgREST
-- Worker WorkManager per sincronizzazione
-- Modello di progetto e oggetto
-- Schermata mappa con selettore Google Maps / OpenStreetMap e marker degli oggetti geolocalizzati
+## Funzioni incluse
+- Onboarding con login/registrazione Supabase (email + password) o uso offline senza account
+- Sessione persistente con refresh automatico del token; richieste REST autenticate (JWT utente)
+- Bootstrap automatico del progetto cloud al primo accesso; gli oggetti creati offline vengono
+  riassegnati al progetto e sincronizzati
+- Elenco oggetti con ricerca e filtri (in uso / archiviati / tutti), stato di sync per oggetto
+- Creazione e modifica oggetto: nome, categoria, stato, note, posizione GPS
+- Archiviazione/ripristino (soft delete sincronizzato)
+- Permessi posizione con spiegazione, gestione del rifiuto permanente e scorciatoia alle impostazioni
+- Acquisizione GPS ad alta precisione con fallback sull'ultima posizione nota
+- Sincronizzazione bidirezionale: push delle modifiche pending + pull incrementale con cursore,
+  sync immediata dopo ogni modifica (appena c'è rete) e periodica ogni ora
+- Mappa Google Maps / OpenStreetMap con preferenza salvata, fallback automatico su OSM senza API key,
+  apertura dell'oggetto dal marker
 
-## Nota sullo stato
-Questo è uno scaffold MVP sorgente. Non è stato compilato in questo ambiente e richiede configurazione delle credenziali, verifica delle versioni SDK e test su dispositivo.
-La sincronizzazione Supabase richiede ancora la milestone Auth: il client attuale usa la anon/publishable key ma non dispone di sessione utente, quindi le policy RLS rifiutano correttamente le scritture. Inoltre il progetto demo `default-project` va sostituito con un UUID di progetto creato per l'utente autenticato.
-Non inserire mai la `service_role` key nell'app: usare esclusivamente la anon/publishable key con RLS.
+## Note di sicurezza
+- Non inserire mai la `service_role` key nell'app: solo anon/publishable key con RLS.
+- I token di sessione sono in SharedPreferences private; backup cloud e trasferimento dispositivo
+  sono disabilitati (`allowBackup=false`, `data_extraction_rules.xml`).
 
 ## Cartografia
 - Google Maps: richiede API key e billing abilitato nel progetto Google Cloud.
-- OpenStreetMap: il provider OSM usa tile pubblici solo per sviluppo/test. Per produzione configurare un tile provider conforme ai termini d'uso, oppure un servizio commerciale/self-hosted.
-- L'interfaccia `MapProvider` consente di aggiungere MapLibre come provider OSM avanzato in una milestone successiva.
+- OpenStreetMap: il provider OSM usa tile pubblici solo per sviluppo/test. Per produzione configurare
+  un tile provider conforme ai termini d'uso, oppure un servizio commerciale/self-hosted.
+- `MapEngine` consente di aggiungere MapLibre come provider OSM avanzato in una milestone successiva.
 
-## Prossimi step
-1. Completare onboarding/auth Supabase e gestione sessione.
-2. Implementare upload immagini Supabase Storage.
-3. Implementare selezione Google Maps/OSM nelle impostazioni.
-4. Implementare QR/NFC.
-5. Implementare tracker BLE/GPS esterni e telemetria.
-6. Implementare matching immagini AI e ARCore.
+## Stato e prossimi step
+Vedi `docs/NEXT_STEPS.md`. In breve: inviti/membership, upload foto su Storage, QR/NFC,
+tracker BLE/GPS, matching immagini.
