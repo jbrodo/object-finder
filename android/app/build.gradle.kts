@@ -110,7 +110,7 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
 
     // Supabase: Auth (GoTrue) + PostgREST via Ktor.
     implementation("io.ktor:ktor-client-core:3.0.3")
@@ -118,7 +118,7 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // Credential Manager: salvataggio/recupero password con il gestore password di sistema.
     implementation("androidx.credentials:credentials:1.3.0")
@@ -142,5 +142,5 @@ dependencies {
     implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }
