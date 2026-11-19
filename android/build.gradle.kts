@@ -1,7 +1,9 @@
+// Toolchain: AGP 9 integra il supporto Kotlin (niente plugin org.jetbrains.kotlin.android).
+// Le versioni di Kotlin, plugin Compose/serialization e KSP vanno aggiornate insieme
+// (gruppo "kotlin-toolchain" di Dependabot).
 plugins {
-    id("com.android.application") version "8.7.3" apply false
-    id("org.jetbrains.kotlin.android") version "2.0.21" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21" apply false
-    id("com.google.devtools.ksp") version "2.0.21-1.0.28" apply false
+    id("com.android.application") version "9.5.1" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.21" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.21" apply false
+    id("com.google.devtools.ksp") version "2.3.14" apply false
 }

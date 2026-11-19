@@ -123,13 +123,12 @@ fun ProjectsScreen(viewModel: ProjectsViewModel, onBack: () -> Unit) {
 @Composable
 private fun ProjectRow(project: ActiveProject, active: Boolean, onClick: () -> Unit) {
     ListItem(
-        headlineContent = { Text(project.name) },
         supportingContent = { Text(project.role?.label ?: "") },
         trailingContent = {
             if (active) Icon(Icons.Default.CheckCircle, contentDescription = "Attivo", tint = MaterialTheme.colorScheme.primary)
         },
         modifier = Modifier.clickable(onClick = onClick),
-    )
+    ) { Text(project.name) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -199,7 +198,6 @@ fun MembersScreen(
                     }
                     items(state.invites, key = { "invite-${it.id}" }) { invite ->
                         ListItem(
-                            headlineContent = { Text(invite.email) },
                             supportingContent = { Text("${invite.role.label} · in attesa di registrazione") },
                             trailingContent = {
                                 Row {
@@ -211,7 +209,7 @@ fun MembersScreen(
                                     }
                                 }
                             },
-                        )
+                        ) { Text(invite.email) }
                         HorizontalDivider()
                     }
                     item(key = "members-header") {
@@ -297,7 +295,6 @@ private fun MemberRow(
 ) {
     var menu by remember { mutableStateOf(false) }
     ListItem(
-        headlineContent = { Text(member.email + if (member.isMe) " (tu)" else "") },
         supportingContent = { Text(member.role.label) },
         trailingContent = {
             if (canManage) Box {
@@ -313,7 +310,7 @@ private fun MemberRow(
                 }
             }
         },
-    )
+    ) { Text(member.email + if (member.isMe) " (tu)" else "") }
 }
 
 @Composable

@@ -137,14 +137,14 @@ fun ObjectFinderApp(
         }
     }
     val startScan: () -> Unit = {
-        (activity as? ComponentActivity)?.let { act ->
+        val act = activity as? ComponentActivity
+        if (act != null) {
             CodeScanner.scan(
                 act,
-            onResult = { handleScanned(it.raw) },
+                onResult = { handleScanned(it.raw) },
                 onError = { msg -> scope.launch { snackbar.showSnackbar(msg, duration = SnackbarDuration.Long) } },
             )
         }
-        Unit
     }
     val session by container.authRepository.session.collectAsStateWithLifecycle()
     val onboardingDone by container.settings.onboardingDone.collectAsStateWithLifecycle()
@@ -263,10 +263,9 @@ fun ObjectFinderApp(
                 Column {
                     choice.objects.forEach { item ->
                         ListItem(
-                            headlineContent = { Text(item.name) },
                             supportingContent = { Text(item.category) },
                             modifier = Modifier.clickable { choosing = null; nav.openObject(item.id) },
-                        )
+                        ) { Text(item.name) }
                     }
                 }
             },

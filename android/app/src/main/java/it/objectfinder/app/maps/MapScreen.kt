@@ -52,7 +52,7 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
+import com.google.maps.android.compose.rememberUpdatedMarkerState
 import it.objectfinder.app.data.local.ObjectEntity
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -212,7 +212,7 @@ private fun GoogleObjectsMap(
         markers.forEach { marker ->
             key(marker.id) {
                 Marker(
-                    state = rememberMarkerState(position = LatLng(marker.latitude, marker.longitude)),
+                    state = rememberUpdatedMarkerState(position = LatLng(marker.latitude, marker.longitude)),
                     title = marker.title,
                     snippet = "${marker.snippet} · tocca per aprire",
                     onInfoWindowClick = { onOpen(marker.id) },

@@ -1,17 +1,6 @@
 package it.objectfinder.app.ui.auth
 
 import android.app.Activity
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.autofill.AutofillNode
-import androidx.compose.ui.autofill.AutofillType
-import androidx.compose.ui.composed
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalAutofill
-import androidx.compose.ui.platform.LocalAutofillTree
-import androidx.compose.runtime.remember
 import androidx.credentials.CreatePasswordRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
@@ -19,23 +8,7 @@ import androidx.credentials.GetPasswordOption
 import androidx.credentials.PasswordCredential
 import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.GetCredentialException
-
-/**
- * Collega un campo al servizio di Autofill di Android (Google Password Manager o altro):
- * con [AutofillType.NewPassword] il gestore propone una password forte, con [AutofillType.Password]
- * compila quella salvata.
- */
-@OptIn(ExperimentalComposeUiApi::class)
-fun Modifier.autofill(types: List<AutofillType>, onFill: (String) -> Unit): Modifier = composed {
-    val autofill = LocalAutofill.current
-    val node = remember(types) { AutofillNode(autofillTypes = types, onFill = onFill) }
-    LocalAutofillTree.current += node
-    this
-        .onGloballyPositioned { node.boundingBox = it.boundsInWindow() }
-        .onFocusChanged { focus ->
-            autofill?.run { if (focus.isFocused) requestAutofillForNode(node) else cancelAutofillForNode(node) }
-        }
-}
+import androidx.credentials.exceptions.NoCredentialException
 
 /** Credential Manager: salvataggio e recupero della password dal gestore di sistema. */
 object SavedCredentials {
@@ -48,8 +21,10 @@ object SavedCredentials {
             GetCredentialRequest(listOf(GetPasswordOption())),
         )
         (response.credential as? PasswordCredential)?.let { Saved(it.id, it.password) }
+    } catch (_: NoCredentialException) {
+        null // nessuna password salvata per l'app: caso normale al primo accesso
     } catch (_: GetCredentialException) {
-        null // nessuna credenziale salvata, annullato o servizio non disponibile: si continua a mano
+        null // annullato o servizio non disponibile: si continua a mano
     }
 
     /** Chiede al gestore password di salvare/aggiornare le credenziali dopo un accesso riuscito. */

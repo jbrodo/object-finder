@@ -11,6 +11,8 @@
 - [x] Edit/archive object flows
 - [x] Real map screen and provider selector (preferenza persistita, fallback OSM)
 - [x] Gradle wrapper, unit test, lint in CI
+- [x] Toolchain aggiornata (AGP 9.5, Gradle 9.9, Kotlin 2.4, KSP 2.3, Compose 1.13, Room 2.8, Ktor 3.6)
+- [ ] targetSdk 37: valutare i cambi di comportamento di Android 17 su dispositivo reale
 
 ## M2 — Cloud identity and projects
 - [x] Supabase Auth login/signup (email + password, gestione conferma email)

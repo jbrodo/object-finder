@@ -11,8 +11,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.activity.compose.LocalActivity
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextObfuscationMode
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.material3.OutlinedSecureTextField
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Visibility
@@ -20,9 +27,6 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.autofill.AutofillType
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,7 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import it.objectfinder.app.data.AppContainer
 import it.objectfinder.app.data.AuthOutcome
@@ -55,8 +58,6 @@ private enum class AuthMode(val label: String) { SIGN_IN("Accedi"), SIGN_UP("Reg
  * Onboarding/login Supabase. L'account è facoltativo: senza, l'app resta un archivio locale.
  * Dopo l'accesso viene garantito un progetto cloud (bootstrap) e avviata la sincronizzazione.
  */
-// Autofill legacy di Compose 1.7 (AutofillType) è sperimentale ma è l'API disponibile con questo BOM.
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun AuthScreen(
     container: AppContainer,
@@ -66,7 +67,9 @@ fun AuthScreen(
     val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf(AuthMode.SIGN_IN) }
     var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    // Campo password sicuro (non copiabile, non registrato dalla tastiera); `password` legge sempre il valore attuale.
+    val passwordState = rememberTextFieldState()
+    val password by remember { derivedStateOf { passwordState.text.toString() } }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf<String?>(null) }
@@ -126,7 +129,7 @@ fun AuthScreen(
             }
             mode = AuthMode.SIGN_IN
             email = saved.email
-            password = saved.password
+            passwordState.setTextAndPlaceCursorAtEnd(saved.password)
             submit()
         }
     }
@@ -182,11 +185,10 @@ fun AuthScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .autofill(listOf(AutofillType.EmailAddress, AutofillType.Username)) { email = it },
+                    .semantics { contentType = ContentType.EmailAddress + ContentType.Username },
             )
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
+            OutlinedSecureTextField(
+                state = passwordState,
                 label = { Text("Password") },
                 supportingText = {
                     if (mode == AuthMode.SIGN_UP) {
@@ -204,9 +206,8 @@ fun AuthScreen(
                         )
                     }
                 },
-                singleLine = true,
                 isError = password.isNotEmpty() && !passwordValid,
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                textObfuscationMode = if (passwordVisible) TextObfuscationMode.Visible else TextObfuscationMode.RevealLastTyped,
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
@@ -215,18 +216,14 @@ fun AuthScreen(
                         )
                     }
                 },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
-                    autoCorrectEnabled = false,
-                ),
-                keyboardActions = KeyboardActions(onDone = { submit() }),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                onKeyboardAction = { submit() },
                 modifier = Modifier
                     .fillMaxWidth()
                     // "Nuova password" in registrazione: il gestore password propone una password forte.
-                    .autofill(
-                        listOf(if (mode == AuthMode.SIGN_UP) AutofillType.NewPassword else AutofillType.Password)
-                    ) { password = it },
+                    .semantics {
+                        contentType = if (mode == AuthMode.SIGN_UP) ContentType.NewPassword else ContentType.Password
+                    },
             )
 
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

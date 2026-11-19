@@ -5,9 +5,10 @@ Kotlin, Jetpack Compose, Room (offline-first), Supabase Auth + PostgREST, WorkMa
 Google Maps / OpenStreetMap tramite provider intercambiabili.
 
 ## Requisiti
-- Android Studio Ladybug o successivo (oppure solo Android SDK da riga di comando)
-- JDK 17 o 21 per Gradle (Gradle 8.9 non supporta JDK 25)
-- Android SDK Platform 35 + Build-Tools 35
+- Android Studio con supporto AGP 9 (oppure solo Android SDK da riga di comando)
+- JDK 17 o successivo
+- Android SDK Platform 37.1 (`platforms/android-37.1`, richiesta da Compose 1.13) + Build-Tools 37;
+  se manca, Gradle la scarica da solo (licenze SDK accettate)
 - Progetto Supabase (facoltativo: senza, l'app funziona come archivio locale)
 - (Opzionale) Google Maps API key; senza, la mappa usa OpenStreetMap
 
@@ -60,7 +61,9 @@ cd android
 ./gradlew :app:lintDebug
 ./gradlew :app:assembleDebug       # APK in app/build/outputs/apk/debug/
 ```
-Se il JDK di default è il 25: `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew ...`.
+Toolchain: Gradle 9.9, Android Gradle Plugin 9.5 (Kotlin integrato), Kotlin 2.4, KSP 2.3,
+Compose BOM 2026.11, Room 2.8, Ktor 3.6; compileSdk 37.1, targetSdk 36, minSdk 26.
+Le versioni che devono restare allineate sono raggruppate in `.github/dependabot.yml`.
 
 ## Build APK con GitHub Actions
 La workflow `Build APK` esegue test unitari, lint e compila l'APK debug a ogni push e pull request;
