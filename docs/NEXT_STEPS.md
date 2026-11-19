@@ -24,10 +24,11 @@
 - [ ] Cifratura token con Android Keystore
 
 ## M3 — Identification
-- [ ] CameraX capture
+- [x] Foto oggetto: scatto (app fotocamera di sistema) e galleria, normalizzazione JPEG
+- [ ] CameraX capture in-app (inquadratura guidata per il riconoscimento)
 - [ ] QR scanning
 - [ ] NFC read/write policy
-- [ ] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`)
+- [x] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`, migration 005)
 - [ ] Visual embeddings and similarity search
 
 ## M4 — Tracking
@@ -47,4 +48,8 @@
   ai gestori di progetto); da rivedere con il flusso inviti.
 - Login, sync e gestione membri sono verificati su Postgres con le migration, ma non ancora
   end-to-end contro un'istanza Supabase reale (GoTrue + PostgREST).
+- Le foto vengono scaricate tutte durante la sync (nessun download on-demand né limite di spazio):
+  da rivedere per progetti con molte foto.
+- Il file picker su emulatore API 30 non mostra file copiati via adb: l'import da galleria è stato
+  verificato solo per la parte comune con lo scatto (stessa pipeline `addPhoto`).
 - Nessuna eliminazione definitiva: l'archiviazione è il soft delete previsto per l'MVP.

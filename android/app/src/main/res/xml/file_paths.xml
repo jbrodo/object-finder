@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solo la cartella temporanea degli scatti è esposta all'app fotocamera. -->
+<paths>
+    <cache-path name="camera" path="camera/" />
+</paths>

@@ -3,6 +3,7 @@ package it.objectfinder.app.ui.objects
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import it.objectfinder.app.data.ObjectRepository
+import it.objectfinder.app.data.PhotoRepository
 import it.objectfinder.app.data.local.ObjectEntity
 import it.objectfinder.app.data.local.ObjectStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,20 +20,23 @@ data class ObjectListState(
     val query: String = "",
     val filter: ObjectFilter = ObjectFilter.ACTIVE,
     val loading: Boolean = true,
+    /** objectId → path della foto di copertina. */
+    val covers: Map<String, String> = emptyMap(),
 )
 
-class ObjectListViewModel(repository: ObjectRepository) : ViewModel() {
+class ObjectListViewModel(repository: ObjectRepository, photos: PhotoRepository) : ViewModel() {
     private val query = MutableStateFlow("")
     private val filter = MutableStateFlow(ObjectFilter.ACTIVE)
 
     val state: StateFlow<ObjectListState> =
-        combine(repository.observeObjects(), query, filter) { all, q, f ->
+        combine(repository.observeObjects(), query, filter, photos.observeCovers()) { all, q, f, covers ->
             ObjectListState(
                 items = filterObjects(all, q, f),
                 totalInProject = all.size,
                 query = q,
                 filter = f,
                 loading = false,
+                covers = covers,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ObjectListState())
 

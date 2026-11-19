@@ -89,7 +89,7 @@ fun ObjectFinderApp(container: AppContainer) {
             )
         }
         composable(Routes.OBJECTS) {
-            val vm = viewModel { ObjectListViewModel(container.objectRepository) }
+            val vm = viewModel { ObjectListViewModel(container.objectRepository, container.photoRepository) }
             MainShell(container, nav, Tab.OBJECTS, requestSync) { modifier ->
                 val active by container.settings.activeProject.collectAsStateWithLifecycle()
                 ObjectListScreen(
@@ -140,7 +140,14 @@ fun ObjectFinderApp(container: AppContainer) {
         composable(Routes.EDITOR) { entry ->
             val id = entry.arguments?.getString("id")
             val vm = viewModel(key = "editor-$id") {
-                ObjectEditorViewModel(id, container.objectRepository, LocationProvider(context), requestSync)
+                ObjectEditorViewModel(
+                    objectId = id,
+                    repository = container.objectRepository,
+                    photoRepository = container.photoRepository,
+                    locationProvider = LocationProvider(context),
+                    appScope = container.appScope,
+                    onLocalChange = requestSync,
+                )
             }
             val active by container.settings.activeProject.collectAsStateWithLifecycle()
             ObjectEditorScreen(

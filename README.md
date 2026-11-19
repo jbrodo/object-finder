@@ -18,7 +18,9 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
    e impostare `SUPABASE_URL` e `SUPABASE_ANON_KEY` (anon/publishable key).
 3. In Supabase, SQL Editor, eseguire in ordine:
    `backend/migrations/001_initial_schema.sql`, `002_storage_policies.sql`, `003_sync_support.sql`,
-   `004_project_members_rpc.sql`.
+   `004_project_members_rpc.sql`, `005_object_photos.sql`.
+   La 005 è necessaria per le foto: corregge le policy Storage della 002, che negavano sempre
+   lettura e upload.
 4. In Supabase → Authentication → Providers abilitare Email/Password. Con "Confirm email" attivo,
    l'app mostra il messaggio di conferma e chiede di accedere dopo aver confermato.
 
@@ -64,6 +66,9 @@ disinstallata l'app.
   permessi in app allineati alle policy RLS (viewer in sola lettura, gestione membri a owner/admin)
 - Elenco oggetti con ricerca e filtri (in uso / archiviati / tutti), stato di sync per oggetto
 - Creazione e modifica oggetto: nome, categoria, stato, note, posizione GPS
+- Foto degli oggetti: scatto o galleria, ridimensionate (max 1920 px, JPEG) senza metadati EXIF,
+  salvate in locale e caricate nel bucket privato `object-photos`; miniatura in elenco,
+  visualizzatore a schermo intero, eliminazione sincronizzata, download delle foto degli altri membri
 - Archiviazione/ripristino (soft delete sincronizzato)
 - Permessi posizione con spiegazione, gestione del rifiuto permanente e scorciatoia alle impostazioni
 - Acquisizione GPS ad alta precisione con fallback sull'ultima posizione nota

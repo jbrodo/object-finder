@@ -2,12 +2,14 @@ package it.objectfinder.app.data.remote
 
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -58,6 +60,18 @@ private data class RemoveMemberArgs(
     @SerialName("p_project") val project: String,
     @SerialName("p_user") val user: String,
 )
+
+@Serializable
+data class PhotoRowDto(
+    val id: String,
+    @SerialName("object_id") val objectId: String,
+    @SerialName("storage_path") val storagePath: String,
+    @SerialName("photo_type") val photoType: String = "reference",
+    @SerialName("captured_at") val capturedAt: String? = null,
+)
+
+@Serializable
+private data class StoragePrefixes(val prefixes: List<String>)
 
 /** Payload di scrittura: niente timestamp/version, gestiti dai trigger della migration 001. */
 @Serializable
@@ -169,6 +183,80 @@ class SupabaseRestApi(
             }
         }.body()
 
+    // ---- Foto: righe object_photos ----
+
+    /** Tutte le foto degli oggetti del progetto (embed inner per filtrare per progetto). */
+    suspend fun listPhotos(projectId: String): List<PhotoRowDto> = authorized { token ->
+        http.client.get("$rest/object_photos") {
+            auth(token)
+            parameter("select", "id,object_id,storage_path,photo_type,captured_at,objects!inner(project_id)")
+            parameter("objects.project_id", "eq.$projectId")
+            parameter("order", "created_at.asc")
+            parameter("limit", 5000)
+        }
+    }.body()
+
+    /** Inserimento idempotente: se la riga esiste già (retry dopo errore di rete) viene ignorata. */
+    suspend fun insertPhotoRow(row: PhotoRowDto) {
+        authorized { token ->
+            http.client.post("$rest/object_photos") {
+                auth(token)
+                parameter("on_conflict", "id")
+                header("Prefer", "resolution=ignore-duplicates,return=minimal")
+                contentType(ContentType.Application.Json)
+                setBody(row)
+            }
+        }
+    }
+
+    suspend fun deletePhotoRow(id: String) {
+        authorized { token ->
+            http.client.delete("$rest/object_photos") {
+                auth(token)
+                parameter("id", "eq.$id")
+            }
+        }
+    }
+
+    // ---- Foto: file su Storage (bucket privato) ----
+
+    suspend fun uploadPhoto(path: String, jpeg: ByteArray) {
+        http.requireConfigured()
+        val upload: suspend (String) -> HttpResponse = { token ->
+            http.client.post("${http.baseUrl}/storage/v1/object/$PHOTO_BUCKET/$path") {
+                auth(token)
+                header("x-upsert", "false")
+                contentType(ContentType.Image.JPEG)
+                setBody(jpeg)
+            }
+        }
+        var response = upload(tokens.validAccessToken())
+        if (response.status == HttpStatusCode.Unauthorized) response = upload(tokens.forceRefresh())
+        // Un retry dopo un upload riuscito ma non confermato riceve "already exists": va bene.
+        if (response.status == HttpStatusCode.Conflict || isDuplicate(response)) return
+        response.ensureSuccess()
+    }
+
+    suspend fun downloadPhoto(path: String): ByteArray = authorized { token ->
+        http.client.get("${http.baseUrl}/storage/v1/object/authenticated/$PHOTO_BUCKET/$path") { auth(token) }
+    }.body()
+
+    suspend fun deletePhotoFile(path: String) {
+        authorized { token ->
+            http.client.delete("${http.baseUrl}/storage/v1/object/$PHOTO_BUCKET") {
+                auth(token)
+                contentType(ContentType.Application.Json)
+                setBody(StoragePrefixes(listOf(path)))
+            }
+        }
+    }
+
+    private suspend fun isDuplicate(response: HttpResponse): Boolean {
+        if (response.status != HttpStatusCode.BadRequest) return false
+        val body = runCatching { response.bodyAsText() }.getOrDefault("")
+        return body.contains("already exists", ignoreCase = true) || body.contains("\"409\"")
+    }
+
     private fun HttpRequestBuilder.auth(token: String) {
         header("apikey", http.anonKey)
         header("Authorization", "Bearer $token")
@@ -182,8 +270,9 @@ class SupabaseRestApi(
         return block(tokens.forceRefresh()).ensureSuccess()
     }
 
-    private companion object {
-        const val OBJECT_COLUMNS =
+    companion object {
+        const val PHOTO_BUCKET = "object-photos"
+        private const val OBJECT_COLUMNS =
             "id,project_id,name,category,notes,status,latitude,longitude,accuracy_meters,version,created_at,updated_at"
     }
 }

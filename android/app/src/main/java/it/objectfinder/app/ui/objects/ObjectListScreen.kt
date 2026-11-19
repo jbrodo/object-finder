@@ -32,7 +32,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import coil.compose.AsyncImage
+import java.io.File
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -88,7 +93,7 @@ fun ObjectListScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(state.items, key = { it.id }) { item ->
-                        ObjectCard(item, onClick = { onOpenObject(item.id) })
+                        ObjectCard(item, cover = state.covers[item.id], onClick = { onOpenObject(item.id) })
                     }
                 }
             }
@@ -103,9 +108,18 @@ fun ObjectListScreen(
 }
 
 @Composable
-private fun ObjectCard(item: ObjectEntity, onClick: () -> Unit) {
+private fun ObjectCard(item: ObjectEntity, cover: String?, onClick: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+      Row(Modifier.padding(start = if (cover != null) 12.dp else 0.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (cover != null) {
+            AsyncImage(
+                model = File(cover),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
+            )
+        }
+        Column(Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     item.name,
@@ -141,6 +155,7 @@ private fun ObjectCard(item: ObjectEntity, onClick: () -> Unit) {
                 Text(item.notes, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
+      }
     }
 }
 

@@ -53,6 +53,8 @@ import java.util.Locale
 @Composable
 fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit, readOnly: Boolean = false) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val photos by viewModel.photos.collectAsStateWithLifecycle()
+    val photoBusy by viewModel.photoBusy.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val permission = rememberLocationPermissionRequester()
 
@@ -151,6 +153,15 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit, re
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            PhotoSection(
+                photos = photos,
+                busy = photoBusy,
+                readOnly = readOnly,
+                newCameraUri = viewModel::newCameraUri,
+                onAdd = viewModel::addPhoto,
+                onDelete = viewModel::deletePhoto,
+            )
+
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Posizione", style = MaterialTheme.typography.titleSmall)
@@ -180,7 +191,13 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit, re
             }
 
             if (!readOnly) Button(onClick = viewModel::save, enabled = state.canSave, modifier = Modifier.fillMaxWidth()) {
-                Text(if (state.isNew) "Registra oggetto" else "Salva modifiche")
+                Text(
+                    when {
+                        state.saving && state.locating -> "Attendo la posizione…"
+                        state.isNew -> "Registra oggetto"
+                        else -> "Salva modifiche"
+                    }
+                )
             }
         }
     }
