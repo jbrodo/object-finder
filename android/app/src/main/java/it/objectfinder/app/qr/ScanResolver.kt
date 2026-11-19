@@ -3,6 +3,7 @@ package it.objectfinder.app.qr
 import androidx.activity.ComponentActivity
 import com.google.android.gms.common.moduleinstall.ModuleInstall
 import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
+import com.google.mlkit.common.MlKitException
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
@@ -86,9 +87,11 @@ object CodeScanner {
      * download. Chiudere lo scanner non è un errore: nessun messaggio.
      */
     fun scan(activity: ComponentActivity, onResult: (ScannedCode) -> Unit, onError: (String) -> Unit) {
+        // Tutti i formati (QR + barcode prodotto EAN/UPC/Code128…): passare FORMAT_ALL_FORMATS (= 0)
+        // insieme a FORMAT_QR_CODE restringeva la scansione al solo QR.
+        // Niente auto-zoom: su alcuni dispositivi continua a ingrandire senza mai decodificare.
         val options = GmsBarcodeScannerOptions.Builder()
-            .setBarcodeFormats(Barcode.FORMAT_QR_CODE, Barcode.FORMAT_ALL_FORMATS)
-            .enableAutoZoom()
+            .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
             .build()
         val scanner = GmsBarcodeScanning.getClient(activity, options)
         val modules = ModuleInstall.getClient(activity)
@@ -116,7 +119,18 @@ object CodeScanner {
                 if (raw.isNullOrBlank()) onError("Codice vuoto")
                 else onResult(ScannedCode(raw, isQr = barcode.format == Barcode.FORMAT_QR_CODE))
             }
-            .addOnFailureListener { e -> onError("Scansione non riuscita: ${e.message ?: "riprova"}") }
+            .addOnFailureListener { e -> failureMessage(e)?.let(onError) }
         // Annullamento (finestra chiusa dall'utente): nessun messaggio.
+    }
+
+    /** Messaggio per un errore dello scanner; null se è un'uscita volontaria (nessun messaggio). */
+    internal fun failureMessage(e: Exception): String? = when ((e as? MlKitException)?.errorCode) {
+        MlKitException.CODE_SCANNER_CANCELLED, MlKitException.CANCELLED,
+        MlKitException.CODE_SCANNER_TASK_IN_PROGRESS -> null
+        MlKitException.CODE_SCANNER_UNAVAILABLE,
+        MlKitException.CODE_SCANNER_GOOGLE_PLAY_SERVICES_VERSION_TOO_OLD -> UNAVAILABLE_MESSAGE
+        MlKitException.CODE_SCANNER_CAMERA_PERMISSION_NOT_GRANTED ->
+            "Permesso fotocamera negato a Google Play services: abilitalo dalle impostazioni di sistema."
+        else -> "Scansione non riuscita: riprova inquadrando il codice da più vicino e con più luce."
     }
 }

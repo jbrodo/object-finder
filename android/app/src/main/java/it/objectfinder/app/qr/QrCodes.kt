@@ -33,7 +33,7 @@ object QrCodes {
     }
 
     /** Matrice QR (true = modulo scuro), con quiet zone di [margin] moduli. */
-    fun matrix(payload: String, margin: Int = 2): Array<BooleanArray> {
+    fun matrix(payload: String, margin: Int = 4): Array<BooleanArray> {
         val hints = mapOf(
             EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
             EncodeHintType.MARGIN to margin,
