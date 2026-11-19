@@ -2,7 +2,9 @@ package it.objectfinder.app.ui.objects
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import it.objectfinder.app.data.IdentifierRepository
 import it.objectfinder.app.data.ObjectRepository
+import it.objectfinder.app.data.PhotoRepository
 import it.objectfinder.app.data.local.ObjectEntity
 import it.objectfinder.app.data.local.ObjectStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,20 +21,29 @@ data class ObjectListState(
     val query: String = "",
     val filter: ObjectFilter = ObjectFilter.ACTIVE,
     val loading: Boolean = true,
+    /** objectId → path della foto di copertina. */
+    val covers: Map<String, String> = emptyMap(),
 )
 
-class ObjectListViewModel(repository: ObjectRepository) : ViewModel() {
+class ObjectListViewModel(
+    repository: ObjectRepository,
+    photos: PhotoRepository,
+    identifiers: IdentifierRepository,
+) : ViewModel() {
     private val query = MutableStateFlow("")
     private val filter = MutableStateFlow(ObjectFilter.ACTIVE)
 
     val state: StateFlow<ObjectListState> =
-        combine(repository.observeObjects(), query, filter) { all, q, f ->
+        combine(
+            repository.observeObjects(), query, filter, photos.observeCovers(), identifiers.observeValuesByObject(),
+        ) { all, q, f, covers, codes ->
             ObjectListState(
-                items = filterObjects(all, q, f),
+                items = filterObjects(all, q, f, codes),
                 totalInProject = all.size,
                 query = q,
                 filter = f,
                 loading = false,
+                covers = covers,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ObjectListState())
 
@@ -40,7 +51,12 @@ class ObjectListViewModel(repository: ObjectRepository) : ViewModel() {
     fun setFilter(value: ObjectFilter) { filter.value = value }
 }
 
-internal fun filterObjects(all: List<ObjectEntity>, query: String, filter: ObjectFilter): List<ObjectEntity> {
+internal fun filterObjects(
+    all: List<ObjectEntity>,
+    query: String,
+    filter: ObjectFilter,
+    codes: Map<String, List<String>> = emptyMap(),
+): List<ObjectEntity> {
     val q = query.trim()
     return all.filter { item ->
         val archived = item.statusEnum == ObjectStatus.ARCHIVED
@@ -52,6 +68,7 @@ internal fun filterObjects(all: List<ObjectEntity>, query: String, filter: Objec
         statusOk && (q.isEmpty() ||
             item.name.contains(q, ignoreCase = true) ||
             item.category.contains(q, ignoreCase = true) ||
-            item.notes.contains(q, ignoreCase = true))
+            item.notes.contains(q, ignoreCase = true) ||
+            codes[item.id].orEmpty().any { it.contains(q, ignoreCase = true) })
     }
 }

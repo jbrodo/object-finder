@@ -33,6 +33,8 @@ fun SettingsScreen(
     container: AppContainer,
     onSignIn: () -> Unit,
     onSyncNow: () -> Unit,
+    onOpenProjects: () -> Unit,
+    onOpenMembers: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -60,8 +62,21 @@ fun SettingsScreen(
                 }
             } else {
                 Text(current.email.ifBlank { current.userId })
-                Text("Progetto: ${project?.name ?: "in preparazione…"}", style = MaterialTheme.typography.bodyMedium)
                 OutlinedButton(onClick = { scope.launch { container.authRepository.signOut() } }) { Text("Esci") }
+            }
+        }
+
+        if (session != null) {
+            Section("Progetto") {
+                val active = project
+                Text(active?.name ?: "In preparazione…", style = MaterialTheme.typography.bodyLarge)
+                active?.role?.let {
+                    Text("Il tuo ruolo: ${it.label}", style = MaterialTheme.typography.bodyMedium)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onOpenProjects) { Text("Cambia o crea") }
+                    OutlinedButton(onClick = onOpenMembers, enabled = active?.role != null) { Text("Membri") }
+                }
             }
         }
 

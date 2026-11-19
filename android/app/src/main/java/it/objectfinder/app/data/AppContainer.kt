@@ -1,6 +1,9 @@
 package it.objectfinder.app.data
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import it.objectfinder.app.data.local.ObjectDatabase
 import it.objectfinder.app.data.remote.AppConfig
 import it.objectfinder.app.data.remote.SupabaseAuthApi
@@ -14,17 +17,24 @@ class AppContainer(context: Context) {
     private val database = ObjectDatabase.create(appContext)
     private val http = SupabaseHttp(config)
 
+    /** Scope di processo per lavori che devono sopravvivere a una schermata (es. pulizia file). */
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     val settings = SettingsStore(appContext)
     val sessionStore = SessionStore(appContext)
 
     val authRepository = AuthRepository(SupabaseAuthApi(http), sessionStore, settings)
     private val restApi = SupabaseRestApi(http, authRepository)
     val projectRepository = ProjectRepository(restApi, authRepository, settings, database.objectDao())
+    val photoRepository = PhotoRepository(appContext, database.photoDao(), restApi)
+    val identifierRepository = IdentifierRepository(database.identifierDao(), restApi)
     val objectRepository = ObjectRepository(
         dao = database.objectDao(),
         api = restApi,
         auth = authRepository,
         projects = projectRepository,
-        settings = settings
+        settings = settings,
+        photos = photoRepository,
+        identifiers = identifierRepository,
     )
 }

@@ -17,9 +17,14 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
 2. Copiare `android/app/src/main/assets/config.properties.example` in `config.properties`
    e impostare `SUPABASE_URL` e `SUPABASE_ANON_KEY` (anon/publishable key).
 3. In Supabase, SQL Editor, eseguire in ordine:
-   `backend/migrations/001_initial_schema.sql`, `002_storage_policies.sql`, `003_sync_support.sql`.
-4. In Supabase → Authentication → Providers abilitare Email/Password. Con "Confirm email" attivo,
-   l'app mostra il messaggio di conferma e chiede di accedere dopo aver confermato.
+   `backend/migrations/001_initial_schema.sql`, `002_storage_policies.sql`, `003_sync_support.sql`,
+   `004_project_members_rpc.sql`, `005_object_photos.sql`, `006_object_identifiers.sql`,
+   `007_project_invites.sql`.
+   La 005 è necessaria per le foto: corregge le policy Storage della 002, che negavano sempre
+   lettura e upload.
+4. In Supabase → Authentication → Providers abilitare Email/Password e **lasciare attivo
+   "Confirm email"**: gli inviti a progetto vengono accettati solo per email confermate; con
+   l'auto-conferma chiunque potrebbe registrarsi con l'email invitata.
 
 ## Build e test
 ```bash
@@ -36,13 +41,44 @@ La workflow `Build APK` esegue test unitari, lint e compila l'APK debug a ogni p
 Al termine, scaricare l'artifact `object-finder-debug-apk` dalla run. La secret repository
 `GOOGLE_MAPS_API_KEY` è opzionale: senza, l'APK viene comunque compilato e usa OpenStreetMap.
 
+## Release firmate (GitHub Releases)
+La workflow `Release APK` parte a ogni tag `vX.Y.Z` (o manualmente da Actions): esegue i test,
+compila l'APK release firmato, verifica la firma e lo pubblica come GitHub Release
+(`object-finder-vX.Y.Z.apk` + checksum SHA-256), scaricabile direttamente da chi ha accesso al repo.
+```bash
+git tag v0.3.0 && git push origin v0.3.0
+```
+Secret richiesti: `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`,
+`RELEASE_KEY_PASSWORD` (senza, la workflow fallisce invece di pubblicare un APK firmato debug).
+In locale la firma si attiva con le stesse chiavi come variabili d'ambiente o in `local.properties`
+(`RELEASE_KEYSTORE_PATH=...`); senza, `assembleRelease` usa la chiave debug.
+
+**Il keystore release non va perso**: senza la stessa chiave non si possono pubblicare aggiornamenti
+installabili sopra le versioni esistenti. Conservarne una copia sicura fuori dal repo.
+L'APK debug della CI e quello release hanno firme diverse: per passare dall'uno all'altro va
+disinstallata l'app.
+
 ## Funzioni incluse
 - Onboarding con login/registrazione Supabase (email + password) o uso offline senza account
 - Sessione persistente con refresh automatico del token; richieste REST autenticate (JWT utente)
 - Bootstrap automatico del progetto cloud al primo accesso; gli oggetti creati offline vengono
   riassegnati al progetto e sincronizzati
+- Progetti multipli: creazione, cambio progetto attivo, ruolo dell'utente per progetto
+- Membri: elenco, aggiunta per email, cambio ruolo, rimozione, uscita dal progetto; chi non ha
+  ancora un account riceve un invito (messaggio da condividere) che si attiva alla registrazione;
+  permessi in app allineati alle policy RLS (viewer in sola lettura, gestione membri a owner/admin)
 - Elenco oggetti con ricerca e filtri (in uso / archiviati / tutti), stato di sync per oggetto
 - Creazione e modifica oggetto: nome, categoria, stato, note, posizione GPS
+- Foto degli oggetti: scatto o galleria, ridimensionate (max 1920 px, JPEG) senza metadati EXIF,
+  salvate in locale e caricate nel bucket privato `object-photos`; miniatura in elenco,
+  visualizzatore a schermo intero, eliminazione sincronizzata, download delle foto degli altri membri
+- Etichette QR: ogni oggetto ha un QR (`objectfinder://object/<id>`, solo l'identificativo) da
+  condividere o stampare; scansione dall'app (scanner Google Play services, senza permesso
+  fotocamera) o con la fotocamera di sistema tramite deep link; se l'oggetto è in un altro progetto
+  l'app propone di passarci
+- Codici esistenti collegati agli oggetti (barcode del prodotto, numero di serie, QR di terzi):
+  scansionati o inseriti a mano; scansionandoli si apre l'oggetto (scelta se più oggetti hanno lo
+  stesso codice); la ricerca in elenco trova anche per codice
 - Archiviazione/ripristino (soft delete sincronizzato)
 - Permessi posizione con spiegazione, gestione del rifiuto permanente e scorciatoia alle impostazioni
 - Acquisizione GPS ad alta precisione con fallback sull'ultima posizione nota
@@ -63,5 +99,5 @@ Al termine, scaricare l'artifact `object-finder-debug-apk` dalla run. La secret 
 - `MapEngine` consente di aggiungere MapLibre come provider OSM avanzato in una milestone successiva.
 
 ## Stato e prossimi step
-Vedi `docs/NEXT_STEPS.md`. In breve: inviti/membership, upload foto su Storage, QR/NFC,
+Vedi `docs/NEXT_STEPS.md`. In breve: inviti a utenti non ancora registrati, upload foto su Storage, QR/NFC,
 tracker BLE/GPS, matching immagini.

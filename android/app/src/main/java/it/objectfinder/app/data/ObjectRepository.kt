@@ -9,12 +9,14 @@ import it.objectfinder.app.data.remote.SupabaseException
 import it.objectfinder.app.data.remote.SupabaseRestApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.UUID
 
-data class SyncReport(val pushed: Int, val pulled: Int)
+data class SyncReport(val pushed: Int, val pulled: Int, val photos: PhotoSyncReport? = null)
 
 data class ObjectDraft(
     val name: String,
@@ -32,6 +34,8 @@ class ObjectRepository(
     private val auth: AuthRepository,
     private val projects: ProjectRepository,
     private val settings: SettingsStore,
+    private val photos: PhotoRepository,
+    private val identifiers: IdentifierRepository,
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     private val syncMutex = Mutex()
@@ -44,12 +48,19 @@ class ObjectRepository(
 
     fun observeObject(id: String): Flow<ObjectEntity?> = dao.observeById(id)
 
-    fun observePendingCount(): Flow<Int> = dao.observePendingCount()
+    /** Modifiche locali in attesa di invio: oggetti + foto. */
+    fun observePendingCount(): Flow<Int> =
+        combine(
+            dao.observePendingCount(),
+            photos.observePendingCount(),
+            identifiers.observePendingCount(),
+        ) { objects, pics, codes -> objects + pics + codes }
 
     suspend fun get(id: String): ObjectEntity? = dao.getById(id)
 
-    suspend fun create(draft: ObjectDraft): ObjectEntity {
+    suspend fun create(draft: ObjectDraft, id: String = UUID.randomUUID().toString()): ObjectEntity {
         val item = ObjectEntity(
+            id = id,
             projectId = projects.currentProjectId,
             name = draft.name.trim(),
             category = draft.category.trim().ifBlank { "general" },
@@ -95,13 +106,23 @@ class ObjectRepository(
         val result = runCatching {
             if (auth.session.value == null) throw SupabaseException.NotAuthenticated()
             val project = projects.ensureActiveProject()
-            val pushed = push(project.id)
+            // Un viewer non può scrivere (RLS): si limita al pull.
+            val pushed = if (project.canEditObjects) push(project.id) else 0
             val pulled = pull(project.id)
-            SyncReport(pushed, pulled)
+            // Dopo gli oggetti: le policy Storage richiedono che l'oggetto esista sul server.
+            val codeChanges = identifiers.sync(project.id, canWrite = project.canEditObjects)
+            val photoReport = photos.sync(project.id, canWrite = project.canEditObjects)
+            SyncReport(pushed + codeChanges, pulled, photoReport)
         }
         settings.setSyncState(
             result.fold(
-                onSuccess = { SyncState.Done(now(), it.pushed, it.pulled) },
+                onSuccess = {
+                    SyncState.Done(
+                        atMillis = now(),
+                        pushed = it.pushed + (it.photos?.let { p -> p.uploaded + p.deleted } ?: 0),
+                        pulled = it.pulled + (it.photos?.downloaded ?: 0),
+                    )
+                },
                 onFailure = { SyncState.Failed(now(), it.message ?: it.javaClass.simpleName) },
             )
         )

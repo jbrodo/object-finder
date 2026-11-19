@@ -1,0 +1,100 @@
+name: Release APK
+
+# Pubblica una GitHub Release con l'APK release firmato a ogni tag vX.Y.Z
+# (es. `git tag v0.3.0 && git push origin v0.3.0`), oppure manualmente da Actions.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag da creare/pubblicare (es. v0.3.0)"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish signed APK
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate tag and signing secrets
+        env:
+          HAS_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' && secrets.RELEASE_KEYSTORE_PASSWORD != '' && secrets.RELEASE_KEY_ALIAS != '' && secrets.RELEASE_KEY_PASSWORD != '' }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::Tag '$TAG' non valido: usare vX.Y.Z (es. v0.3.0)"; exit 1
+          fi
+          # Una release firmata con chiave debug non sarebbe aggiornabile: meglio fallire.
+          if [[ "$HAS_KEYSTORE" != "true" ]]; then
+            echo "::error::Secret di firma mancanti (RELEASE_KEYSTORE_BASE64, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD)"; exit 1
+          fi
+          echo "VERSION_NAME=${TAG#v}" >> "$GITHUB_ENV"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+
+      - name: Unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon :app:testReleaseUnitTest
+
+      - name: Assemble signed release APK
+        working-directory: android
+        env:
+          RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: >
+          ./gradlew --no-daemon :app:assembleRelease
+          -PVERSION_NAME="$VERSION_NAME"
+          -PVERSION_CODE="$((100 + ${{ github.run_number }}))"
+          -PGOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
+
+      - name: Verify signature
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" | tee signature.txt
+          if grep -q "CN=Android Debug" signature.txt; then
+            echo "::error::APK firmato con la chiave debug"; exit 1
+          fi
+          cp "$APK" "object-finder-$TAG.apk"
+          sha256sum "object-finder-$TAG.apk" > "object-finder-$TAG.apk.sha256"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "object-finder-$TAG.apk" "object-finder-$TAG.apk.sha256" --clobber
+          else
+            gh release create "$TAG" "object-finder-$TAG.apk" "object-finder-$TAG.apk.sha256" \
+              --target "$GITHUB_SHA" --title "Object Finder $TAG" --generate-notes
+          fi
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

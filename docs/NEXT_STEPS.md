@@ -17,16 +17,20 @@
 - [x] Default project bootstrap after signup
 - [x] Authenticated REST requests (JWT, refresh automatico, retry su 401)
 - [x] Sync pull cursor (incrementale su `updated_at`) e regola di conflitto base
-- [ ] Create project flow / selezione tra più progetti
-- [ ] Membership invite flow
+- [x] Create project flow / selezione tra più progetti
+- [x] Membership flow: aggiunta per email, ruoli, rimozione, uscita (RPC migration 004)
+- [x] Inviti a email non ancora registrate (migration 007, accettazione al login con email confermata)
+- [ ] Invio email dell'invito lato server (Edge Function con service_role)
 - [ ] Conflitti multi-utente fini: confronto `version` lato server (RPC o Edge Function)
 - [ ] Cifratura token con Android Keystore
 
 ## M3 — Identification
-- [ ] CameraX capture
-- [ ] QR scanning
+- [x] Foto oggetto: scatto (app fotocamera di sistema) e galleria, normalizzazione JPEG
+- [ ] CameraX capture in-app (inquadratura guidata per il riconoscimento)
+- [x] QR: etichetta per oggetto (condividi/stampa), scansione in-app, deep link `objectfinder://object/<id>`
+- [x] Collegare codici esistenti (barcode prodotto, seriale) tramite `object_identifiers` (migration 006)
 - [ ] NFC read/write policy
-- [ ] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`)
+- [x] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`, migration 005)
 - [ ] Visual embeddings and similarity search
 
 ## M4 — Tracking
@@ -42,4 +46,16 @@
   cursore composto `(updated_at, id)`.
 - Dopo il logout gli oggetti cloud restano sul dispositivo ma non sono visibili finché non si
   riaccede allo stesso account.
+- `invite_project_member` rivela a owner/admin se un'email ha già un account ("aggiunto" vs
+  "invitato"): enumerazione limitata ai gestori di progetto.
+- Gli inviti non hanno scadenza; si revocano manualmente dalla schermata Membri.
+- Login, sync e gestione membri sono verificati su Postgres con le migration, ma non ancora
+  end-to-end contro un'istanza Supabase reale (GoTrue + PostgREST).
+- Le foto vengono scaricate tutte durante la sync (nessun download on-demand né limite di spazio):
+  da rivedere per progetti con molte foto.
+- Il file picker su emulatore API 30 non mostra file copiati via adb: l'import da galleria è stato
+  verificato solo per la parte comune con lo scatto (stessa pipeline `addPhoto`).
+- Lo scanner QR in-app richiede Google Play services recente (modulo scaricato on-demand); sul
+  vecchio emulatore API 30 non è disponibile e l'app lo segnala. Verificati deep link (a freddo e a
+  caldo), generazione/decodifica del QR e risoluzione; la lettura reale va provata su dispositivo.
 - Nessuna eliminazione definitiva: l'archiviazione è il soft delete previsto per l'MVP.

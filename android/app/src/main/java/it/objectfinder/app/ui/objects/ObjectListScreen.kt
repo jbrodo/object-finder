@@ -32,7 +32,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import coil.compose.AsyncImage
+import java.io.File
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,6 +51,7 @@ fun ObjectListScreen(
     onOpenObject: (String) -> Unit,
     onCreateObject: () -> Unit,
     modifier: Modifier = Modifier,
+    canCreate: Boolean = true,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -53,7 +59,7 @@ fun ObjectListScreen(
         OutlinedTextField(
             value = state.query,
             onValueChange = viewModel::setQuery,
-            placeholder = { Text("Cerca per nome, categoria, note") },
+            placeholder = { Text("Cerca nome, note o codice") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -87,11 +93,11 @@ fun ObjectListScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(state.items, key = { it.id }) { item ->
-                        ObjectCard(item, onClick = { onOpenObject(item.id) })
+                        ObjectCard(item, cover = state.covers[item.id], onClick = { onOpenObject(item.id) })
                     }
                 }
             }
-            ExtendedFloatingActionButton(
+            if (canCreate) ExtendedFloatingActionButton(
                 onClick = onCreateObject,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Registra oggetto") },
@@ -102,9 +108,18 @@ fun ObjectListScreen(
 }
 
 @Composable
-private fun ObjectCard(item: ObjectEntity, onClick: () -> Unit) {
+private fun ObjectCard(item: ObjectEntity, cover: String?, onClick: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+      Row(Modifier.padding(start = if (cover != null) 12.dp else 0.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (cover != null) {
+            AsyncImage(
+                model = File(cover),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
+            )
+        }
+        Column(Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     item.name,
@@ -140,6 +155,7 @@ private fun ObjectCard(item: ObjectEntity, onClick: () -> Unit) {
                 Text(item.notes, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
+      }
     }
 }
 

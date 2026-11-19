@@ -3,7 +3,20 @@ package it.objectfinder.app.ui.objects
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import it.objectfinder.app.data.ObjectDraft
+import android.net.Uri
 import it.objectfinder.app.data.ObjectRepository
+import it.objectfinder.app.data.AddIdentifierResult
+import it.objectfinder.app.data.IdentifierRepository
+import it.objectfinder.app.data.PhotoRepository
+import it.objectfinder.app.data.local.IdentifierEntity
+import it.objectfinder.app.data.local.IdentifierType
+import it.objectfinder.app.qr.QrCodes
+import it.objectfinder.app.data.local.PhotoEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import java.util.UUID
 import it.objectfinder.app.data.local.ObjectStatus
 import it.objectfinder.app.location.LocationProvider
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +43,8 @@ data class EditorState(
     /** true quando il salvataggio è completato e la schermata può chiudersi. */
     val finished: Boolean = false,
 ) {
-    val canSave: Boolean get() = loaded && name.isNotBlank() && !saving && !locating
+    // Si può salvare anche durante l'acquisizione GPS: il salvataggio ne attende la fine.
+    val canSave: Boolean get() = loaded && name.isNotBlank() && !saving
     val hasLocation: Boolean get() = latitude != null && longitude != null
     val isArchived: Boolean get() = status == ObjectStatus.ARCHIVED
 }
@@ -39,11 +53,83 @@ data class EditorState(
 class ObjectEditorViewModel(
     private val objectId: String?,
     private val repository: ObjectRepository,
+    private val photoRepository: PhotoRepository,
+    private val identifierRepository: IdentifierRepository,
     private val locationProvider: LocationProvider,
+    private val appScope: CoroutineScope,
     private val onLocalChange: () -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(EditorState(isNew = objectId == null, loaded = objectId == null))
     val state: StateFlow<EditorState> = _state.asStateFlow()
+
+    /** Id stabile anche per un oggetto nuovo: le foto possono essere allegate prima del salvataggio. */
+    private val effectiveId: String = objectId ?: UUID.randomUUID().toString()
+    private var saved = false
+    private var locateJob: Job? = null
+
+    val photos: StateFlow<List<PhotoEntity>> = photoRepository.observeForObject(effectiveId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _photoBusy = MutableStateFlow(false)
+    val photoBusy: StateFlow<Boolean> = _photoBusy.asStateFlow()
+
+    val identifiers: StateFlow<List<IdentifierEntity>> = identifierRepository.observeForObject(effectiveId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Collega un codice esistente (scansionato o digitato) all'oggetto. */
+    fun addCode(type: IdentifierType, raw: String) {
+        if (QrCodes.parseObjectId(raw) != null) {
+            _state.update { it.copy(message = "È un'etichetta Object Finder: identifica già un oggetto, non va collegata.") }
+            return
+        }
+        viewModelScope.launch {
+            val message = when (identifierRepository.add(effectiveId, type, raw)) {
+                AddIdentifierResult.Added -> {
+                    if (objectId != null) onLocalChange()
+                    "Codice collegato"
+                }
+                AddIdentifierResult.Duplicate -> "Codice già collegato a questo oggetto"
+                AddIdentifierResult.Invalid -> "Codice non valido"
+            }
+            _state.update { it.copy(message = message) }
+        }
+    }
+
+    fun deleteCode(id: String) {
+        viewModelScope.launch {
+            identifierRepository.delete(id)
+            if (objectId != null) onLocalChange()
+        }
+    }
+
+    fun showMessage(text: String) = _state.update { it.copy(message = text) }
+
+    fun newCameraUri(): Uri = photoRepository.newCameraUri()
+
+    fun addPhoto(uri: Uri) {
+        _photoBusy.value = true
+        viewModelScope.launch {
+            runCatching { photoRepository.addPhoto(effectiveId, uri) }
+                .onSuccess { if (objectId != null) onLocalChange() }
+                .onFailure { e -> _state.update { it.copy(message = "Foto non salvata: ${e.message ?: "errore"}") } }
+            _photoBusy.value = false
+        }
+    }
+
+    fun deletePhoto(photoId: String) {
+        viewModelScope.launch {
+            photoRepository.deletePhoto(photoId)
+            if (objectId != null) onLocalChange()
+        }
+    }
+
+    override fun onCleared() {
+        // Editor di un oggetto nuovo chiuso senza salvare: niente foto orfane su disco.
+        if (objectId == null && !saved) appScope.launch {
+            photoRepository.discardAllForObject(effectiveId)
+            identifierRepository.discardAllForObject(effectiveId)
+        }
+    }
 
     init {
         if (objectId != null) viewModelScope.launch {
@@ -75,7 +161,7 @@ class ObjectEditorViewModel(
     fun captureLocation() {
         if (_state.value.locating) return
         _state.update { it.copy(locating = true) }
-        viewModelScope.launch {
+        locateJob = viewModelScope.launch {
             val location = runCatching { locationProvider.currentLocation() }.getOrNull()
             _state.update {
                 if (location == null) it.copy(
@@ -94,12 +180,14 @@ class ObjectEditorViewModel(
     }
 
     fun save() {
-        val s = _state.value
-        if (!s.canSave) return
+        if (!_state.value.canSave) return
         _state.update { it.copy(saving = true) }
         viewModelScope.launch {
+            locateJob?.join()
+            val s = _state.value
             val draft = ObjectDraft(s.name, s.category, s.notes, s.status, s.latitude, s.longitude, s.accuracyMeters)
-            if (objectId == null) repository.create(draft) else repository.update(objectId, draft)
+            if (objectId == null) repository.create(draft, effectiveId) else repository.update(objectId, draft)
+            saved = true
             onLocalChange()
             _state.update { it.copy(saving = false, finished = true) }
         }

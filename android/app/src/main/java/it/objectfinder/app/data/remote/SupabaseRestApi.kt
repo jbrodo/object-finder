@@ -2,17 +2,20 @@ package it.objectfinder.app.data.remote
 
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 
 @Serializable
 data class ProjectDto(
@@ -21,6 +24,83 @@ data class ProjectDto(
     val description: String = "",
     @SerialName("owner_id") val ownerId: String,
 )
+
+@Serializable
+data class MembershipRoleDto(val role: String)
+
+/** Progetto con il ruolo dell'utente corrente (embed inner su project_members). */
+@Serializable
+data class ProjectWithRoleDto(
+    val id: String,
+    val name: String,
+    val description: String = "",
+    @SerialName("owner_id") val ownerId: String,
+    @SerialName("project_members") val memberships: List<MembershipRoleDto> = emptyList(),
+)
+
+@Serializable
+data class ProjectMemberDto(
+    @SerialName("user_id") val userId: String,
+    val email: String? = null,
+    val role: String,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+private data class ProjectArg(@SerialName("p_project") val project: String)
+
+@Serializable
+private data class AddMemberArgs(
+    @SerialName("p_project") val project: String,
+    @SerialName("p_email") val email: String,
+    @SerialName("p_role") val role: String,
+)
+
+@Serializable
+private data class RemoveMemberArgs(
+    @SerialName("p_project") val project: String,
+    @SerialName("p_user") val user: String,
+)
+
+@Serializable
+data class PhotoRowDto(
+    val id: String,
+    @SerialName("object_id") val objectId: String,
+    @SerialName("storage_path") val storagePath: String,
+    @SerialName("photo_type") val photoType: String = "reference",
+    @SerialName("captured_at") val capturedAt: String? = null,
+)
+
+@Serializable
+data class IdentifierRowDto(
+    val id: String,
+    @SerialName("object_id") val objectId: String,
+    @SerialName("identifier_type") val type: String,
+    @SerialName("identifier_value") val value: String,
+)
+
+@Serializable
+data class InviteDto(
+    val id: String,
+    @SerialName("project_id") val projectId: String,
+    val email: String,
+    val role: String,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("accepted_at") val acceptedAt: String? = null,
+)
+
+@Serializable
+private data class InviteArgs(
+    @SerialName("p_project") val project: String,
+    @SerialName("p_email") val email: String,
+    @SerialName("p_role") val role: String,
+)
+
+@Serializable
+private class NoArgs
+
+@Serializable
+private data class StoragePrefixes(val prefixes: List<String>)
 
 /** Payload di scrittura: niente timestamp/version, gestiti dai trigger della migration 001. */
 @Serializable
@@ -64,13 +144,33 @@ class SupabaseRestApi(
 ) {
     private val rest get() = "${http.baseUrl}/rest/v1"
 
-    suspend fun listProjects(): List<ProjectDto> = authorized { token ->
+    /** Progetti dell'utente con il suo ruolo (RLS restituisce solo quelli di cui è membro). */
+    suspend fun listProjects(userId: String): List<ProjectWithRoleDto> = authorized { token ->
         http.client.get("$rest/projects") {
             auth(token)
-            parameter("select", "id,name,description,owner_id")
+            parameter("select", "id,name,description,owner_id,project_members!inner(role)")
+            parameter("project_members.user_id", "eq.$userId")
             parameter("order", "created_at.asc")
         }
     }.body()
+
+    suspend fun listMembers(projectId: String): List<ProjectMemberDto> = rpc("list_project_members", ProjectArg(projectId)).body()
+
+    suspend fun addMember(projectId: String, email: String, role: String) {
+        rpc("add_project_member", AddMemberArgs(projectId, email, role))
+    }
+
+    suspend fun removeMember(projectId: String, userId: String) {
+        rpc("remove_project_member", RemoveMemberArgs(projectId, userId))
+    }
+
+    private suspend inline fun <reified T : Any> rpc(function: String, args: T): HttpResponse = authorized { token ->
+        http.client.post("$rest/rpc/$function") {
+            auth(token)
+            contentType(ContentType.Application.Json)
+            setBody(args)
+        }
+    }
 
     /**
      * L'id è generato dal client e la risposta è `return=minimal`: la policy SELECT su projects
@@ -112,6 +212,141 @@ class SupabaseRestApi(
             }
         }.body()
 
+    // ---- Foto: righe object_photos ----
+
+    /** Tutte le foto degli oggetti del progetto (embed inner per filtrare per progetto). */
+    suspend fun listPhotos(projectId: String): List<PhotoRowDto> = authorized { token ->
+        http.client.get("$rest/object_photos") {
+            auth(token)
+            parameter("select", "id,object_id,storage_path,photo_type,captured_at,objects!inner(project_id)")
+            parameter("objects.project_id", "eq.$projectId")
+            parameter("order", "created_at.asc")
+            parameter("limit", 5000)
+        }
+    }.body()
+
+    /** Inserimento idempotente: se la riga esiste già (retry dopo errore di rete) viene ignorata. */
+    suspend fun insertPhotoRow(row: PhotoRowDto) {
+        authorized { token ->
+            http.client.post("$rest/object_photos") {
+                auth(token)
+                parameter("on_conflict", "id")
+                header("Prefer", "resolution=ignore-duplicates,return=minimal")
+                contentType(ContentType.Application.Json)
+                setBody(row)
+            }
+        }
+    }
+
+    suspend fun deletePhotoRow(id: String) {
+        authorized { token ->
+            http.client.delete("$rest/object_photos") {
+                auth(token)
+                parameter("id", "eq.$id")
+            }
+        }
+    }
+
+    // ---- Codici collegati (object_identifiers) ----
+
+    suspend fun listIdentifiers(projectId: String): List<IdentifierRowDto> = authorized { token ->
+        http.client.get("$rest/object_identifiers") {
+            auth(token)
+            parameter("select", "id,object_id,identifier_type,identifier_value,objects!inner(project_id)")
+            parameter("objects.project_id", "eq.$projectId")
+            parameter("order", "created_at.asc")
+            parameter("limit", 10000)
+        }
+    }.body()
+
+    suspend fun insertIdentifier(row: IdentifierRowDto) {
+        authorized { token ->
+            http.client.post("$rest/object_identifiers") {
+                auth(token)
+                parameter("on_conflict", "id")
+                header("Prefer", "resolution=ignore-duplicates,return=minimal")
+                contentType(ContentType.Application.Json)
+                setBody(row)
+            }
+        }
+    }
+
+    suspend fun deleteIdentifier(id: String) {
+        authorized { token ->
+            http.client.delete("$rest/object_identifiers") {
+                auth(token)
+                parameter("id", "eq.$id")
+            }
+        }
+    }
+
+    // ---- Inviti (migration 007) ----
+
+    /** 'added' se l'account esiste (aggiunto subito), 'invited' se è stato creato un invito. */
+    suspend fun inviteMember(projectId: String, email: String, role: String): String =
+        // PostgREST restituisce uno scalare JSON ("invited"): body<String>() darebbe il testo grezzo con le virgolette.
+        supabaseJson.decodeFromString(String.serializer(), rpc("invite_project_member", InviteArgs(projectId, email, role)).bodyAsText())
+
+    suspend fun acceptMyInvites(): Int = rpc("accept_my_invites", NoArgs()).body<Int>()
+
+    suspend fun listPendingInvites(projectId: String): List<InviteDto> = authorized { token ->
+        http.client.get("$rest/project_invites") {
+            auth(token)
+            parameter("select", "id,project_id,email,role,created_at,accepted_at")
+            parameter("project_id", "eq.$projectId")
+            parameter("accepted_at", "is.null")
+            parameter("order", "created_at.desc")
+        }
+    }.body()
+
+    suspend fun revokeInvite(id: String) {
+        authorized { token ->
+            http.client.delete("$rest/project_invites") {
+                auth(token)
+                parameter("id", "eq.$id")
+            }
+        }
+    }
+
+    // ---- Foto: file su Storage (bucket privato) ----
+
+    suspend fun uploadPhoto(path: String, jpeg: ByteArray) {
+        http.requireConfigured()
+        val upload: suspend (String) -> HttpResponse = { token ->
+            http.client.post("${http.baseUrl}/storage/v1/object/$PHOTO_BUCKET/$path") {
+                auth(token)
+                header("x-upsert", "false")
+                contentType(ContentType.Image.JPEG)
+                setBody(jpeg)
+            }
+        }
+        var response = upload(tokens.validAccessToken())
+        if (response.status == HttpStatusCode.Unauthorized) response = upload(tokens.forceRefresh())
+        // Un retry dopo un upload riuscito ma non confermato riceve "already exists": va bene.
+        if (response.status == HttpStatusCode.Conflict || isDuplicate(response)) return
+        response.ensureSuccess()
+    }
+
+    suspend fun downloadPhoto(path: String): ByteArray = authorized { token ->
+        http.client.get("${http.baseUrl}/storage/v1/object/authenticated/$PHOTO_BUCKET/$path") { auth(token) }
+    }.body()
+
+    suspend fun deletePhotoFile(path: String) {
+        authorized { token ->
+            http.client.delete("${http.baseUrl}/storage/v1/object/$PHOTO_BUCKET") {
+                auth(token)
+                contentType(ContentType.Application.Json)
+                setBody(StoragePrefixes(listOf(path)))
+            }
+        }
+    }
+
+    private suspend fun isDuplicate(response: HttpResponse): Boolean {
+        if (response.status != HttpStatusCode.BadRequest) return false
+        val body = runCatching { response.bodyAsText() }.getOrDefault("")
+        return body.contains("already exists", ignoreCase = true) || body.contains("\"409\"")
+    }
+
     private fun HttpRequestBuilder.auth(token: String) {
         header("apikey", http.anonKey)
         header("Authorization", "Bearer $token")
@@ -125,8 +360,9 @@ class SupabaseRestApi(
         return block(tokens.forceRefresh()).ensureSuccess()
     }
 
-    private companion object {
-        const val OBJECT_COLUMNS =
+    companion object {
+        const val PHOTO_BUCKET = "object-photos"
+        private const val OBJECT_COLUMNS =
             "id,project_id,name,category,notes,status,latitude,longitude,accuracy_meters,version,created_at,updated_at"
     }
 }

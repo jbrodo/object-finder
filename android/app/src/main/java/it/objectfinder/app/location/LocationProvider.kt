@@ -24,6 +24,14 @@ class LocationProvider(context: Context) {
 
     fun hasPermission(): Boolean = hasLocationPermission(appContext)
 
+    /** Ultima posizione nota (istantanea, può essere vecchia): utile per un primo centraggio. */
+    @SuppressLint("MissingPermission")
+    suspend fun lastKnownLocation(): DeviceLocation? {
+        if (!hasPermission()) return null
+        val location = runCatching { client.lastLocation.await() }.getOrNull() ?: return null
+        return DeviceLocation(location.latitude, location.longitude, location.accuracy)
+    }
+
     /**
      * Fix "fresco" ad alta precisione (max 15 s); se non disponibile ripiega sull'ultima
      * posizione nota. Restituisce null se GPS spento o permesso negato.
