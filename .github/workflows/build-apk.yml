@@ -25,6 +25,30 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Configure Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::warning::Secret SUPABASE_URL/SUPABASE_ANON_KEY assenti: APK senza Supabase (solo offline)"
+            exit 0
+          fi
+          # Nell'app va solo la chiave anon/publishable: una chiave privilegiata scavalca la RLS.
+          if [[ "$SUPABASE_ANON_KEY" == sb_secret_* ]]; then
+            echo "::error::SUPABASE_ANON_KEY è una Secret key: usare la Publishable/anon key"; exit 1
+          fi
+          payload=$(echo "$SUPABASE_ANON_KEY" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null || true)
+          if echo "$payload" | grep -q '"service_role"'; then
+            echo "::error::SUPABASE_ANON_KEY è la service_role key: usare la anon key"; exit 1
+          fi
+          if [[ "$SUPABASE_URL" != https://* ]]; then
+            echo "::error::SUPABASE_URL deve iniziare con https://"; exit 1
+          fi
+          printf 'SUPABASE_URL=%s\nSUPABASE_ANON_KEY=%s\n' "$SUPABASE_URL" "$SUPABASE_ANON_KEY" \
+            > android/app/src/main/assets/config.properties
+          echo "Supabase configurato: $SUPABASE_URL"
+
       - name: Unit tests and lint
         working-directory: android
         run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug
