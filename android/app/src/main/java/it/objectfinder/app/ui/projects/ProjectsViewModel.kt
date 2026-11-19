@@ -3,6 +3,8 @@ package it.objectfinder.app.ui.projects
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import it.objectfinder.app.data.ActiveProject
+import it.objectfinder.app.data.InviteResult
+import it.objectfinder.app.data.PendingInvite
 import it.objectfinder.app.data.ProjectMember
 import it.objectfinder.app.data.ProjectRepository
 import it.objectfinder.app.data.ProjectRole
@@ -67,6 +69,9 @@ class ProjectsViewModel(
 
 data class MembersUiState(
     val members: List<ProjectMember> = emptyList(),
+    val invites: List<PendingInvite> = emptyList(),
+    /** Invito appena creato: la UI propone di condividerlo. */
+    val justInvited: PendingInvite? = null,
     val loaded: Boolean = false,
     val op: OpState = OpState(),
     /** true dopo l'uscita dal progetto: la schermata si chiude. */
@@ -84,10 +89,26 @@ class MembersViewModel(
 
     fun reload() = run { load() }
 
-    fun add(email: String, role: ProjectRole) = run(done = "Membro aggiunto") {
-        repository.addMember(email, role)
+    fun add(email: String, role: ProjectRole) = run {
+        val result = repository.inviteMember(email, role)
+        load()
+        if (result == InviteResult.INVITED) {
+            val invite = _state.value.invites.firstOrNull { it.email.equals(email.trim(), ignoreCase = true) }
+                ?: PendingInvite("", email.trim().lowercase(), role)
+            _state.update { it.copy(justInvited = invite) }
+        } else {
+            _state.update { it.copy(op = it.op.copy(message = "Membro aggiunto")) }
+        }
+    }
+
+    fun revokeInvite(invite: PendingInvite) = run(done = "Invito revocato") {
+        repository.revokeInvite(invite.id)
         load()
     }
+
+    fun shareInvite(invite: PendingInvite) = _state.update { it.copy(justInvited = invite) }
+
+    fun consumeInvite() = _state.update { it.copy(justInvited = null) }
 
     fun changeRole(member: ProjectMember, role: ProjectRole) = run(done = "Ruolo aggiornato") {
         repository.addMember(member.email, role)
@@ -109,7 +130,9 @@ class MembersViewModel(
 
     private suspend fun load() {
         val members = repository.listMembers()
-        _state.update { it.copy(members = members, loaded = true) }
+        // Gli inviti sono visibili solo a owner/admin (RLS): per gli altri l'elenco è vuoto.
+        val invites = runCatching { repository.listPendingInvites() }.getOrDefault(emptyList())
+        _state.update { it.copy(members = members, invites = invites, loaded = true) }
     }
 
     private fun run(done: String? = null, block: suspend () -> Unit) {
@@ -117,10 +140,14 @@ class MembersViewModel(
         _state.update { it.copy(op = OpState(busy = true)) }
         viewModelScope.launch {
             val result = runCatching { block() }
-            _state.update {
-                it.copy(
+            _state.update { current ->
+                current.copy(
                     loaded = true,
-                    op = result.fold({ OpState(message = done) }, { e -> OpState(message = e.userMessage()) }),
+                    op = result.fold(
+                        // Un messaggio impostato dal blocco stesso (es. "Membro aggiunto") non va perso.
+                        onSuccess = { OpState(message = done ?: current.op.message) },
+                        onFailure = { e -> OpState(message = e.userMessage()) },
+                    ),
                 )
             }
         }

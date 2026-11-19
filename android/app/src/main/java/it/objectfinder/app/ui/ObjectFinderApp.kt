@@ -2,7 +2,14 @@ package it.objectfinder.app.ui
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -94,6 +101,7 @@ fun ObjectFinderApp(
     val resolver = remember(container) {
         ScanResolver(
             findObject = { container.objectRepository.get(it) },
+            findObjectsByCode = { container.identifierRepository.findObjects(it) },
             currentProjectId = { container.projectRepository.currentProjectId },
             knownProjects = {
                 // A freddo l'elenco può non essere ancora caricato: si aggiorna (best-effort).
@@ -105,12 +113,15 @@ fun ObjectFinderApp(
         )
     }
 
+    var choosing by remember { mutableStateOf<ScanOutcome.Choose?>(null) }
+
     /** Gestisce un contenuto scansionato o un deep link: apre l'oggetto o spiega perché no. */
     fun handleScanned(raw: String) {
         scope.launch {
             when (val outcome = resolver.resolve(raw)) {
                 is ScanOutcome.Open -> nav.openObject(outcome.objectId)
-                is ScanOutcome.Message -> snackbar.showSnackbar(outcome.text)
+                is ScanOutcome.Message -> snackbar.showSnackbar(outcome.text, duration = SnackbarDuration.Long)
+                is ScanOutcome.Choose -> choosing = outcome
                 is ScanOutcome.SwitchProject -> {
                     val result = snackbar.showSnackbar(
                         message = "«${outcome.objectName}» è nel progetto «${outcome.project.name}»",
@@ -129,7 +140,7 @@ fun ObjectFinderApp(
         (activity as? ComponentActivity)?.let { act ->
             CodeScanner.scan(
                 act,
-            onResult = ::handleScanned,
+            onResult = { handleScanned(it.raw) },
                 onError = { msg -> scope.launch { snackbar.showSnackbar(msg, duration = SnackbarDuration.Long) } },
             )
         }
@@ -167,7 +178,7 @@ fun ObjectFinderApp(
             )
         }
         composable(Routes.OBJECTS) {
-            val vm = viewModel { ObjectListViewModel(container.objectRepository, container.photoRepository) }
+            val vm = viewModel { ObjectListViewModel(container.objectRepository, container.photoRepository, container.identifierRepository) }
             MainShell(container, nav, Tab.OBJECTS, requestSync, startScan) { modifier ->
                 val active by container.settings.activeProject.collectAsStateWithLifecycle()
                 ObjectListScreen(
@@ -222,6 +233,7 @@ fun ObjectFinderApp(
                     objectId = id,
                     repository = container.objectRepository,
                     photoRepository = container.photoRepository,
+                    identifierRepository = container.identifierRepository,
                     locationProvider = LocationProvider(context),
                     appScope = container.appScope,
                     onLocalChange = requestSync,
@@ -236,6 +248,25 @@ fun ObjectFinderApp(
             )
         }
     }
+    choosing?.let { choice ->
+        AlertDialog(
+            onDismissRequest = { choosing = null },
+            title = { Text("Più oggetti con questo codice") },
+            text = {
+                Column {
+                    choice.objects.forEach { item ->
+                        ListItem(
+                            headlineContent = { Text(item.name) },
+                            supportingContent = { Text(item.category) },
+                            modifier = Modifier.clickable { choosing = null; nav.openObject(item.id) },
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosing = null }) { Text("Chiudi") } },
+        )
+    }
+
     // Snackbar globale (scansioni/deep link) sopra qualsiasi schermata, sopra la barra di navigazione.
     SnackbarHost(
         snackbar,

@@ -35,6 +35,7 @@ class ObjectRepository(
     private val projects: ProjectRepository,
     private val settings: SettingsStore,
     private val photos: PhotoRepository,
+    private val identifiers: IdentifierRepository,
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     private val syncMutex = Mutex()
@@ -49,7 +50,11 @@ class ObjectRepository(
 
     /** Modifiche locali in attesa di invio: oggetti + foto. */
     fun observePendingCount(): Flow<Int> =
-        combine(dao.observePendingCount(), photos.observePendingCount()) { objects, pics -> objects + pics }
+        combine(
+            dao.observePendingCount(),
+            photos.observePendingCount(),
+            identifiers.observePendingCount(),
+        ) { objects, pics, codes -> objects + pics + codes }
 
     suspend fun get(id: String): ObjectEntity? = dao.getById(id)
 
@@ -105,8 +110,9 @@ class ObjectRepository(
             val pushed = if (project.canEditObjects) push(project.id) else 0
             val pulled = pull(project.id)
             // Dopo gli oggetti: le policy Storage richiedono che l'oggetto esista sul server.
+            val codeChanges = identifiers.sync(project.id, canWrite = project.canEditObjects)
             val photoReport = photos.sync(project.id, canWrite = project.canEditObjects)
-            SyncReport(pushed, pulled, photoReport)
+            SyncReport(pushed + codeChanges, pulled, photoReport)
         }
         settings.setSyncState(
             result.fold(

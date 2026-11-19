@@ -19,7 +19,8 @@
 - [x] Sync pull cursor (incrementale su `updated_at`) e regola di conflitto base
 - [x] Create project flow / selezione tra più progetti
 - [x] Membership flow: aggiunta per email, ruoli, rimozione, uscita (RPC migration 004)
-- [ ] Inviti a email non ancora registrate (tabella inviti + accettazione al signup)
+- [x] Inviti a email non ancora registrate (migration 007, accettazione al login con email confermata)
+- [ ] Invio email dell'invito lato server (Edge Function con service_role)
 - [ ] Conflitti multi-utente fini: confronto `version` lato server (RPC o Edge Function)
 - [ ] Cifratura token con Android Keystore
 
@@ -27,7 +28,7 @@
 - [x] Foto oggetto: scatto (app fotocamera di sistema) e galleria, normalizzazione JPEG
 - [ ] CameraX capture in-app (inquadratura guidata per il riconoscimento)
 - [x] QR: etichetta per oggetto (condividi/stampa), scansione in-app, deep link `objectfinder://object/<id>`
-- [ ] Collegare codici esistenti (barcode prodotto, seriale) tramite `object_identifiers`
+- [x] Collegare codici esistenti (barcode prodotto, seriale) tramite `object_identifiers` (migration 006)
 - [ ] NFC read/write policy
 - [x] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`, migration 005)
 - [ ] Visual embeddings and similarity search
@@ -45,8 +46,9 @@
   cursore composto `(updated_at, id)`.
 - Dopo il logout gli oggetti cloud restano sul dispositivo ma non sono visibili finché non si
   riaccede allo stesso account.
-- `add_project_member` rivela a owner/admin se un'email ha un account (enumerazione limitata
-  ai gestori di progetto); da rivedere con il flusso inviti.
+- `invite_project_member` rivela a owner/admin se un'email ha già un account ("aggiunto" vs
+  "invitato"): enumerazione limitata ai gestori di progetto.
+- Gli inviti non hanno scadenza; si revocano manualmente dalla schermata Membri.
 - Login, sync e gestione membri sono verificati su Postgres con le migration, ma non ancora
   end-to-end contro un'istanza Supabase reale (GoTrue + PostgREST).
 - Le foto vengono scaricate tutte durante la sync (nessun download on-demand né limite di spazio):

@@ -15,6 +15,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 
 @Serializable
 data class ProjectDto(
@@ -69,6 +70,34 @@ data class PhotoRowDto(
     @SerialName("photo_type") val photoType: String = "reference",
     @SerialName("captured_at") val capturedAt: String? = null,
 )
+
+@Serializable
+data class IdentifierRowDto(
+    val id: String,
+    @SerialName("object_id") val objectId: String,
+    @SerialName("identifier_type") val type: String,
+    @SerialName("identifier_value") val value: String,
+)
+
+@Serializable
+data class InviteDto(
+    val id: String,
+    @SerialName("project_id") val projectId: String,
+    val email: String,
+    val role: String,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("accepted_at") val acceptedAt: String? = null,
+)
+
+@Serializable
+private data class InviteArgs(
+    @SerialName("p_project") val project: String,
+    @SerialName("p_email") val email: String,
+    @SerialName("p_role") val role: String,
+)
+
+@Serializable
+private class NoArgs
 
 @Serializable
 private data class StoragePrefixes(val prefixes: List<String>)
@@ -212,6 +241,67 @@ class SupabaseRestApi(
     suspend fun deletePhotoRow(id: String) {
         authorized { token ->
             http.client.delete("$rest/object_photos") {
+                auth(token)
+                parameter("id", "eq.$id")
+            }
+        }
+    }
+
+    // ---- Codici collegati (object_identifiers) ----
+
+    suspend fun listIdentifiers(projectId: String): List<IdentifierRowDto> = authorized { token ->
+        http.client.get("$rest/object_identifiers") {
+            auth(token)
+            parameter("select", "id,object_id,identifier_type,identifier_value,objects!inner(project_id)")
+            parameter("objects.project_id", "eq.$projectId")
+            parameter("order", "created_at.asc")
+            parameter("limit", 10000)
+        }
+    }.body()
+
+    suspend fun insertIdentifier(row: IdentifierRowDto) {
+        authorized { token ->
+            http.client.post("$rest/object_identifiers") {
+                auth(token)
+                parameter("on_conflict", "id")
+                header("Prefer", "resolution=ignore-duplicates,return=minimal")
+                contentType(ContentType.Application.Json)
+                setBody(row)
+            }
+        }
+    }
+
+    suspend fun deleteIdentifier(id: String) {
+        authorized { token ->
+            http.client.delete("$rest/object_identifiers") {
+                auth(token)
+                parameter("id", "eq.$id")
+            }
+        }
+    }
+
+    // ---- Inviti (migration 007) ----
+
+    /** 'added' se l'account esiste (aggiunto subito), 'invited' se è stato creato un invito. */
+    suspend fun inviteMember(projectId: String, email: String, role: String): String =
+        // PostgREST restituisce uno scalare JSON ("invited"): body<String>() darebbe il testo grezzo con le virgolette.
+        supabaseJson.decodeFromString(String.serializer(), rpc("invite_project_member", InviteArgs(projectId, email, role)).bodyAsText())
+
+    suspend fun acceptMyInvites(): Int = rpc("accept_my_invites", NoArgs()).body<Int>()
+
+    suspend fun listPendingInvites(projectId: String): List<InviteDto> = authorized { token ->
+        http.client.get("$rest/project_invites") {
+            auth(token)
+            parameter("select", "id,project_id,email,role,created_at,accepted_at")
+            parameter("project_id", "eq.$projectId")
+            parameter("accepted_at", "is.null")
+            parameter("order", "created_at.desc")
+        }
+    }.body()
+
+    suspend fun revokeInvite(id: String) {
+        authorized { token ->
+            http.client.delete("$rest/project_invites") {
                 auth(token)
                 parameter("id", "eq.$id")
             }

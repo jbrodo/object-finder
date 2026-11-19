@@ -59,7 +59,7 @@ fun ObjectListScreen(
         OutlinedTextField(
             value = state.query,
             onValueChange = viewModel::setQuery,
-            placeholder = { Text("Cerca per nome, categoria, note") },
+            placeholder = { Text("Cerca nome, note o codice") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),

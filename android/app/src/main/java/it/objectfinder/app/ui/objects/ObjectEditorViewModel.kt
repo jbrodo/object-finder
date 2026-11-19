@@ -5,7 +5,12 @@ import androidx.lifecycle.viewModelScope
 import it.objectfinder.app.data.ObjectDraft
 import android.net.Uri
 import it.objectfinder.app.data.ObjectRepository
+import it.objectfinder.app.data.AddIdentifierResult
+import it.objectfinder.app.data.IdentifierRepository
 import it.objectfinder.app.data.PhotoRepository
+import it.objectfinder.app.data.local.IdentifierEntity
+import it.objectfinder.app.data.local.IdentifierType
+import it.objectfinder.app.qr.QrCodes
 import it.objectfinder.app.data.local.PhotoEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -49,6 +54,7 @@ class ObjectEditorViewModel(
     private val objectId: String?,
     private val repository: ObjectRepository,
     private val photoRepository: PhotoRepository,
+    private val identifierRepository: IdentifierRepository,
     private val locationProvider: LocationProvider,
     private val appScope: CoroutineScope,
     private val onLocalChange: () -> Unit,
@@ -66,6 +72,37 @@ class ObjectEditorViewModel(
 
     private val _photoBusy = MutableStateFlow(false)
     val photoBusy: StateFlow<Boolean> = _photoBusy.asStateFlow()
+
+    val identifiers: StateFlow<List<IdentifierEntity>> = identifierRepository.observeForObject(effectiveId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Collega un codice esistente (scansionato o digitato) all'oggetto. */
+    fun addCode(type: IdentifierType, raw: String) {
+        if (QrCodes.parseObjectId(raw) != null) {
+            _state.update { it.copy(message = "È un'etichetta Object Finder: identifica già un oggetto, non va collegata.") }
+            return
+        }
+        viewModelScope.launch {
+            val message = when (identifierRepository.add(effectiveId, type, raw)) {
+                AddIdentifierResult.Added -> {
+                    if (objectId != null) onLocalChange()
+                    "Codice collegato"
+                }
+                AddIdentifierResult.Duplicate -> "Codice già collegato a questo oggetto"
+                AddIdentifierResult.Invalid -> "Codice non valido"
+            }
+            _state.update { it.copy(message = message) }
+        }
+    }
+
+    fun deleteCode(id: String) {
+        viewModelScope.launch {
+            identifierRepository.delete(id)
+            if (objectId != null) onLocalChange()
+        }
+    }
+
+    fun showMessage(text: String) = _state.update { it.copy(message = text) }
 
     fun newCameraUri(): Uri = photoRepository.newCameraUri()
 
@@ -88,7 +125,10 @@ class ObjectEditorViewModel(
 
     override fun onCleared() {
         // Editor di un oggetto nuovo chiuso senza salvare: niente foto orfane su disco.
-        if (objectId == null && !saved) appScope.launch { photoRepository.discardAllForObject(effectiveId) }
+        if (objectId == null && !saved) appScope.launch {
+            photoRepository.discardAllForObject(effectiveId)
+            identifierRepository.discardAllForObject(effectiveId)
+        }
     }
 
     init {

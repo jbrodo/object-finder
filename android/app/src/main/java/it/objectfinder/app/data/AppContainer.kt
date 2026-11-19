@@ -27,6 +27,7 @@ class AppContainer(context: Context) {
     private val restApi = SupabaseRestApi(http, authRepository)
     val projectRepository = ProjectRepository(restApi, authRepository, settings, database.objectDao())
     val photoRepository = PhotoRepository(appContext, database.photoDao(), restApi)
+    val identifierRepository = IdentifierRepository(database.identifierDao(), restApi)
     val objectRepository = ObjectRepository(
         dao = database.objectDao(),
         api = restApi,
@@ -34,5 +35,6 @@ class AppContainer(context: Context) {
         projects = projectRepository,
         settings = settings,
         photos = photoRepository,
+        identifiers = identifierRepository,
     )
 }

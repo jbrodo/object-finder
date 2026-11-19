@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
@@ -45,7 +47,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.content.Context
+import android.content.Intent
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -53,6 +58,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.objectfinder.app.data.ActiveProject
+import it.objectfinder.app.data.PendingInvite
 import it.objectfinder.app.data.ProjectMember
 import it.objectfinder.app.data.ProjectRole
 
@@ -138,6 +144,8 @@ fun MembersScreen(
     var adding by remember { mutableStateOf(false) }
     var confirmLeave by remember { mutableStateOf(false) }
     var confirmRemove by remember { mutableStateOf<ProjectMember?>(null) }
+    var confirmRevoke by remember { mutableStateOf<PendingInvite?>(null) }
+    val context = LocalContext.current
     val canManage = project?.canManageMembers == true
 
     LaunchedEffect(state.op.message) {
@@ -181,6 +189,39 @@ fun MembersScreen(
                 )
             }
             LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
+                if (state.invites.isNotEmpty()) {
+                    item(key = "invites-header") {
+                        Text(
+                            "Inviti in attesa",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
+                        )
+                    }
+                    items(state.invites, key = { "invite-${it.id}" }) { invite ->
+                        ListItem(
+                            headlineContent = { Text(invite.email) },
+                            supportingContent = { Text("${invite.role.label} · in attesa di registrazione") },
+                            trailingContent = {
+                                Row {
+                                    IconButton(onClick = { viewModel.shareInvite(invite) }) {
+                                        Icon(Icons.Default.Share, contentDescription = "Condividi invito")
+                                    }
+                                    IconButton(onClick = { confirmRevoke = invite }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Revoca invito")
+                                    }
+                                }
+                            },
+                        )
+                        HorizontalDivider()
+                    }
+                    item(key = "members-header") {
+                        Text(
+                            "Membri",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
+                        )
+                    }
+                }
                 items(state.members, key = { it.userId }) { member ->
                     MemberRow(
                         member = member,
@@ -205,6 +246,35 @@ fun MembersScreen(
             confirm = "Rimuovi",
             onDismiss = { confirmRemove = null },
             onConfirm = { confirmRemove = null; viewModel.remove(member) },
+        )
+    }
+    confirmRevoke?.let { invite ->
+        ConfirmDialog(
+            title = "Revocare l'invito?",
+            text = "${invite.email} non potrà più entrare nel progetto con questo invito.",
+            confirm = "Revoca",
+            onDismiss = { confirmRevoke = null },
+            onConfirm = { confirmRevoke = null; viewModel.revokeInvite(invite) },
+        )
+    }
+    state.justInvited?.let { invite ->
+        AlertDialog(
+            onDismissRequest = viewModel::consumeInvite,
+            title = { Text("Invito creato") },
+            text = {
+                Text(
+                    "${invite.email} non ha ancora un account. Mandagli l'invito: dopo la registrazione " +
+                        "con questa email (e la conferma dell'indirizzo) entrerà nel progetto come " +
+                        "${invite.role.label.lowercase()}."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.consumeInvite()
+                    shareInviteText(context, inviteMessage(project?.name ?: "Object Finder", invite))
+                }) { Text("Condividi invito") }
+            },
+            dismissButton = { TextButton(onClick = viewModel::consumeInvite) { Text("Più tardi") } },
         )
     }
     if (confirmLeave) {
@@ -257,7 +327,8 @@ private fun AddMemberDialog(onDismiss: () -> Unit, onConfirm: (String, ProjectRo
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "La persona deve avere già un account Object Finder.",
+                    "Se la persona ha già un account viene aggiunta subito, altrimenti riceverà un invito " +
+                        "valido quando si registrerà con questa email.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedTextField(
@@ -310,6 +381,20 @@ private fun ConfirmDialog(title: String, text: String, confirm: String, onDismis
         confirmButton = { TextButton(onClick = onConfirm) { Text(confirm, color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
     )
+}
+
+internal fun inviteMessage(projectName: String, invite: PendingInvite): String =
+    "Ti ho invitato nel progetto «$projectName» su Object Finder come ${invite.role.label.lowercase()}.\n" +
+        "Installa l'app e registrati con questa email: ${invite.email}\n" +
+        "Dopo aver confermato l'indirizzo email, il progetto comparirà al primo accesso."
+
+private fun shareInviteText(context: Context, text: String) {
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, "Invito a Object Finder")
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    runCatching { context.startActivity(Intent.createChooser(send, "Invia invito")) }
 }
 
 @Composable

@@ -63,6 +63,7 @@ fun ObjectEditorScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val photos by viewModel.photos.collectAsStateWithLifecycle()
     val photoBusy by viewModel.photoBusy.collectAsStateWithLifecycle()
+    val codes by viewModel.identifiers.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val permission = rememberLocationPermissionRequester()
 
@@ -176,6 +177,14 @@ fun ObjectEditorScreen(
                 newCameraUri = viewModel::newCameraUri,
                 onAdd = viewModel::addPhoto,
                 onDelete = viewModel::deletePhoto,
+            )
+
+            CodesSection(
+                codes = codes,
+                readOnly = readOnly,
+                onAdd = viewModel::addCode,
+                onDelete = viewModel::deleteCode,
+                onError = viewModel::showMessage,
             )
 
             Card(Modifier.fillMaxWidth()) {

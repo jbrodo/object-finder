@@ -16,6 +16,10 @@ import java.util.UUID
 
 data class ProjectMember(val userId: String, val email: String, val role: ProjectRole, val isMe: Boolean)
 
+data class PendingInvite(val id: String, val email: String, val role: ProjectRole)
+
+enum class InviteResult { ADDED, INVITED }
+
 class ProjectRepository(
     private val api: SupabaseRestApi,
     private val auth: AuthRepository,
@@ -38,6 +42,8 @@ class ProjectRepository(
      */
     suspend fun ensureActiveProject(): ActiveProject = mutex.withLock {
         val userId = requireUserId()
+        // Inviti ricevuti prima della registrazione: diventano membership (best-effort; richiede 007).
+        runCatching { api.acceptMyInvites() }
         var list = fetchProjects(userId)
         val saved = settings.activeProject.value
         val chosen = list.firstOrNull { it.id == saved?.id }
@@ -69,10 +75,27 @@ class ProjectRepository(
         return api.listMembers(projectId).map { it.toMember(me) }
     }
 
+    /** Cambio ruolo di un membro esistente. */
     suspend fun addMember(email: String, role: ProjectRole) {
         require(role in ProjectRole.assignable) { "Ruolo non assegnabile" }
         api.addMember(requireActiveCloudProject(), email.trim(), role.wire)
     }
+
+    /** Aggiunge subito se l'account esiste, altrimenti crea un invito pendente. */
+    suspend fun inviteMember(email: String, role: ProjectRole): InviteResult {
+        require(role in ProjectRole.assignable) { "Ruolo non assegnabile" }
+        return when (api.inviteMember(requireActiveCloudProject(), email.trim(), role.wire)) {
+            "added" -> InviteResult.ADDED
+            else -> InviteResult.INVITED
+        }
+    }
+
+    suspend fun listPendingInvites(): List<PendingInvite> =
+        api.listPendingInvites(requireActiveCloudProject()).map {
+            PendingInvite(it.id, it.email, ProjectRole.fromWire(it.role) ?: ProjectRole.VIEWER)
+        }
+
+    suspend fun revokeInvite(id: String) = api.revokeInvite(id)
 
     suspend fun removeMember(userId: String) {
         api.removeMember(requireActiveCloudProject(), userId)
