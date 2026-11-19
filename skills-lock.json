@@ -1,0 +1,159 @@
+{
+  "version": 2,
+  "skills": {
+    "agent-architecture-audit": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/agent-architecture-audit/SKILL.md",
+      "computedHash": "f6f406de704ba1f3c4b678674e8ef60d7308ab5eee053c7e45a2ad9c4f1177bc"
+    },
+    "agent-security-hardening": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/agent-security-hardening/SKILL.md",
+      "computedHash": "5f34c60c6a164cb01360ee28603215393894f034f762681cb505e96b89022e5e"
+    },
+    "agentic-engineering": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/agentic-engineering/SKILL.md",
+      "computedHash": "de2f09092364cc89f2cf877c4af8ebd7c0075b69e50d9730a0eb81a7af7dc620"
+    },
+    "android-clean-architecture": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/android-clean-architecture/SKILL.md",
+      "computedHash": "b5513d6cf5102d341e1aa93337752a4bcf4862d67cf4570dc1ae746df366c6ba"
+    },
+    "api-design": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/api-design/SKILL.md",
+      "computedHash": "81d497a208fd9e18972b4a4a6fadc1a1af1de691382f02fd6d387bb505160a78"
+    },
+    "architecture-decision-records": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/architecture-decision-records/SKILL.md",
+      "computedHash": "8efc159025ce583f1947c1f2fe4d46c42644c787a70abc54f7fd18100b47b271"
+    },
+    "backend-patterns": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/backend-patterns/SKILL.md",
+      "computedHash": "e39330205cf49940fb809109a690b87afbbca5d2e86269267abb8416d2093c15"
+    },
+    "coding-standards": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/coding-standards/SKILL.md",
+      "computedHash": "7fc24f273f3203023b0e2b3d5c9d1172f5e3301ed4623859bda3399e163c1e4d"
+    },
+    "dart-flutter-patterns": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/dart-flutter-patterns/SKILL.md",
+      "computedHash": "af324b4b37090b717c830e5a44c11a9069fcea5c81daeeb03ba5ddff8ea1e446"
+    },
+    "design-system": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/design-system/SKILL.md",
+      "computedHash": "2913be4d68c05d341ee7e07cc4ea7539004c6885a8e19dd2e2f23c40636868bd"
+    },
+    "flutter-dart-code-review": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/flutter-dart-code-review/SKILL.md",
+      "computedHash": "d05b112db73ee5779188d24e3ecef1f065d428231f69f943d9cd60f0c48cc075"
+    },
+    "hexagonal-architecture": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/hexagonal-architecture/SKILL.md",
+      "computedHash": "365f9ec13315c077889fbed05cdad5efb277c214a46f7ba3150e6738941d6860"
+    },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "commit": "b49177d32788f2dc585c42831d845dacf1ebed2c",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "08bd5bf141cb507f46bd8347890cd985865606f15adf88295ed3a73bc9ad5d96"
+    },
+    "java-coding-standards": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/java-coding-standards/SKILL.md",
+      "computedHash": "11df0ff4be3c05e6edf33ab47709c525fb884090b424f5c76da4610f15b0f83a"
+    },
+    "kotlin-coroutines-flows": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/kotlin-coroutines-flows/SKILL.md",
+      "computedHash": "d4a613f11c658c9505add74de43d1c720fa15742dfa81df8a54e12f9bed3f9fd"
+    },
+    "kotlin-exposed-patterns": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/kotlin-exposed-patterns/SKILL.md",
+      "computedHash": "66d33eb629289205af256c5fc972b96932476fcd0f326072324df17547f8289d"
+    },
+    "kotlin-ktor-patterns": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/kotlin-ktor-patterns/SKILL.md",
+      "computedHash": "b3c53370cc759c0818af9e51e6f16ed0735ded79138777a379aaf1cdcc759f7f"
+    },
+    "kotlin-patterns": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/kotlin-patterns/SKILL.md",
+      "computedHash": "440a4d922cbffb97e99f9de1668acf5b50ab4bc838a1c951c562bf08acd43235"
+    },
+    "kotlin-testing": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/kotlin-testing/SKILL.md",
+      "computedHash": "c894346ba381187c2ad004ff0acd621c19f58bfb4afbddd299f674a601f29b02"
+    },
+    "postgres-patterns": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/postgres-patterns/SKILL.md",
+      "computedHash": "758f1bbc01cd005b51e04dce9a8e2a5052fbc3b0aacc35de257080a4ecc91948"
+    },
+    "tdd-workflow": {
+      "source": "affaan-m/ECC",
+      "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
+      "sourceType": "github",
+      "skillPath": "skills/tdd-workflow/SKILL.md",
+      "computedHash": "fae829ad557e0eec5db5bac5acd07e1a15c1f547d9a0601cd560e1024e1db4fd"
+    },
+    "ui-taste": {
+      "source": "uizze.sh",
+      "sourceUrl": "https://uizze.sh/",
+      "sourceType": "well-known",
+      "computedHash": "85da37a788dc4b5b63411e5681403d930b1077604a20497739fa05c8d21f01fc",
+      "wellKnownDigest": "sha256:f26d607ceb3f3a6fa8c98f8dbcb2b1aeb0392de1953e826bb8893d9e49983bf9"
+    }
+  }
+}
