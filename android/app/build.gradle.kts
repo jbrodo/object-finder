@@ -17,6 +17,16 @@ val mapsApiKey: String = providers.gradleProperty("GOOGLE_MAPS_API_KEY").orNull
     ?: localProperties.getProperty("GOOGLE_MAPS_API_KEY")
     ?: ""
 
+// Firma release: variabili d'ambiente (CI) oppure local.properties. Se assenti, la build
+// release resta possibile ma firmata con la chiave debug (non distribuibile).
+fun releaseSetting(name: String): String? =
+    System.getenv(name)?.takeIf { it.isNotBlank() } ?: localProperties.getProperty(name)
+val releaseKeystore = releaseSetting("RELEASE_KEYSTORE_PATH")?.let { rootProject.file(it) }?.takeIf { it.exists() }
+
+// Versione: la CI la ricava dal tag (v1.2.3) e dal numero di run.
+val appVersionName = providers.gradleProperty("VERSION_NAME").orNull ?: "0.2.0"
+val appVersionCode = providers.gradleProperty("VERSION_CODE").orNull?.toIntOrNull() ?: 2
+
 android {
     namespace = "it.objectfinder.app"
     compileSdk = 35
@@ -25,10 +35,29 @@ android {
         applicationId = "it.objectfinder.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = mapsApiKey
         buildConfigField("boolean", "HAS_GOOGLE_MAPS_KEY", mapsApiKey.isNotBlank().toString())
+    }
+
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = releaseSetting("RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = releaseSetting("RELEASE_KEY_ALIAS")
+                keyPassword = releaseSetting("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // R8 disattivato finché non ci sono regole verificate per Ktor/serialization/Room.
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+        }
     }
 
     buildFeatures {

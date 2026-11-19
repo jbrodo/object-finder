@@ -37,6 +37,23 @@ La workflow `Build APK` esegue test unitari, lint e compila l'APK debug a ogni p
 Al termine, scaricare l'artifact `object-finder-debug-apk` dalla run. La secret repository
 `GOOGLE_MAPS_API_KEY` è opzionale: senza, l'APK viene comunque compilato e usa OpenStreetMap.
 
+## Release firmate (GitHub Releases)
+La workflow `Release APK` parte a ogni tag `vX.Y.Z` (o manualmente da Actions): esegue i test,
+compila l'APK release firmato, verifica la firma e lo pubblica come GitHub Release
+(`object-finder-vX.Y.Z.apk` + checksum SHA-256), scaricabile direttamente da chi ha accesso al repo.
+```bash
+git tag v0.3.0 && git push origin v0.3.0
+```
+Secret richiesti: `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`,
+`RELEASE_KEY_PASSWORD` (senza, la workflow fallisce invece di pubblicare un APK firmato debug).
+In locale la firma si attiva con le stesse chiavi come variabili d'ambiente o in `local.properties`
+(`RELEASE_KEYSTORE_PATH=...`); senza, `assembleRelease` usa la chiave debug.
+
+**Il keystore release non va perso**: senza la stessa chiave non si possono pubblicare aggiornamenti
+installabili sopra le versioni esistenti. Conservarne una copia sicura fuori dal repo.
+L'APK debug della CI e quello release hanno firme diverse: per passare dall'uno all'altro va
+disinstallata l'app.
+
 ## Funzioni incluse
 - Onboarding con login/registrazione Supabase (email + password) o uso offline senza account
 - Sessione persistente con refresh automatico del token; richieste REST autenticate (JWT utente)
