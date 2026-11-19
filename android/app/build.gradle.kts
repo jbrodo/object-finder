@@ -1,7 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")\n    id("org.jetbrains.kotlin.plugin.serialization")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
 }
 
@@ -15,6 +16,8 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] =
+            providers.gradleProperty("GOOGLE_MAPS_API_KEY").getOrElse("")
     }
 
     buildFeatures { compose = true }
@@ -47,7 +50,8 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
 
     implementation("androidx.work:work-runtime-ktx:2.10.0")
-    implementation("com.google.android.gms:play-services-location:21.3.0")\n    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     // Supabase MVP: PostgREST via Ktor. Auth/session will be added in milestone 2.
     implementation("io.ktor:ktor-client-core:3.0.3")

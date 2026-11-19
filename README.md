@@ -18,6 +18,10 @@ Google Maps / OpenStreetMap predisposti tramite provider separati.
 5. Eseguire la migration `backend/migrations/001_initial_schema.sql` nel SQL Editor di Supabase.
 6. Sincronizzare Gradle e avviare su un dispositivo Android con GPS.
 
+## Build APK con GitHub Actions
+La workflow `Build APK` compila l'APK debug a ogni push e pull request; è possibile avviarla anche manualmente dalla scheda Actions.
+Al termine, scaricare l'artifact `object-finder-debug-apk` dalla run. La secret repository `GOOGLE_MAPS_API_KEY` è opzionale: senza, l'APK viene comunque compilato ma Google Maps non è configurato.
+
 ## Funzioni MVP incluse nel codice
 - Dashboard minimale
 - Creazione e lista oggetti
