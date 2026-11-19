@@ -38,5 +38,6 @@ class AppContainer(context: Context) {
         photos = photoRepository,
         identifiers = identifierRepository,
         history = locationHistoryRepository,
+        conflicts = database.conflictDao(),
     )
 }

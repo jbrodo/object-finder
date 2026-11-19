@@ -8,8 +8,11 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [ObjectEntity::class, PhotoEntity::class, IdentifierEntity::class, LocationHistoryEntity::class],
-    version = 5,
+    entities = [
+        ObjectEntity::class, PhotoEntity::class, IdentifierEntity::class,
+        LocationHistoryEntity::class, ObjectConflictEntity::class,
+    ],
+    version = 6,
     exportSchema = false,
 )
 abstract class ObjectDatabase : RoomDatabase() {
@@ -17,6 +20,7 @@ abstract class ObjectDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun identifierDao(): IdentifierDao
     abstract fun locationHistoryDao(): LocationHistoryDao
+    abstract fun conflictDao(): ObjectConflictDao
 
     companion object {
         /** v1 → v2: colonna remoteUpdatedAt e indici su projectId/syncStatus. Nessuna perdita di dati. */
@@ -75,9 +79,20 @@ abstract class ObjectDatabase : RoomDatabase() {
             }
         }
 
+        /** v5 → v6: versione remota (concorrenza ottimistica) e conflitti da risolvere. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE objects ADD COLUMN remoteVersion INTEGER")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS object_conflicts (" +
+                        "objectId TEXT NOT NULL PRIMARY KEY, kind TEXT NOT NULL, serverJson TEXT, detectedAt INTEGER NOT NULL)"
+                )
+            }
+        }
+
         fun create(context: Context): ObjectDatabase =
             Room.databaseBuilder(context, ObjectDatabase::class.java, "object-finder.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
     }
 }

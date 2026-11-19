@@ -20,7 +20,7 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
    da SQL Editor eseguendo in ordine:
    `backend/migrations/001_initial_schema.sql`, `002_storage_policies.sql`, `003_sync_support.sql`,
    `004_project_members_rpc.sql`, `005_object_photos.sql`, `006_object_identifiers.sql`,
-   `007_project_invites.sql`, `008_location_history.sql`.
+   `007_project_invites.sql`, `008_location_history.sql`, `009_object_deletions.sql`.
    La 005 è necessaria per le foto: corregge le policy Storage della 002, che negavano sempre
    lettura e upload.
 4. In Supabase → Authentication → Providers abilitare Email/Password e **lasciare attivo
@@ -112,6 +112,10 @@ disinstallata l'app.
 - Archiviazione/ripristino (soft delete sincronizzato)
 - Permessi posizione con spiegazione, gestione del rifiuto permanente e scorciatoia alle impostazioni
 - Acquisizione GPS ad alta precisione con fallback sull'ultima posizione nota
+- Conflitti tra membri: concorrenza ottimistica sulla `version` del server; se un altro membro ha
+  modificato (o eliminato) l'oggetto nel frattempo, nessuna versione viene persa e la scheda mostra
+  le differenze campo per campo con la scelta "Tieni la mia" / "Usa quella del server"
+- Eliminazione definitiva (owner/admin) con foto, codici e storico, propagata agli altri dispositivi
 - Sincronizzazione bidirezionale: push delle modifiche pending + pull incrementale con cursore,
   sync immediata dopo ogni modifica (appena c'è rete) e periodica ogni ora
 - "Vicini": elenco ordinato per distanza dal telefono, con la distanza su ogni oggetto
@@ -123,8 +127,8 @@ disinstallata l'app.
 
 ## Note di sicurezza
 - Non inserire mai la `service_role` key nell'app: solo anon/publishable key con RLS.
-- I token di sessione sono in SharedPreferences private; backup cloud e trasferimento dispositivo
-  sono disabilitati (`allowBackup=false`, `data_extraction_rules.xml`).
+- I token di sessione sono cifrati con AES-256-GCM (chiave nell'Android Keystore, non estraibile) in
+  SharedPreferences private; backup cloud e trasferimento dispositivo sono disabilitati.
 
 ## Cartografia
 - Google Maps: richiede API key e billing abilitato nel progetto Google Cloud.

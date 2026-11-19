@@ -31,10 +31,19 @@ interface ObjectDao {
      * (stesso `updatedAt` locale): evita di perdere una modifica concorrente.
      */
     @Query(
-        "UPDATE objects SET syncStatus = 'synced', remoteUpdatedAt = :remoteUpdatedAt " +
+        "UPDATE objects SET syncStatus = 'synced', remoteUpdatedAt = :remoteUpdatedAt, remoteVersion = :remoteVersion " +
             "WHERE id = :id AND updatedAt = :localUpdatedAt"
     )
-    suspend fun markSynced(id: String, localUpdatedAt: Long, remoteUpdatedAt: String?): Int
+    suspend fun markSynced(id: String, localUpdatedAt: Long, remoteUpdatedAt: String?, remoteVersion: Int?): Int
+
+    @Query("UPDATE objects SET syncStatus = 'conflict' WHERE id = :id")
+    suspend fun markConflict(id: String)
+
+    @Query("SELECT COUNT(*) FROM objects WHERE syncStatus = 'conflict'")
+    fun observeConflictCount(): Flow<Int>
+
+    @Query("DELETE FROM objects WHERE id = :id")
+    suspend fun delete(id: String)
 
     /** Riassegna gli oggetti creati offline al progetto cloud attivo e li rimette in coda di sync. */
     @Query("UPDATE objects SET projectId = :to, syncStatus = 'pending' WHERE projectId = :from")

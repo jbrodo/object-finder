@@ -42,6 +42,7 @@ fun SettingsScreen(
     val project by container.settings.activeProject.collectAsStateWithLifecycle()
     val syncState by container.settings.syncState.collectAsStateWithLifecycle()
     val pending by container.objectRepository.observePendingCount().collectAsStateWithLifecycle(0)
+    val conflicts by container.objectRepository.observeConflictCount().collectAsStateWithLifecycle(0)
     val mapEngine by container.settings.mapEngine.collectAsStateWithLifecycle()
 
     Column(
@@ -82,6 +83,12 @@ fun SettingsScreen(
 
         Section("Sincronizzazione") {
             Text("Modifiche da inviare: $pending")
+            if (conflicts > 0) {
+                Text(
+                    "Conflitti da risolvere: $conflicts (oggetti con l'icona di avviso nell'elenco)",
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             Text(describe(syncState), style = MaterialTheme.typography.bodyMedium)
             Button(onClick = onSyncNow, enabled = session != null && syncState !is SyncState.Running) {
                 Text("Sincronizza ora")

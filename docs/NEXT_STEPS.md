@@ -21,8 +21,9 @@
 - [x] Membership flow: aggiunta per email, ruoli, rimozione, uscita (RPC migration 004)
 - [x] Inviti a email non ancora registrate (migration 007, accettazione al login con email confermata)
 - [ ] Invio email dell'invito lato server (Edge Function con service_role)
-- [ ] Conflitti multi-utente fini: confronto `version` lato server (RPC o Edge Function)
-- [ ] Cifratura token con Android Keystore
+- [x] Conflitti multi-utente: concorrenza ottimistica su `version`, scelta guidata dall'utente
+- [x] Cifratura token con Android Keystore (AES-256-GCM)
+- [x] Eliminazione definitiva propagata (migration 009, tombstone `deleted_objects`)
 
 ## M3 — Identification
 - [x] Foto oggetto: scatto (app fotocamera di sistema) e galleria, normalizzazione JPEG
@@ -64,4 +65,5 @@
 - Lo scanner QR in-app richiede Google Play services recente (modulo scaricato on-demand); sul
   vecchio emulatore API 30 non è disponibile e l'app lo segnala. Verificati deep link (a freddo e a
   caldo), generazione/decodifica del QR e risoluzione; la lettura reale va provata su dispositivo.
-- Nessuna eliminazione definitiva: l'archiviazione è il soft delete previsto per l'MVP.
+- Se un oggetto eliminato da un altro membro viene "ricreato" da chi aveva modifiche in sospeso,
+  le foto già cancellate sul server non tornano (solo i dati dell'oggetto e le foto non ancora inviate).

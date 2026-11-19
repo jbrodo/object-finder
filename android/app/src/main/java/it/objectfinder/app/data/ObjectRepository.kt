@@ -1,11 +1,16 @@
 package it.objectfinder.app.data
 
+import it.objectfinder.app.data.local.ConflictKind
 import it.objectfinder.app.data.local.LOCAL_PROJECT_ID
+import it.objectfinder.app.data.local.ObjectConflictDao
+import it.objectfinder.app.data.local.ObjectConflictEntity
 import it.objectfinder.app.data.local.ObjectDao
 import it.objectfinder.app.data.local.ObjectEntity
 import it.objectfinder.app.data.local.ObjectStatus
 import it.objectfinder.app.data.local.SyncStatus
+import it.objectfinder.app.data.remote.ObjectReadDto
 import it.objectfinder.app.data.remote.SupabaseException
+import it.objectfinder.app.data.remote.supabaseJson
 import it.objectfinder.app.data.remote.SupabaseRestApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +42,7 @@ class ObjectRepository(
     private val photos: PhotoRepository,
     private val identifiers: IdentifierRepository,
     private val history: LocationHistoryRepository,
+    private val conflicts: ObjectConflictDao,
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     private val syncMutex = Mutex()
@@ -59,6 +65,14 @@ class ObjectRepository(
         ) { objects, pics, codes, positions -> objects + pics + codes + positions }
 
     suspend fun get(id: String): ObjectEntity? = dao.getById(id)
+
+    fun observeConflictCount(): Flow<Int> = dao.observeConflictCount()
+
+    fun observeConflict(id: String): Flow<ObjectConflictEntity?> = conflicts.observe(id)
+
+    /** Le modifiche a un oggetto in conflitto restano "la mia versione" finché l'utente non sceglie. */
+    private fun statusAfterLocalEdit(existing: ObjectEntity) =
+        if (existing.isConflict) SyncStatus.CONFLICT.wire else SyncStatus.PENDING.wire
 
     suspend fun create(draft: ObjectDraft, id: String = UUID.randomUUID().toString()): ObjectEntity {
         val item = ObjectEntity(
@@ -96,7 +110,7 @@ class ObjectRepository(
                 latitude = draft.latitude,
                 longitude = draft.longitude,
                 accuracyMeters = draft.accuracyMeters,
-                syncStatus = SyncStatus.PENDING.wire,
+                syncStatus = statusAfterLocalEdit(existing),
                 updatedAt = now(),
             )
         dao.upsert(updated)
@@ -107,7 +121,68 @@ class ObjectRepository(
     suspend fun setArchived(id: String, archived: Boolean) {
         val existing = dao.getById(id) ?: return
         val status = if (archived) ObjectStatus.ARCHIVED else ObjectStatus.ACTIVE
-        dao.upsert(existing.copy(status = status.wire, syncStatus = SyncStatus.PENDING.wire, updatedAt = now()))
+        dao.upsert(existing.copy(status = status.wire, syncStatus = statusAfterLocalEdit(existing), updatedAt = now()))
+    }
+
+    // ---- Conflitti ----
+
+    /** Tieni la versione locale: sovrascrive quella del server (o ricrea l'oggetto eliminato). */
+    suspend fun keepMine(id: String) {
+        val item = dao.getById(id) ?: return
+        val conflict = conflicts.get(id)
+        val server = conflict?.serverJson?.let { supabaseJson.decodeFromString(ObjectReadDto.serializer(), it) }
+        dao.upsert(
+            item.copy(
+                syncStatus = SyncStatus.PENDING.wire,
+                remoteVersion = server?.version,       // null + remoteUpdatedAt null → reinserimento
+                remoteUpdatedAt = server?.updatedAt,
+                updatedAt = now(),
+            )
+        )
+        conflicts.delete(id)
+    }
+
+    /** Usa la versione del server: scarta le modifiche locali (o elimina, se eliminato sul server). */
+    suspend fun useServer(id: String) {
+        val conflict = conflicts.get(id) ?: return
+        val server = conflict.serverJson?.let { supabaseJson.decodeFromString(ObjectReadDto.serializer(), it) }
+        if (server == null) {
+            removeLocally(id)
+        } else {
+            val local = dao.getById(id)
+            SyncMerge.mergeRemote(server, local?.copy(syncStatus = SyncStatus.SYNCED.wire))?.let { dao.upsert(it) }
+            server.latitude?.let { lat ->
+                server.longitude?.let { lon -> history.record(id, lat, lon, server.accuracyMeters) }
+            }
+        }
+        conflicts.delete(id)
+    }
+
+    // ---- Eliminazione definitiva ----
+
+    /**
+     * Elimina l'oggetto con foto, codici e storico. Se è già sul server serve la connessione e il
+     * ruolo owner/admin (RLS): gli altri dispositivi lo rimuovono al pull (tombstone, migration 009).
+     */
+    suspend fun deletePermanently(id: String) {
+        val item = dao.getById(id) ?: return
+        if (item.projectId != LOCAL_PROJECT_ID && !item.neverSynced) {
+            if (auth.session.value == null) throw SupabaseException.NotAuthenticated()
+            // File su Storage prima della riga (la cascade cancella le righe object_photos, non i file).
+            runCatching { api.photoPathsForObject(id) }.getOrDefault(emptyList()).forEach { path ->
+                runCatching { api.deletePhotoFile(path) }
+            }
+            if (!api.deleteObject(id)) throw SupabaseException.Http(403, "Solo proprietario e amministratori possono eliminare")
+        }
+        removeLocally(id)
+    }
+
+    private suspend fun removeLocally(id: String) {
+        photos.discardAllForObject(id)
+        identifiers.discardAllForObject(id)
+        history.discardAllForObject(id)
+        conflicts.delete(id)
+        dao.delete(id)
     }
 
     /** Push delle modifiche pending + pull incrementale dal server. Richiede sessione autenticata. */
@@ -142,11 +217,44 @@ class ObjectRepository(
 
     private suspend fun push(projectId: String): Int {
         var count = 0
-        dao.pendingSync(projectId).forEach { item ->
-            val saved = api.upsertObject(SyncMerge.toWriteDto(item))
-            if (dao.markSynced(item.id, item.updatedAt, saved.updatedAt) > 0) count++
-        }
+        dao.pendingSync(projectId).forEach { item -> if (pushOne(item)) count++ }
         return count
+    }
+
+    /** true se inviato; false se è nato un conflitto (o l'oggetto è cambiato durante l'invio). */
+    private suspend fun pushOne(item: ObjectEntity): Boolean {
+        val dto = SyncMerge.toWriteDto(item)
+        val saved: ObjectReadDto? = when {
+            item.neverSynced -> try {
+                api.insertObject(dto)
+            } catch (e: SupabaseException.Http) {
+                if (e.status != 409) throw e
+                null // già presente (invio precedente non confermato, o creato altrove): si confronta
+            }
+            item.remoteVersion != null -> api.updateObjectIfVersion(dto, item.remoteVersion)
+            else -> null // sincronizzato dalla versione precedente dell'app, senza version: si confronta
+        }
+        val result = saved ?: when (val mismatch = SyncMerge.resolveMismatch(item, api.getObject(item.id))) {
+            is SyncMerge.Mismatch.Retry -> api.updateObjectIfVersion(dto, mismatch.version)
+                ?: return openConflict(item, ConflictKind.CHANGED, api.getObject(item.id))
+            is SyncMerge.Mismatch.Conflict -> return openConflict(item, ConflictKind.CHANGED, mismatch.server)
+            SyncMerge.Mismatch.DeletedRemotely -> return openConflict(item, ConflictKind.DELETED, null)
+        }
+        return dao.markSynced(item.id, item.updatedAt, result.updatedAt, result.version) > 0
+    }
+
+    private suspend fun openConflict(item: ObjectEntity, kind: ConflictKind, server: ObjectReadDto?): Boolean {
+        val resolvedKind = if (server == null) ConflictKind.DELETED else kind
+        conflicts.upsert(
+            ObjectConflictEntity(
+                objectId = item.id,
+                kind = resolvedKind.wire,
+                serverJson = server?.let { supabaseJson.encodeToString(ObjectReadDto.serializer(), it) },
+                detectedAt = now(),
+            )
+        )
+        dao.markConflict(item.id)
+        return false
     }
 
     private suspend fun pull(projectId: String): Int {
@@ -155,7 +263,18 @@ class ObjectRepository(
         while (true) {
             val page = api.objectsUpdatedSince(projectId, cursor, PAGE_SIZE)
             page.forEach { remote ->
-                SyncMerge.mergeRemote(remote, dao.getById(remote.id))?.let {
+                val local = dao.getById(remote.id)
+                if (local != null && local.isConflict) {
+                    // Conflitto aperto: si aggiorna solo la copia server da mostrare all'utente.
+                    conflicts.upsert(
+                        ObjectConflictEntity(
+                            remote.id, ConflictKind.CHANGED.wire,
+                            supabaseJson.encodeToString(ObjectReadDto.serializer(), remote), now(),
+                        )
+                    )
+                    return@forEach
+                }
+                SyncMerge.mergeRemote(remote, local)?.let {
                     dao.upsert(it)
                     applied++
                 }
@@ -164,7 +283,28 @@ class ObjectRepository(
             settings.setPullCursor(projectId, cursor)
             if (page.size < PAGE_SIZE) break
         }
-        return applied
+        return applied + pullDeletions(projectId)
+    }
+
+    /** Eliminazioni fatte da altri membri: rimuove le copie locali (o apre un conflitto se modificate qui). */
+    private suspend fun pullDeletions(projectId: String): Int {
+        val key = "del_$projectId"
+        var cursor = settings.pullCursor(key)
+        val deleted = api.deletedObjectsSince(projectId, cursor)
+        var removed = 0
+        deleted.forEach { tombstone ->
+            val local = dao.getById(tombstone.objectId) ?: return@forEach
+            if (local.isPending || local.isConflict) {
+                openConflict(local, ConflictKind.DELETED, null)
+            } else {
+                removeLocally(local.id)
+                removed++
+            }
+        }
+        cursor = deleted.map { it.deletedAt }.plus(listOfNotNull(cursor))
+            .maxByOrNull { SyncMerge.parseEpochMillis(it) ?: Long.MIN_VALUE }
+        settings.setPullCursor(key, cursor)
+        return removed
     }
 
     private companion object {

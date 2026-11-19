@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
 import android.widget.Toast
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.mutableStateOf
@@ -181,9 +182,17 @@ private fun ObjectCard(item: ObjectEntity, cover: String?, distance: Double?, on
                     modifier = Modifier.weight(1f),
                 )
                 Icon(
-                    if (item.isPending) Icons.Default.CloudUpload else Icons.Default.CloudDone,
-                    contentDescription = if (item.isPending) "Da sincronizzare" else "Sincronizzato",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    when {
+                        item.isConflict -> Icons.Default.Warning
+                        item.isPending -> Icons.Default.CloudUpload
+                        else -> Icons.Default.CloudDone
+                    },
+                    contentDescription = when {
+                        item.isConflict -> "Conflitto da risolvere"
+                        item.isPending -> "Da sincronizzare"
+                        else -> "Sincronizzato"
+                    },
+                    tint = if (item.isConflict) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
                 )
             }

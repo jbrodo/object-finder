@@ -4,6 +4,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.patch
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
@@ -15,6 +16,9 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.builtins.serializer
 
 @Serializable
@@ -77,6 +81,12 @@ data class IdentifierRowDto(
     @SerialName("object_id") val objectId: String,
     @SerialName("identifier_type") val type: String,
     @SerialName("identifier_value") val value: String,
+)
+
+@Serializable
+data class DeletedObjectDto(
+    @SerialName("object_id") val objectId: String,
+    @SerialName("deleted_at") val deletedAt: String,
 )
 
 @Serializable
@@ -198,17 +208,72 @@ class SupabaseRestApi(
         }
     }
 
-    suspend fun upsertObject(item: ObjectWriteDto): ObjectReadDto = authorized { token ->
+    /** Inserimento di un oggetto mai sincronizzato. Un 409 (già esistente) va gestito dal chiamante. */
+    suspend fun insertObject(item: ObjectWriteDto): ObjectReadDto = authorized { token ->
         http.client.post("$rest/objects") {
             auth(token)
-            parameter("on_conflict", "id")
             parameter("select", OBJECT_COLUMNS)
-            header("Prefer", "resolution=merge-duplicates,return=representation")
+            header("Prefer", "return=representation")
             header("Accept", "application/vnd.pgrst.object+json")
             contentType(ContentType.Application.Json)
             setBody(item)
         }
     }.body()
+
+    /**
+     * Concorrenza ottimistica: aggiorna solo se sul server c'è ancora la [expectedVersion] nota.
+     * null = nessuna riga aggiornata (modificato da altri, eliminato o senza permesso).
+     */
+    suspend fun updateObjectIfVersion(item: ObjectWriteDto, expectedVersion: Int): ObjectReadDto? =
+        authorized { token ->
+            http.client.patch("$rest/objects") {
+                auth(token)
+                parameter("id", "eq.${item.id}")
+                parameter("version", "eq.$expectedVersion")
+                parameter("select", OBJECT_COLUMNS)
+                header("Prefer", "return=representation")
+                contentType(ContentType.Application.Json)
+                setBody(item)
+            }
+        }.body<List<ObjectReadDto>>().firstOrNull()
+
+    suspend fun getObject(id: String): ObjectReadDto? = authorized { token ->
+        http.client.get("$rest/objects") {
+            auth(token)
+            parameter("id", "eq.$id")
+            parameter("select", OBJECT_COLUMNS)
+        }
+    }.body<List<ObjectReadDto>>().firstOrNull()
+
+    /** Eliminazione definitiva (RLS: owner/admin). false = nessuna riga eliminata (permessi). */
+    suspend fun deleteObject(id: String): Boolean = authorized { token ->
+        http.client.delete("$rest/objects") {
+            auth(token)
+            parameter("id", "eq.$id")
+            parameter("select", "id")
+            header("Prefer", "return=representation")
+        }
+    }.body<List<JsonObject>>().isNotEmpty()
+
+    /** Eliminazioni avvenute nel progetto dopo il cursore (migration 009). */
+    suspend fun deletedObjectsSince(projectId: String, cursor: String?): List<DeletedObjectDto> = authorized { token ->
+        http.client.get("$rest/deleted_objects") {
+            auth(token)
+            parameter("select", "object_id,deleted_at")
+            parameter("project_id", "eq.$projectId")
+            if (cursor != null) parameter("deleted_at", "gt.$cursor")
+            parameter("order", "deleted_at.asc")
+            parameter("limit", 1000)
+        }
+    }.body()
+
+    suspend fun photoPathsForObject(objectId: String): List<String> = authorized { token ->
+        http.client.get("$rest/object_photos") {
+            auth(token)
+            parameter("select", "storage_path")
+            parameter("object_id", "eq.$objectId")
+        }
+    }.body<List<JsonObject>>().mapNotNull { it["storage_path"]?.jsonPrimitive?.contentOrNull }
 
     /** Pull incrementale ordinato per `updated_at` (cursore esclusivo). */
     suspend fun objectsUpdatedSince(projectId: String, cursor: String?, limit: Int = 500): List<ObjectReadDto> =

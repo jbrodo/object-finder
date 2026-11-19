@@ -40,7 +40,7 @@ interface LocationHistoryDao {
 
     @Query(
         "SELECT h.* FROM location_history h JOIN objects o ON o.id = h.objectId " +
-            "WHERE o.projectId = :projectId AND h.syncStatus = 'pending_upload'"
+            "WHERE o.projectId = :projectId AND h.syncStatus = 'pending_upload' AND o.syncStatus != 'conflict'"
     )
     suspend fun pendingForProject(projectId: String): List<LocationHistoryEntity>
 

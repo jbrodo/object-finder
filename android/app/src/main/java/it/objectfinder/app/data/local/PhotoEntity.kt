@@ -53,7 +53,8 @@ interface PhotoDao {
 
     @Query(
         "SELECT p.* FROM object_photos p JOIN objects o ON o.id = p.objectId " +
-            "WHERE o.projectId = :projectId AND p.syncStatus = :status"
+            // Oggetti in conflitto esclusi: se eliminati sul server l'invio fallirebbe (RLS).
+            "WHERE o.projectId = :projectId AND p.syncStatus = :status AND o.syncStatus != 'conflict'"
     )
     suspend fun byProjectAndStatus(projectId: String, status: String): List<PhotoEntity>
 

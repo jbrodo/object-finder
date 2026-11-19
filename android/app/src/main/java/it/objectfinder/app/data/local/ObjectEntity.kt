@@ -22,7 +22,9 @@ enum class ObjectStatus(val wire: String, val label: String) {
 
 enum class SyncStatus(val wire: String) {
     PENDING("pending"),
-    SYNCED("synced");
+    SYNCED("synced"),
+    /** Modificato anche sul server da un altro membro: serve una scelta dell'utente (vedi ObjectConflictEntity). */
+    CONFLICT("conflict");
 }
 
 @Entity(tableName = "objects", indices = [Index("projectId"), Index("syncStatus")])
@@ -41,7 +43,12 @@ data class ObjectEntity(
     val updatedAt: Long = System.currentTimeMillis(),
     /** `updated_at` lato server dell'ultima versione nota (ISO-8601), null se mai sincronizzato. */
     val remoteUpdatedAt: String? = null,
+    /** `version` lato server dell'ultima copia nota: base della concorrenza ottimistica. */
+    val remoteVersion: Int? = null,
 ) {
+    val isConflict: Boolean get() = syncStatus == SyncStatus.CONFLICT.wire
+    /** Mai arrivato sul server: si può eliminare senza connessione. */
+    val neverSynced: Boolean get() = remoteVersion == null && remoteUpdatedAt == null
     val hasLocation: Boolean get() = latitude != null && longitude != null
     val statusEnum: ObjectStatus get() = ObjectStatus.fromWire(status)
     val isPending: Boolean get() = syncStatus == SyncStatus.PENDING.wire

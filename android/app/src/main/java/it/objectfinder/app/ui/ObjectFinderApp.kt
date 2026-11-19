@@ -250,6 +250,7 @@ fun ObjectFinderApp(
                 viewModel = vm,
                 readOnly = active?.canEditObjects == false,
                 objectId = id,
+                canDelete = active?.canDeleteObjects ?: true,
                 onClose = { nav.popBackStack() },
             )
         }

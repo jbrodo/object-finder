@@ -5,6 +5,13 @@ import androidx.lifecycle.viewModelScope
 import it.objectfinder.app.data.ObjectDraft
 import android.net.Uri
 import it.objectfinder.app.data.ObjectRepository
+import it.objectfinder.app.data.SyncMerge
+import it.objectfinder.app.data.local.ConflictKind
+import it.objectfinder.app.data.remote.ObjectReadDto
+import it.objectfinder.app.data.remote.SupabaseException
+import it.objectfinder.app.data.remote.supabaseJson
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import it.objectfinder.app.data.AddIdentifierResult
 import it.objectfinder.app.data.IdentifierRepository
 import it.objectfinder.app.data.LocationHistoryRepository
@@ -50,6 +57,8 @@ data class EditorState(
     val hasLocation: Boolean get() = latitude != null && longitude != null
     val isArchived: Boolean get() = status == ObjectStatus.ARCHIVED
 }
+
+data class ConflictUi(val deletedOnServer: Boolean, val differences: List<SyncMerge.FieldDiff>)
 
 /** Gestisce creazione e modifica: `objectId == null` → nuovo oggetto. */
 class ObjectEditorViewModel(
@@ -139,23 +148,85 @@ class ObjectEditorViewModel(
     val history: StateFlow<List<LocationHistoryEntity>> = historyRepository.observeForObject(effectiveId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Conflitto aperto (modifica concorrente o eliminazione sul server) con i campi diversi. */
+    val conflict: StateFlow<ConflictUi?> = combine(
+        objectId?.let { repository.observeConflict(it) } ?: flowOf(null),
+        objectId?.let { repository.observeObject(it) } ?: flowOf(null),
+    ) { conflict, local ->
+        if (conflict == null || local == null) null
+        else {
+            val server = conflict.serverJson?.let { supabaseJson.decodeFromString(ObjectReadDto.serializer(), it) }
+            ConflictUi(
+                deletedOnServer = server == null || ConflictKind.fromWire(conflict.kind) == ConflictKind.DELETED,
+                differences = server?.let { SyncMerge.diff(local, it) }.orEmpty(),
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     init {
         if (objectId != null) viewModelScope.launch { runCatching { refreshHistory(objectId) } }
-        if (objectId != null) viewModelScope.launch {
-            val item = repository.get(objectId)
-            _state.update {
-                if (item == null) it.copy(loaded = true, notFound = true)
-                else it.copy(
-                    loaded = true,
-                    name = item.name,
-                    category = item.category,
-                    notes = item.notes,
-                    status = item.statusEnum,
-                    latitude = item.latitude,
-                    longitude = item.longitude,
-                    accuracyMeters = item.accuracyMeters,
-                )
+        if (objectId != null) viewModelScope.launch { reload() }
+    }
+
+    private suspend fun reload() {
+        val item = objectId?.let { repository.get(it) }
+        _state.update {
+            if (item == null) it.copy(loaded = true, notFound = true)
+            else it.copy(
+                loaded = true,
+                name = item.name,
+                category = item.category,
+                notes = item.notes,
+                status = item.statusEnum,
+                latitude = item.latitude,
+                longitude = item.longitude,
+                accuracyMeters = item.accuracyMeters,
+            )
+        }
+    }
+
+    fun keepMine() {
+        val id = objectId ?: return
+        viewModelScope.launch {
+            // Prima si salvano le eventuali modifiche in corso nel form, poi si sceglie la propria versione.
+            val s = _state.value
+            repository.update(id, ObjectDraft(s.name, s.category, s.notes, s.status, s.latitude, s.longitude, s.accuracyMeters))
+            repository.keepMine(id)
+            onLocalChange()
+            _state.update { it.copy(message = "Tenuta la tua versione: verrà inviata al server") }
+        }
+    }
+
+    fun useServer() {
+        val id = objectId ?: return
+        viewModelScope.launch {
+            val deleted = conflict.value?.deletedOnServer == true
+            repository.useServer(id)
+            if (deleted) _state.update { it.copy(finished = true) }
+            else {
+                reload()
+                _state.update { it.copy(message = "Ripristinata la versione del server") }
             }
+        }
+    }
+
+    fun deletePermanently() {
+        val id = objectId ?: return
+        _state.update { it.copy(saving = true) }
+        viewModelScope.launch {
+            runCatching { repository.deletePermanently(id) }
+                .onSuccess {
+                    saved = true
+                    _state.update { it.copy(saving = false, finished = true) }
+                }
+                .onFailure { e ->
+                    val text = when (e) {
+                        is SupabaseException.NotAuthenticated -> "Accedi per eliminare un oggetto condiviso"
+                        is java.io.IOException -> "Serve una connessione per eliminare un oggetto già sincronizzato"
+                        else -> e.message ?: "Eliminazione non riuscita"
+                    }
+                    _state.update { it.copy(saving = false, message = text) }
+                }
         }
     }
 

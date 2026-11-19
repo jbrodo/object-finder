@@ -16,6 +16,8 @@ enum class ProjectRole(val wire: String, val label: String) {
 
     val canEditObjects: Boolean get() = this == OWNER || this == ADMIN || this == EDITOR
     val canManageMembers: Boolean get() = this == OWNER || this == ADMIN
+    /** RLS objects_delete: solo owner/admin. */
+    val canDeleteObjects: Boolean get() = this == OWNER || this == ADMIN
 
     companion object {
         fun fromWire(value: String?): ProjectRole? = entries.firstOrNull { it.wire == value }
@@ -28,6 +30,8 @@ enum class ProjectRole(val wire: String, val label: String) {
 data class ActiveProject(val id: String, val name: String, val role: ProjectRole? = null) {
     val canEditObjects: Boolean get() = role?.canEditObjects ?: true
     val canManageMembers: Boolean get() = role?.canManageMembers ?: false
+    /** Progetto locale (offline): l'utente è l'unico proprietario dei suoi dati. */
+    val canDeleteObjects: Boolean get() = role?.canDeleteObjects ?: true
 }
 
 sealed interface SyncState {

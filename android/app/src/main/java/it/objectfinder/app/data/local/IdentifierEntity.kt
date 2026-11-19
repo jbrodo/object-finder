@@ -64,7 +64,8 @@ interface IdentifierDao {
 
     @Query(
         "SELECT i.* FROM object_identifiers i JOIN objects o ON o.id = i.objectId " +
-            "WHERE o.projectId = :projectId AND i.syncStatus = :status"
+            // Oggetti in conflitto esclusi: se eliminati sul server l'invio fallirebbe (RLS).
+            "WHERE o.projectId = :projectId AND i.syncStatus = :status AND o.syncStatus != 'conflict'"
     )
     suspend fun byProjectAndStatus(projectId: String, status: String): List<IdentifierEntity>
 

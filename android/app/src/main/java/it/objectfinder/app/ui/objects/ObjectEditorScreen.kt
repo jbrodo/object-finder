@@ -14,7 +14,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.QrCode2
@@ -60,8 +62,11 @@ fun ObjectEditorScreen(
     onClose: () -> Unit,
     readOnly: Boolean = false,
     objectId: String? = null,
+    canDelete: Boolean = false,
 ) {
     var showLabel by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    val conflict by viewModel.conflict.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val photos by viewModel.photos.collectAsStateWithLifecycle()
     val photoBusy by viewModel.photoBusy.collectAsStateWithLifecycle()
@@ -98,6 +103,11 @@ fun ObjectEditorScreen(
                             Icon(Icons.Default.QrCode2, contentDescription = "Etichetta QR")
                         }
                     }
+                    if (canDelete && !readOnly && !state.isNew && state.loaded && !state.notFound) {
+                        IconButton(onClick = { confirmDelete = true }, enabled = !state.saving) {
+                            Icon(Icons.Default.DeleteForever, contentDescription = "Elimina definitivamente")
+                        }
+                    }
                     if (!readOnly && !state.isNew && state.loaded && !state.notFound) {
                         IconButton(onClick = viewModel::toggleArchived) {
                             Icon(
@@ -111,6 +121,25 @@ fun ObjectEditorScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        if (confirmDelete) {
+            AlertDialog(
+                onDismissRequest = { confirmDelete = false },
+                title = { Text("Eliminare definitivamente?") },
+                text = {
+                    Text(
+                        "«${state.name}» verrà eliminato con foto, codici collegati e storico posizioni, " +
+                            "anche dai dispositivi degli altri membri. Non si può annullare: se vuoi solo " +
+                            "nasconderlo, usa Archivia."
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { confirmDelete = false; viewModel.deletePermanently() }) {
+                        Text("Elimina", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Annulla") } },
+            )
+        }
         if (showLabel && objectId != null) {
             QrLabelDialog(objectId = objectId, title = state.name, onDismiss = { showLabel = false })
         }
@@ -130,6 +159,9 @@ fun ObjectEditorScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            conflict?.let {
+                ConflictBanner(it, readOnly, onKeepMine = viewModel::keepMine, onUseServer = viewModel::useServer)
+            }
             if (readOnly) {
                 Text(
                     "Hai accesso in sola lettura a questo progetto.",
