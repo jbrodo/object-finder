@@ -60,6 +60,7 @@ jobs:
         env:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         # versionCode crescente a ogni run: l'APK nuovo è sempre un aggiornamento del precedente.
+        # Aggiornare la versione base quando cambia la versione dell'app; le release usano il tag Git.
         run: >
           ./gradlew --no-daemon :app:assembleDebug
           -PGOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
