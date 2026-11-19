@@ -39,6 +39,10 @@ import it.objectfinder.app.ui.objects.ObjectEditorScreen
 import it.objectfinder.app.ui.objects.ObjectEditorViewModel
 import it.objectfinder.app.ui.objects.ObjectListScreen
 import it.objectfinder.app.ui.objects.ObjectListViewModel
+import it.objectfinder.app.ui.projects.MembersScreen
+import it.objectfinder.app.ui.projects.MembersViewModel
+import it.objectfinder.app.ui.projects.ProjectsScreen
+import it.objectfinder.app.ui.projects.ProjectsViewModel
 import it.objectfinder.app.ui.settings.SettingsScreen
 
 private object Routes {
@@ -47,6 +51,8 @@ private object Routes {
     const val MAP = "map"
     const val SETTINGS = "settings"
     const val EDITOR = "editor?id={id}"
+    const val PROJECTS = "projects"
+    const val MEMBERS = "members"
     fun editor(id: String? = null) = if (id == null) "editor" else "editor?id=$id"
 }
 
@@ -85,8 +91,10 @@ fun ObjectFinderApp(container: AppContainer) {
         composable(Routes.OBJECTS) {
             val vm = viewModel { ObjectListViewModel(container.objectRepository) }
             MainShell(container, nav, Tab.OBJECTS, requestSync) { modifier ->
+                val active by container.settings.activeProject.collectAsStateWithLifecycle()
                 ObjectListScreen(
                     viewModel = vm,
+                    canCreate = active?.canEditObjects ?: true,
                     onOpenObject = { nav.navigate(Routes.editor(it)) },
                     onCreateObject = { nav.navigate(Routes.editor()) },
                     modifier = modifier,
@@ -112,16 +120,34 @@ fun ObjectFinderApp(container: AppContainer) {
                     container = container,
                     onSignIn = { nav.navigate(Routes.AUTH) },
                     onSyncNow = requestSync,
+                    onOpenProjects = { nav.navigate(Routes.PROJECTS) },
+                    onOpenMembers = { nav.navigate(Routes.MEMBERS) },
                     modifier = modifier,
                 )
             }
+        }
+        composable(Routes.PROJECTS) {
+            val vm = viewModel {
+                ProjectsViewModel(container.projectRepository, container.settings, onProjectChanged = requestSync)
+            }
+            ProjectsScreen(viewModel = vm, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.MEMBERS) {
+            val project by container.settings.activeProject.collectAsStateWithLifecycle()
+            val vm = viewModel { MembersViewModel(container.projectRepository, onProjectChanged = requestSync) }
+            MembersScreen(viewModel = vm, project = project, onBack = { nav.popBackStack() })
         }
         composable(Routes.EDITOR) { entry ->
             val id = entry.arguments?.getString("id")
             val vm = viewModel(key = "editor-$id") {
                 ObjectEditorViewModel(id, container.objectRepository, LocationProvider(context), requestSync)
             }
-            ObjectEditorScreen(viewModel = vm, onClose = { nav.popBackStack() })
+            val active by container.settings.activeProject.collectAsStateWithLifecycle()
+            ObjectEditorScreen(
+                viewModel = vm,
+                readOnly = active?.canEditObjects == false,
+                onClose = { nav.popBackStack() },
+            )
         }
     }
 }

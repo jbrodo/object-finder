@@ -22,6 +22,43 @@ data class ProjectDto(
     @SerialName("owner_id") val ownerId: String,
 )
 
+@Serializable
+data class MembershipRoleDto(val role: String)
+
+/** Progetto con il ruolo dell'utente corrente (embed inner su project_members). */
+@Serializable
+data class ProjectWithRoleDto(
+    val id: String,
+    val name: String,
+    val description: String = "",
+    @SerialName("owner_id") val ownerId: String,
+    @SerialName("project_members") val memberships: List<MembershipRoleDto> = emptyList(),
+)
+
+@Serializable
+data class ProjectMemberDto(
+    @SerialName("user_id") val userId: String,
+    val email: String? = null,
+    val role: String,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+private data class ProjectArg(@SerialName("p_project") val project: String)
+
+@Serializable
+private data class AddMemberArgs(
+    @SerialName("p_project") val project: String,
+    @SerialName("p_email") val email: String,
+    @SerialName("p_role") val role: String,
+)
+
+@Serializable
+private data class RemoveMemberArgs(
+    @SerialName("p_project") val project: String,
+    @SerialName("p_user") val user: String,
+)
+
 /** Payload di scrittura: niente timestamp/version, gestiti dai trigger della migration 001. */
 @Serializable
 data class ObjectWriteDto(
@@ -64,13 +101,33 @@ class SupabaseRestApi(
 ) {
     private val rest get() = "${http.baseUrl}/rest/v1"
 
-    suspend fun listProjects(): List<ProjectDto> = authorized { token ->
+    /** Progetti dell'utente con il suo ruolo (RLS restituisce solo quelli di cui è membro). */
+    suspend fun listProjects(userId: String): List<ProjectWithRoleDto> = authorized { token ->
         http.client.get("$rest/projects") {
             auth(token)
-            parameter("select", "id,name,description,owner_id")
+            parameter("select", "id,name,description,owner_id,project_members!inner(role)")
+            parameter("project_members.user_id", "eq.$userId")
             parameter("order", "created_at.asc")
         }
     }.body()
+
+    suspend fun listMembers(projectId: String): List<ProjectMemberDto> = rpc("list_project_members", ProjectArg(projectId)).body()
+
+    suspend fun addMember(projectId: String, email: String, role: String) {
+        rpc("add_project_member", AddMemberArgs(projectId, email, role))
+    }
+
+    suspend fun removeMember(projectId: String, userId: String) {
+        rpc("remove_project_member", RemoveMemberArgs(projectId, userId))
+    }
+
+    private suspend inline fun <reified T : Any> rpc(function: String, args: T): HttpResponse = authorized { token ->
+        http.client.post("$rest/rpc/$function") {
+            auth(token)
+            contentType(ContentType.Application.Json)
+            setBody(args)
+        }
+    }
 
     /**
      * L'id è generato dal client e la risposta è `return=minimal`: la policy SELECT su projects

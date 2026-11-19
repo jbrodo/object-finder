@@ -46,6 +46,7 @@ fun ObjectListScreen(
     onOpenObject: (String) -> Unit,
     onCreateObject: () -> Unit,
     modifier: Modifier = Modifier,
+    canCreate: Boolean = true,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -91,7 +92,7 @@ fun ObjectListScreen(
                     }
                 }
             }
-            ExtendedFloatingActionButton(
+            if (canCreate) ExtendedFloatingActionButton(
                 onClick = onCreateObject,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Registra oggetto") },

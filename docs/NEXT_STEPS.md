@@ -17,8 +17,9 @@
 - [x] Default project bootstrap after signup
 - [x] Authenticated REST requests (JWT, refresh automatico, retry su 401)
 - [x] Sync pull cursor (incrementale su `updated_at`) e regola di conflitto base
-- [ ] Create project flow / selezione tra più progetti
-- [ ] Membership invite flow
+- [x] Create project flow / selezione tra più progetti
+- [x] Membership flow: aggiunta per email, ruoli, rimozione, uscita (RPC migration 004)
+- [ ] Inviti a email non ancora registrate (tabella inviti + accettazione al signup)
 - [ ] Conflitti multi-utente fini: confronto `version` lato server (RPC o Edge Function)
 - [ ] Cifratura token con Android Keystore
 
@@ -42,4 +43,8 @@
   cursore composto `(updated_at, id)`.
 - Dopo il logout gli oggetti cloud restano sul dispositivo ma non sono visibili finché non si
   riaccede allo stesso account.
+- `add_project_member` rivela a owner/admin se un'email ha un account (enumerazione limitata
+  ai gestori di progetto); da rivedere con il flusso inviti.
+- Login, sync e gestione membri sono verificati su Postgres con le migration, ma non ancora
+  end-to-end contro un'istanza Supabase reale (GoTrue + PostgREST).
 - Nessuna eliminazione definitiva: l'archiviazione è il soft delete previsto per l'MVP.

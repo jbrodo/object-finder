@@ -68,7 +68,8 @@ class SupabaseHttp(val config: AppConfig) {
 suspend fun HttpResponse.ensureSuccess(): HttpResponse {
     if (status.isSuccess()) return this
     val body = runCatching { bodyAsText() }.getOrDefault("")
-    throw SupabaseException.Http(status.value, parseSupabaseError(body) ?: "Errore HTTP ${status.value}")
+    val raw = parseSupabaseError(body)
+    throw SupabaseException.Http(status.value, raw?.let(::localizeServerMessage) ?: "Errore HTTP ${status.value}")
 }
 
 internal fun parseSupabaseError(body: String): String? {
@@ -76,4 +77,24 @@ internal fun parseSupabaseError(body: String): String? {
     // GoTrue: error_description | msg ; PostgREST: message
     return listOf("error_description", "msg", "message", "error")
         .firstNotNullOfOrNull { key -> obj[key]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() } }
+}
+
+private val KNOWN_MESSAGES = listOf(
+    "invalid login credentials" to "Email o password non corretti",
+    "email not confirmed" to "Email non ancora confermata: controlla la tua casella",
+    "user already registered" to "Esiste già un account con questa email",
+    "password should be at least" to "La password è troppo corta",
+    "no account found for this email" to "Nessun account registrato con questa email",
+    "the owner role cannot be assigned" to "Il ruolo di proprietario non è assegnabile",
+    "the owner role cannot be changed" to "Il ruolo del proprietario non può essere cambiato",
+    "the project owner cannot be removed" to "Il proprietario non può essere rimosso dal progetto",
+    "only owners and admins" to "Operazione riservata a proprietari e amministratori",
+    "not a project member" to "Non fai parte di questo progetto",
+    "row-level security" to "Permessi insufficienti per questa operazione",
+)
+
+/** Messaggi server noti → italiano; gli altri restano invariati. */
+internal fun localizeServerMessage(message: String): String {
+    val lower = message.lowercase()
+    return KNOWN_MESSAGES.firstOrNull { (key, _) -> lower.contains(key) }?.second ?: message
 }

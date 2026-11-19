@@ -51,7 +51,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit) {
+fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit, readOnly: Boolean = false) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val permission = rememberLocationPermissionRequester()
@@ -71,14 +71,14 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (state.isNew) "Nuovo oggetto" else "Modifica oggetto") },
+                title = { Text(if (readOnly) "Dettaglio oggetto" else if (state.isNew) "Nuovo oggetto" else "Modifica oggetto") },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
                     }
                 },
                 actions = {
-                    if (!state.isNew && state.loaded && !state.notFound) {
+                    if (!readOnly && !state.isNew && state.loaded && !state.notFound) {
                         IconButton(onClick = viewModel::toggleArchived) {
                             Icon(
                                 if (state.isArchived) Icons.Default.Unarchive else Icons.Default.Archive,
@@ -107,6 +107,13 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (readOnly) {
+                Text(
+                    "Hai accesso in sola lettura a questo progetto.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             if (state.isArchived) {
                 Text(
                     "Oggetto archiviato: non compare nell'elenco principale.",
@@ -117,6 +124,7 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit) {
             OutlinedTextField(
                 value = state.name,
                 onValueChange = viewModel::setName,
+                enabled = !readOnly,
                 label = { Text("Nome oggetto *") },
                 singleLine = true,
                 isError = state.nameTouched && state.name.isBlank(),
@@ -127,14 +135,16 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit) {
             OutlinedTextField(
                 value = state.category,
                 onValueChange = viewModel::setCategory,
+                enabled = !readOnly,
                 label = { Text("Categoria") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            StatusSelector(state.status, viewModel::setStatus)
+            StatusSelector(state.status, viewModel::setStatus, enabled = !readOnly)
             OutlinedTextField(
                 value = state.notes,
                 onValueChange = viewModel::setNotes,
+                enabled = !readOnly,
                 label = { Text("Note") },
                 minLines = 3,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -151,7 +161,7 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit) {
                         else "Nessuna posizione salvata",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!readOnly) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = { permission.withPermission(viewModel::captureLocation) },
                             enabled = !state.locating,
@@ -169,7 +179,7 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit) {
                 }
             }
 
-            Button(onClick = viewModel::save, enabled = state.canSave, modifier = Modifier.fillMaxWidth()) {
+            if (!readOnly) Button(onClick = viewModel::save, enabled = state.canSave, modifier = Modifier.fillMaxWidth()) {
                 Text(if (state.isNew) "Registra oggetto" else "Salva modifiche")
             }
         }
@@ -178,15 +188,16 @@ fun ObjectEditorScreen(viewModel: ObjectEditorViewModel, onClose: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StatusSelector(selected: ObjectStatus, onSelect: (ObjectStatus) -> Unit) {
+private fun StatusSelector(selected: ObjectStatus, onSelect: (ObjectStatus) -> Unit, enabled: Boolean) {
     var expanded by remember { mutableStateOf(false) }
     // L'archiviazione ha un'azione dedicata nella top bar.
     val options = ObjectStatus.entries.filter { it != ObjectStatus.ARCHIVED }
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = enabled && it }) {
         OutlinedTextField(
             value = selected.label,
             onValueChange = {},
             readOnly = true,
+            enabled = enabled,
             label = { Text("Stato") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),

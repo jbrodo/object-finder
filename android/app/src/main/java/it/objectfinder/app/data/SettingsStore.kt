@@ -6,7 +6,29 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-data class ActiveProject(val id: String, val name: String)
+/** Ruoli allineati all'enum `public.project_role`. */
+enum class ProjectRole(val wire: String, val label: String) {
+    OWNER("owner", "Proprietario"),
+    ADMIN("admin", "Amministratore"),
+    EDITOR("editor", "Editor"),
+    VIEWER("viewer", "Solo lettura"),
+    TRACKER("tracker", "Tracker");
+
+    val canEditObjects: Boolean get() = this == OWNER || this == ADMIN || this == EDITOR
+    val canManageMembers: Boolean get() = this == OWNER || this == ADMIN
+
+    companion object {
+        fun fromWire(value: String?): ProjectRole? = entries.firstOrNull { it.wire == value }
+        /** Ruoli assegnabili a un membro (l'owner è unico e fissato alla creazione). */
+        val assignable = listOf(ADMIN, EDITOR, VIEWER)
+    }
+}
+
+/** Progetto attivo; [role] null = progetto locale offline (nessuna restrizione). */
+data class ActiveProject(val id: String, val name: String, val role: ProjectRole? = null) {
+    val canEditObjects: Boolean get() = role?.canEditObjects ?: true
+    val canManageMembers: Boolean get() = role?.canManageMembers ?: false
+}
 
 sealed interface SyncState {
     data object Idle : SyncState
@@ -40,8 +62,10 @@ class SettingsStore(context: Context) {
 
     fun setActiveProject(project: ActiveProject?) {
         prefs.edit().apply {
-            if (project == null) remove(KEY_PROJECT_ID).remove(KEY_PROJECT_NAME)
-            else putString(KEY_PROJECT_ID, project.id).putString(KEY_PROJECT_NAME, project.name)
+            if (project == null) remove(KEY_PROJECT_ID).remove(KEY_PROJECT_NAME).remove(KEY_PROJECT_ROLE)
+            else putString(KEY_PROJECT_ID, project.id)
+                .putString(KEY_PROJECT_NAME, project.name)
+                .putString(KEY_PROJECT_ROLE, project.role?.wire)
         }.apply()
         _activeProject.value = project
     }
@@ -71,13 +95,18 @@ class SettingsStore(context: Context) {
 
     private fun readProject(): ActiveProject? {
         val id = prefs.getString(KEY_PROJECT_ID, null) ?: return null
-        return ActiveProject(id, prefs.getString(KEY_PROJECT_NAME, null) ?: "Progetto")
+        return ActiveProject(
+            id = id,
+            name = prefs.getString(KEY_PROJECT_NAME, null) ?: "Progetto",
+            role = ProjectRole.fromWire(prefs.getString(KEY_PROJECT_ROLE, null)),
+        )
     }
 
     private companion object {
         const val KEY_MAP = "map_engine"
         const val KEY_PROJECT_ID = "active_project_id"
         const val KEY_PROJECT_NAME = "active_project_name"
+        const val KEY_PROJECT_ROLE = "active_project_role"
         const val KEY_ONBOARDING = "onboarding_done"
         const val KEY_CURSOR = "pull_cursor_"
     }

@@ -95,7 +95,8 @@ class ObjectRepository(
         val result = runCatching {
             if (auth.session.value == null) throw SupabaseException.NotAuthenticated()
             val project = projects.ensureActiveProject()
-            val pushed = push(project.id)
+            // Un viewer non può scrivere (RLS): si limita al pull.
+            val pushed = if (project.canEditObjects) push(project.id) else 0
             val pulled = pull(project.id)
             SyncReport(pushed, pulled)
         }

@@ -17,7 +17,8 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
 2. Copiare `android/app/src/main/assets/config.properties.example` in `config.properties`
    e impostare `SUPABASE_URL` e `SUPABASE_ANON_KEY` (anon/publishable key).
 3. In Supabase, SQL Editor, eseguire in ordine:
-   `backend/migrations/001_initial_schema.sql`, `002_storage_policies.sql`, `003_sync_support.sql`.
+   `backend/migrations/001_initial_schema.sql`, `002_storage_policies.sql`, `003_sync_support.sql`,
+   `004_project_members_rpc.sql`.
 4. In Supabase → Authentication → Providers abilitare Email/Password. Con "Confirm email" attivo,
    l'app mostra il messaggio di conferma e chiede di accedere dopo aver confermato.
 
@@ -41,6 +42,9 @@ Al termine, scaricare l'artifact `object-finder-debug-apk` dalla run. La secret 
 - Sessione persistente con refresh automatico del token; richieste REST autenticate (JWT utente)
 - Bootstrap automatico del progetto cloud al primo accesso; gli oggetti creati offline vengono
   riassegnati al progetto e sincronizzati
+- Progetti multipli: creazione, cambio progetto attivo, ruolo dell'utente per progetto
+- Membri: elenco, aggiunta per email (account esistente), cambio ruolo, rimozione, uscita dal progetto;
+  permessi in app allineati alle policy RLS (viewer in sola lettura, gestione membri a owner/admin)
 - Elenco oggetti con ricerca e filtri (in uso / archiviati / tutti), stato di sync per oggetto
 - Creazione e modifica oggetto: nome, categoria, stato, note, posizione GPS
 - Archiviazione/ripristino (soft delete sincronizzato)
@@ -63,5 +67,5 @@ Al termine, scaricare l'artifact `object-finder-debug-apk` dalla run. La secret 
 - `MapEngine` consente di aggiungere MapLibre come provider OSM avanzato in una milestone successiva.
 
 ## Stato e prossimi step
-Vedi `docs/NEXT_STEPS.md`. In breve: inviti/membership, upload foto su Storage, QR/NFC,
+Vedi `docs/NEXT_STEPS.md`. In breve: inviti a utenti non ancora registrati, upload foto su Storage, QR/NFC,
 tracker BLE/GPS, matching immagini.
