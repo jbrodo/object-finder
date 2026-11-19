@@ -79,6 +79,11 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     testOptions { unitTests.isReturnDefaultValues = true }
+    lint {
+        // Digital Asset Links servono solo a condividere le password con un sito web dello stesso
+        // dominio (Credential Manager); Object Finder non ne ha. Da riattivare se nascerà un sito.
+        disable += "CredManMissingDal"
+    }
 }
 
 dependencies {
@@ -114,6 +119,10 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // Credential Manager: salvataggio/recupero password con il gestore password di sistema.
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
 
     // Foto: rendering immagini locali e correzione orientamento EXIF.
     implementation("io.coil-kt:coil-compose:2.7.0")

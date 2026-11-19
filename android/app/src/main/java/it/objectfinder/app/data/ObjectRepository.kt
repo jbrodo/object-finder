@@ -36,6 +36,7 @@ class ObjectRepository(
     private val settings: SettingsStore,
     private val photos: PhotoRepository,
     private val identifiers: IdentifierRepository,
+    private val history: LocationHistoryRepository,
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     private val syncMutex = Mutex()
@@ -54,7 +55,8 @@ class ObjectRepository(
             dao.observePendingCount(),
             photos.observePendingCount(),
             identifiers.observePendingCount(),
-        ) { objects, pics, codes -> objects + pics + codes }
+            history.observePendingCount(),
+        ) { objects, pics, codes, positions -> objects + pics + codes + positions }
 
     suspend fun get(id: String): ObjectEntity? = dao.getById(id)
 
@@ -73,12 +75,19 @@ class ObjectRepository(
             updatedAt = now(),
         )
         dao.upsert(item)
+        recordPosition(item)
         return item
+    }
+
+    private suspend fun recordPosition(item: ObjectEntity) {
+        val lat = item.latitude ?: return
+        val lon = item.longitude ?: return
+        history.record(item.id, lat, lon, item.accuracyMeters)
     }
 
     suspend fun update(id: String, draft: ObjectDraft) {
         val existing = dao.getById(id) ?: return
-        dao.upsert(
+        val updated =
             existing.copy(
                 name = draft.name.trim(),
                 category = draft.category.trim().ifBlank { "general" },
@@ -90,7 +99,8 @@ class ObjectRepository(
                 syncStatus = SyncStatus.PENDING.wire,
                 updatedAt = now(),
             )
-        )
+        dao.upsert(updated)
+        recordPosition(updated)
     }
 
     /** Archiviazione = soft delete (status `archived`), reversibile e sincronizzata. */
@@ -111,8 +121,9 @@ class ObjectRepository(
             val pulled = pull(project.id)
             // Dopo gli oggetti: le policy Storage richiedono che l'oggetto esista sul server.
             val codeChanges = identifiers.sync(project.id, canWrite = project.canEditObjects)
+            val positions = if (project.canEditObjects) history.push(project.id) else 0
             val photoReport = photos.sync(project.id, canWrite = project.canEditObjects)
-            SyncReport(pushed + codeChanges, pulled, photoReport)
+            SyncReport(pushed + codeChanges + positions, pulled, photoReport)
         }
         settings.setSyncState(
             result.fold(

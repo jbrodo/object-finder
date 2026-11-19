@@ -10,7 +10,19 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.autofill.AutofillType
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +55,8 @@ private enum class AuthMode(val label: String) { SIGN_IN("Accedi"), SIGN_UP("Reg
  * Onboarding/login Supabase. L'account è facoltativo: senza, l'app resta un archivio locale.
  * Dopo l'accesso viene garantito un progetto cloud (bootstrap) e avviata la sincronizzazione.
  */
+// Autofill legacy di Compose 1.7 (AutofillType) è sperimentale ma è l'API disponibile con questo BOM.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun AuthScreen(
     container: AppContainer,
@@ -56,11 +70,20 @@ fun AuthScreen(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf<String?>(null) }
+    var passwordVisible by remember { mutableStateOf(false) }
+    val activity = LocalActivity.current
     val configured = container.config.isSupabaseConfigured
 
     val emailValid = EMAIL_REGEX.matches(email.trim())
-    val passwordValid = password.length >= 6
+    // Accesso: minimo Supabase (6) per gli account esistenti; registrazione: requisito più severo.
+    val minLength = if (mode == AuthMode.SIGN_UP) MIN_SIGNUP_PASSWORD else 6
+    val passwordValid = password.length >= minLength
     val canSubmit = configured && emailValid && passwordValid && !busy
+
+    /** Offre al gestore password di salvare le credenziali appena usate con successo. */
+    suspend fun offerSave() {
+        activity?.let { SavedCredentials.save(it, email.trim(), password) }
+    }
 
     fun submit() {
         if (!canSubmit) return
@@ -77,11 +100,13 @@ fun AuthScreen(
             }.onSuccess { outcome ->
                 when (outcome) {
                     AuthOutcome.SignedIn -> {
+                        offerSave()
                         // Bootstrap progetto best-effort: se fallisce, ci riprova la sync.
                         runCatching { container.projectRepository.ensureActiveProject() }
                         onDone()
                     }
                     is AuthOutcome.ConfirmEmail -> {
+                        offerSave()
                         info = "Ti abbiamo inviato un'email di conferma a ${outcome.email}. Confermala e poi accedi."
                         mode = AuthMode.SIGN_IN
                     }
@@ -90,6 +115,24 @@ fun AuthScreen(
             busy = false
         }
     }
+
+    /** Credenziali salvate nel gestore password: compila e accede. */
+    fun useSavedCredentials(auto: Boolean) {
+        val act = activity ?: return
+        scope.launch {
+            val saved = SavedCredentials.pick(act) ?: run {
+                if (!auto) info = "Nessuna password salvata per Object Finder su questo dispositivo."
+                return@launch
+            }
+            mode = AuthMode.SIGN_IN
+            email = saved.email
+            password = saved.password
+            submit()
+        }
+    }
+
+    // All'apertura propone subito le credenziali salvate (se non ce ne sono non appare nulla).
+    LaunchedEffect(configured) { if (configured) useSavedCredentials(auto = true) }
 
     Scaffold { padding ->
         Column(
@@ -137,18 +180,53 @@ fun AuthScreen(
                 singleLine = true,
                 isError = email.isNotBlank() && !emailValid,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .autofill(listOf(AutofillType.EmailAddress, AutofillType.Username)) { email = it },
             )
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
-                supportingText = { if (mode == AuthMode.SIGN_UP) Text("Almeno 6 caratteri") },
+                supportingText = {
+                    if (mode == AuthMode.SIGN_UP) {
+                        val strength = passwordStrength(password)
+                        Text(
+                            if (password.isEmpty()) "Almeno $MIN_SIGNUP_PASSWORD caratteri: puoi usare la password suggerita dal gestore password"
+                            else "Robustezza: ${strength.label}" +
+                                if (password.length < MIN_SIGNUP_PASSWORD) " · almeno $MIN_SIGNUP_PASSWORD caratteri" else "",
+                            color = when {
+                                password.isEmpty() -> MaterialTheme.colorScheme.onSurfaceVariant
+                                strength == PasswordStrength.STRONG -> MaterialTheme.colorScheme.primary
+                                strength == PasswordStrength.WEAK -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                },
                 singleLine = true,
                 isError = password.isNotEmpty() && !passwordValid,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (passwordVisible) "Nascondi password" else "Mostra password",
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done,
+                    autoCorrectEnabled = false,
+                ),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // "Nuova password" in registrazione: il gestore password propone una password forte.
+                    .autofill(
+                        listOf(if (mode == AuthMode.SIGN_UP) AutofillType.NewPassword else AutofillType.Password)
+                    ) { password = it },
             )
 
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -157,6 +235,12 @@ fun AuthScreen(
             Button(onClick = ::submit, enabled = canSubmit, modifier = Modifier.fillMaxWidth()) {
                 if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 else Text(mode.label)
+            }
+            if (configured && mode == AuthMode.SIGN_IN) {
+                TextButton(onClick = { useSavedCredentials(auto = false) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Key, contentDescription = null, Modifier.size(18.dp))
+                    Text("  Usa password salvata")
+                }
             }
             TextButton(onClick = onContinueOffline, modifier = Modifier.fillMaxWidth()) {
                 Text("Continua senza account")

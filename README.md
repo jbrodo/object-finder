@@ -20,7 +20,7 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
    da SQL Editor eseguendo in ordine:
    `backend/migrations/001_initial_schema.sql`, `002_storage_policies.sql`, `003_sync_support.sql`,
    `004_project_members_rpc.sql`, `005_object_photos.sql`, `006_object_identifiers.sql`,
-   `007_project_invites.sql`.
+   `007_project_invites.sql`, `008_location_history.sql`.
    La 005 è necessaria per le foto: corregge le policy Storage della 002, che negavano sempre
    lettura e upload.
 4. In Supabase → Authentication → Providers abilitare Email/Password e **lasciare attivo
@@ -86,7 +86,10 @@ L'APK debug della CI e quello release hanno firme diverse: per passare dall'uno 
 disinstallata l'app.
 
 ## Funzioni incluse
-- Onboarding con login/registrazione Supabase (email + password) o uso offline senza account
+- Onboarding con login/registrazione Supabase (email + password) o uso offline senza account;
+  integrazione con il gestore password di Android (autofill: in registrazione il campo è "nuova
+  password", così il gestore può proporne una forte; salvataggio dopo l'accesso e proposta delle
+  credenziali salvate all'apertura), pulsante per mostrare la password, indicatore di robustezza
 - Sessione persistente con refresh automatico del token; richieste REST autenticate (JWT utente)
 - Bootstrap automatico del progetto cloud al primo accesso; gli oggetti creati offline vengono
   riassegnati al progetto e sincronizzati
@@ -111,6 +114,10 @@ disinstallata l'app.
 - Acquisizione GPS ad alta precisione con fallback sull'ultima posizione nota
 - Sincronizzazione bidirezionale: push delle modifiche pending + pull incrementale con cursore,
   sync immediata dopo ogni modifica (appena c'è rete) e periodica ogni ora
+- "Vicini": elenco ordinato per distanza dal telefono, con la distanza su ogni oggetto
+- Storico posizioni: ogni nuova posizione (oltre l'incertezza del GPS) viene registrata e sincronizzata
+  (tabella `locations`, append-only); in scheda: data, coordinate, spostamento, apertura su mappa
+- "Portami lì": navigazione a piedi verso l'oggetto con Google Maps (o altra app mappe)
 - Mappa Google Maps / OpenStreetMap con preferenza salvata, fallback automatico su OSM senza API key,
   apertura dell'oggetto dal marker
 

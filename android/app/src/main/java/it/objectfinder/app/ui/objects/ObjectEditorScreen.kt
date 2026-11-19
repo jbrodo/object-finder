@@ -14,7 +14,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.QrCode2
 import it.objectfinder.app.qr.QrLabelDialog
 import androidx.compose.material.icons.filled.Unarchive
@@ -64,6 +66,8 @@ fun ObjectEditorScreen(
     val photos by viewModel.photos.collectAsStateWithLifecycle()
     val photoBusy by viewModel.photoBusy.collectAsStateWithLifecycle()
     val codes by viewModel.identifiers.collectAsStateWithLifecycle()
+    val history by viewModel.history.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val permission = rememberLocationPermissionRequester()
 
@@ -197,6 +201,15 @@ fun ObjectEditorScreen(
                         else "Nessuna posizione salvata",
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    if (state.hasLocation) {
+                        Button(
+                            onClick = { navigateTo(context, state.latitude!!, state.longitude!!) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Default.Directions, contentDescription = null, Modifier.size(18.dp))
+                            Text("  Portami lì")
+                        }
+                    }
                     if (!readOnly) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = { permission.withPermission(viewModel::captureLocation) },
@@ -214,6 +227,8 @@ fun ObjectEditorScreen(
                     }
                 }
             }
+
+            LocationHistorySection(history)
 
             if (!readOnly) Button(onClick = viewModel::save, enabled = state.canSave, modifier = Modifier.fillMaxWidth()) {
                 Text(

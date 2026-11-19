@@ -8,14 +8,15 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [ObjectEntity::class, PhotoEntity::class, IdentifierEntity::class],
-    version = 4,
+    entities = [ObjectEntity::class, PhotoEntity::class, IdentifierEntity::class, LocationHistoryEntity::class],
+    version = 5,
     exportSchema = false,
 )
 abstract class ObjectDatabase : RoomDatabase() {
     abstract fun objectDao(): ObjectDao
     abstract fun photoDao(): PhotoDao
     abstract fun identifierDao(): IdentifierDao
+    abstract fun locationHistoryDao(): LocationHistoryDao
 
     companion object {
         /** v1 → v2: colonna remoteUpdatedAt e indici su projectId/syncStatus. Nessuna perdita di dati. */
@@ -54,9 +55,29 @@ abstract class ObjectDatabase : RoomDatabase() {
             }
         }
 
+        /** v4 → v5: storico posizioni; ogni oggetto con coordinate riceve la posizione attuale come primo punto. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS location_history (" +
+                        "id TEXT NOT NULL PRIMARY KEY, objectId TEXT NOT NULL, latitude REAL NOT NULL, " +
+                        "longitude REAL NOT NULL, accuracyMeters REAL, recordedAt INTEGER NOT NULL, " +
+                        "source TEXT NOT NULL, syncStatus TEXT NOT NULL)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_location_history_objectId ON location_history(objectId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_location_history_syncStatus ON location_history(syncStatus)")
+                // Id deterministico dall'id oggetto: SQLite non ha UUID; il formato resta un UUID valido.
+                db.execSQL(
+                    "INSERT INTO location_history (id, objectId, latitude, longitude, accuracyMeters, recordedAt, source, syncStatus) " +
+                        "SELECT substr(id, 1, 14) || '5' || substr(id, 16), id, latitude, longitude, accuracyMeters, " +
+                        "updatedAt, 'phone', 'pending_upload' FROM objects WHERE latitude IS NOT NULL AND longitude IS NOT NULL"
+                )
+            }
+        }
+
         fun create(context: Context): ObjectDatabase =
             Room.databaseBuilder(context, ObjectDatabase::class.java, "object-finder.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
     }
 }

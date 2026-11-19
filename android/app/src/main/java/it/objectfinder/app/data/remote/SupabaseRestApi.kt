@@ -80,6 +80,17 @@ data class IdentifierRowDto(
 )
 
 @Serializable
+data class LocationRowDto(
+    val id: String,
+    @SerialName("object_id") val objectId: String,
+    val source: String,
+    val latitude: Double,
+    val longitude: Double,
+    @SerialName("accuracy_meters") val accuracyMeters: Float?,
+    @SerialName("recorded_at") val recordedAt: String,
+)
+
+@Serializable
 data class InviteDto(
     val id: String,
     @SerialName("project_id") val projectId: String,
@@ -279,6 +290,31 @@ class SupabaseRestApi(
             }
         }
     }
+
+    // ---- Storico posizioni (tabella locations, migration 008) ----
+
+    /** Inserimento idempotente (stesso id → ignorato): i retry dopo errori di rete sono sicuri. */
+    suspend fun insertLocation(row: LocationRowDto) {
+        authorized { token ->
+            http.client.post("$rest/locations") {
+                auth(token)
+                parameter("on_conflict", "id")
+                header("Prefer", "resolution=ignore-duplicates,return=minimal")
+                contentType(ContentType.Application.Json)
+                setBody(row)
+            }
+        }
+    }
+
+    suspend fun locationsForObject(objectId: String, limit: Int = 50): List<LocationRowDto> = authorized { token ->
+        http.client.get("$rest/locations") {
+            auth(token)
+            parameter("select", "id,object_id,source,latitude,longitude,accuracy_meters,recorded_at")
+            parameter("object_id", "eq.$objectId")
+            parameter("order", "recorded_at.desc")
+            parameter("limit", limit)
+        }
+    }.body()
 
     // ---- Inviti (migration 007) ----
 

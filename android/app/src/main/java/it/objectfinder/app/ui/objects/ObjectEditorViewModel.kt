@@ -7,6 +7,8 @@ import android.net.Uri
 import it.objectfinder.app.data.ObjectRepository
 import it.objectfinder.app.data.AddIdentifierResult
 import it.objectfinder.app.data.IdentifierRepository
+import it.objectfinder.app.data.LocationHistoryRepository
+import it.objectfinder.app.data.local.LocationHistoryEntity
 import it.objectfinder.app.data.PhotoRepository
 import it.objectfinder.app.data.local.IdentifierEntity
 import it.objectfinder.app.data.local.IdentifierType
@@ -55,6 +57,9 @@ class ObjectEditorViewModel(
     private val repository: ObjectRepository,
     private val photoRepository: PhotoRepository,
     private val identifierRepository: IdentifierRepository,
+    private val historyRepository: LocationHistoryRepository,
+    /** Aggiorna lo storico dal server (no-op offline). */
+    private val refreshHistory: suspend (String) -> Unit,
     private val locationProvider: LocationProvider,
     private val appScope: CoroutineScope,
     private val onLocalChange: () -> Unit,
@@ -131,7 +136,11 @@ class ObjectEditorViewModel(
         }
     }
 
+    val history: StateFlow<List<LocationHistoryEntity>> = historyRepository.observeForObject(effectiveId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     init {
+        if (objectId != null) viewModelScope.launch { runCatching { refreshHistory(objectId) } }
         if (objectId != null) viewModelScope.launch {
             val item = repository.get(objectId)
             _state.update {

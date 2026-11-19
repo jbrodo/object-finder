@@ -1,6 +1,8 @@
 package it.objectfinder.app.ui.objects
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +22,19 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Search
+import android.widget.Toast
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import it.objectfinder.app.data.Geo
+import it.objectfinder.app.location.LocationProvider
+import it.objectfinder.app.ui.common.rememberLocationPermissionRequester
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -54,6 +68,30 @@ fun ObjectListScreen(
     canCreate: Boolean = true,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val permission = rememberLocationPermissionRequester()
+    var locating by remember { mutableStateOf(false) }
+
+    fun toggleNearby() {
+        if (state.origin != null) { viewModel.setOrigin(null); return }
+        permission.withPermission {
+            locating = true
+            scope.launch {
+                val provider = LocationProvider(context)
+                // Ordinamento immediato con l'ultima posizione nota, poi affinato con un fix fresco.
+                val quick = provider.lastKnownLocation()?.also(viewModel::setOrigin)
+                val fresh = provider.currentLocation()
+                locating = false
+                when {
+                    fresh != null -> viewModel.setOrigin(fresh)
+                    quick == null -> Toast.makeText(
+                        context, "Posizione non disponibile: verifica che il GPS sia attivo", Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
+        }
+    }
 
     Column(modifier.fillMaxSize()) {
         OutlinedTextField(
@@ -65,7 +103,7 @@ fun ObjectListScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         )
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ObjectFilter.entries.forEach { option ->
@@ -75,6 +113,15 @@ fun ObjectListScreen(
                     label = { Text(option.label) },
                 )
             }
+            FilterChip(
+                selected = state.origin != null,
+                onClick = ::toggleNearby,
+                leadingIcon = {
+                    if (locating) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Default.NearMe, contentDescription = null, Modifier.size(16.dp))
+                },
+                label = { Text("Vicini") },
+            )
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -93,7 +140,12 @@ fun ObjectListScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(state.items, key = { it.id }) { item ->
-                        ObjectCard(item, cover = state.covers[item.id], onClick = { onOpenObject(item.id) })
+                        ObjectCard(
+                            item,
+                            cover = state.covers[item.id],
+                            distance = state.distanceTo(item),
+                            onClick = { onOpenObject(item.id) },
+                        )
                     }
                 }
             }
@@ -108,7 +160,7 @@ fun ObjectListScreen(
 }
 
 @Composable
-private fun ObjectCard(item: ObjectEntity, cover: String?, onClick: () -> Unit) {
+private fun ObjectCard(item: ObjectEntity, cover: String?, distance: Double?, onClick: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
       Row(Modifier.padding(start = if (cover != null) 12.dp else 0.dp), verticalAlignment = Alignment.CenterVertically) {
         if (cover != null) {
@@ -149,7 +201,14 @@ private fun ObjectCard(item: ObjectEntity, cover: String?, onClick: () -> Unit) 
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.width(4.dp))
-                Text(formatLocation(item), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    distance?.let {
+                        // Sotto i 10 m la differenza è dentro l'incertezza del GPS.
+                        if (it < 10) "a meno di 10 m da te" else "a ${Geo.formatDistance(it)} da te"
+                    } ?: formatLocation(item),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (distance != null) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Unspecified,
+                )
             }
             if (item.notes.isNotBlank()) {
                 Text(item.notes, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)

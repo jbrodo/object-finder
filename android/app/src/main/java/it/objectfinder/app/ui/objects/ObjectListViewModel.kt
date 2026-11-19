@@ -2,7 +2,9 @@ package it.objectfinder.app.ui.objects
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import it.objectfinder.app.data.Geo
 import it.objectfinder.app.data.IdentifierRepository
+import it.objectfinder.app.location.DeviceLocation
 import it.objectfinder.app.data.ObjectRepository
 import it.objectfinder.app.data.PhotoRepository
 import it.objectfinder.app.data.local.ObjectEntity
@@ -23,7 +25,16 @@ data class ObjectListState(
     val loading: Boolean = true,
     /** objectId → path della foto di copertina. */
     val covers: Map<String, String> = emptyMap(),
-)
+    /** Posizione del telefono se l'ordinamento "vicino a me" è attivo. */
+    val origin: DeviceLocation? = null,
+) {
+    fun distanceTo(item: ObjectEntity): Double? {
+        val from = origin ?: return null
+        val lat = item.latitude ?: return null
+        val lon = item.longitude ?: return null
+        return Geo.distanceMeters(from.latitude, from.longitude, lat, lon)
+    }
+}
 
 class ObjectListViewModel(
     repository: ObjectRepository,
@@ -32,6 +43,7 @@ class ObjectListViewModel(
 ) : ViewModel() {
     private val query = MutableStateFlow("")
     private val filter = MutableStateFlow(ObjectFilter.ACTIVE)
+    private val origin = MutableStateFlow<DeviceLocation?>(null)
 
     val state: StateFlow<ObjectListState> =
         combine(
@@ -45,7 +57,13 @@ class ObjectListViewModel(
                 loading = false,
                 covers = covers,
             )
+        }.combine(origin) { state, from ->
+            if (from == null) state
+            else state.copy(items = sortByDistance(state.items, from.latitude, from.longitude), origin = from)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ObjectListState())
+
+    /** Attiva (posizione) o disattiva (null) l'ordinamento per distanza. */
+    fun setOrigin(location: DeviceLocation?) { origin.value = location }
 
     fun setQuery(value: String) { query.value = value }
     fun setFilter(value: ObjectFilter) { filter.value = value }
@@ -72,3 +90,11 @@ internal fun filterObjects(
             codes[item.id].orEmpty().any { it.contains(q, ignoreCase = true) })
     }
 }
+
+/** Più vicini prima; gli oggetti senza coordinate in fondo, in ordine invariato. */
+internal fun sortByDistance(items: List<ObjectEntity>, latitude: Double, longitude: Double): List<ObjectEntity> =
+    items.sortedWith(compareBy(nullsLast()) { item ->
+        val lat = item.latitude
+        val lon = item.longitude
+        if (lat == null || lon == null) null else Geo.distanceMeters(latitude, longitude, lat, lon)
+    })

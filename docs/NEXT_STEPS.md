@@ -33,6 +33,12 @@
 - [x] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`, migration 005)
 - [ ] Visual embeddings and similarity search
 
+## M3.5 — Ritrovare gli oggetti
+- [x] "Vicini": ordinamento per distanza dal telefono
+- [x] Storico posizioni (migration 008, append-only) con spostamenti
+- [x] "Portami lì" (navigazione verso l'oggetto)
+- [x] Password: autofill/Credential Manager, mostra password, robustezza
+
 ## M4 — Tracking
 - [ ] BLE scan/connect
 - [ ] GPS tracker ingestion endpoint

@@ -234,6 +234,12 @@ fun ObjectFinderApp(
                     repository = container.objectRepository,
                     photoRepository = container.photoRepository,
                     identifierRepository = container.identifierRepository,
+                    historyRepository = container.locationHistoryRepository,
+                    refreshHistory = { objectId ->
+                        if (container.authRepository.session.value != null &&
+                            container.settings.activeProject.value?.role != null
+                        ) container.locationHistoryRepository.refresh(objectId)
+                    },
                     locationProvider = LocationProvider(context),
                     appScope = container.appScope,
                     onLocalChange = requestSync,
