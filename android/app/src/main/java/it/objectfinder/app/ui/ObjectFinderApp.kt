@@ -1,134 +1,186 @@
 package it.objectfinder.app.ui
 
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import it.objectfinder.app.data.AppContainer
-import it.objectfinder.app.data.ObjectEntity
-import it.objectfinder.app.location.LocationProvider\nimport it.objectfinder.app.maps.ObjectMapScreen
-import it.objectfinder.app.sync.ObjectSyncWorker
-import kotlinx.coroutines.launch
-import java.util.UUID
+import it.objectfinder.app.data.local.ObjectStatus
+import it.objectfinder.app.location.LocationProvider
+import it.objectfinder.app.maps.ObjectMapScreen
+import it.objectfinder.app.sync.SyncScheduler
+import it.objectfinder.app.ui.auth.AuthScreen
+import it.objectfinder.app.ui.objects.ObjectEditorScreen
+import it.objectfinder.app.ui.objects.ObjectEditorViewModel
+import it.objectfinder.app.ui.objects.ObjectListScreen
+import it.objectfinder.app.ui.objects.ObjectListViewModel
+import it.objectfinder.app.ui.settings.SettingsScreen
+
+private object Routes {
+    const val AUTH = "auth"
+    const val OBJECTS = "objects"
+    const val MAP = "map"
+    const val SETTINGS = "settings"
+    const val EDITOR = "editor?id={id}"
+    fun editor(id: String? = null) = if (id == null) "editor" else "editor?id=$id"
+}
+
+private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
+    OBJECTS(Routes.OBJECTS, "Oggetti", Icons.AutoMirrored.Filled.List),
+    MAP(Routes.MAP, "Mappa", Icons.Default.Map),
+    SETTINGS(Routes.SETTINGS, "Impostazioni", Icons.Default.Settings),
+}
 
 @Composable
 fun ObjectFinderApp(container: AppContainer) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val objects by container.repository.observeObjects().collectAsState(initial = emptyList())
-    var name by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("general") }
-    var notes by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf("") }
-    var locationPermission by remember { mutableStateOf(false) }\n    var showMap by remember { mutableStateOf(false) }
+    val context = LocalContext.current.applicationContext
+    val nav = rememberNavController()
+    val session by container.authRepository.session.collectAsStateWithLifecycle()
+    val onboardingDone by container.settings.onboardingDone.collectAsStateWithLifecycle()
+    val requestSync = remember(context) { { SyncScheduler.syncNow(context) } }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        locationPermission = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+    // Primo avvio senza sessione → onboarding/login; poi l'app resta usabile anche offline.
+    val start = remember { if (session == null && !onboardingDone) Routes.AUTH else Routes.OBJECTS }
+
+    NavHost(navController = nav, startDestination = start) {
+        composable(Routes.AUTH) {
+            AuthScreen(
+                container = container,
+                onDone = {
+                    container.settings.setOnboardingDone()
+                    requestSync()
+                    nav.leaveAuth()
+                },
+                onContinueOffline = {
+                    container.settings.setOnboardingDone()
+                    nav.leaveAuth()
+                },
+            )
+        }
+        composable(Routes.OBJECTS) {
+            val vm = viewModel { ObjectListViewModel(container.objectRepository) }
+            MainShell(container, nav, Tab.OBJECTS, requestSync) { modifier ->
+                ObjectListScreen(
+                    viewModel = vm,
+                    onOpenObject = { nav.navigate(Routes.editor(it)) },
+                    onCreateObject = { nav.navigate(Routes.editor()) },
+                    modifier = modifier,
+                )
+            }
+        }
+        composable(Routes.MAP) {
+            val objects by container.objectRepository.observeObjects().collectAsStateWithLifecycle(emptyList())
+            val engine by container.settings.mapEngine.collectAsStateWithLifecycle()
+            MainShell(container, nav, Tab.MAP, requestSync) { modifier ->
+                ObjectMapScreen(
+                    objects = objects.filter { it.statusEnum != ObjectStatus.ARCHIVED },
+                    preferredEngine = engine,
+                    onEngineChange = container.settings::setMapEngine,
+                    onOpenObject = { nav.navigate(Routes.editor(it)) },
+                    modifier = modifier,
+                )
+            }
+        }
+        composable(Routes.SETTINGS) {
+            MainShell(container, nav, Tab.SETTINGS, requestSync) { modifier ->
+                SettingsScreen(
+                    container = container,
+                    onSignIn = { nav.navigate(Routes.AUTH) },
+                    onSyncNow = requestSync,
+                    modifier = modifier,
+                )
+            }
+        }
+        composable(Routes.EDITOR) { entry ->
+            val id = entry.arguments?.getString("id")
+            val vm = viewModel(key = "editor-$id") {
+                ObjectEditorViewModel(id, container.objectRepository, LocationProvider(context), requestSync)
+            }
+            ObjectEditorScreen(viewModel = vm, onClose = { nav.popBackStack() })
+        }
     }
+}
+
+private fun NavHostController.leaveAuth() {
+    if (!popBackStack()) {
+        navigate(Routes.OBJECTS) { popUpTo(Routes.AUTH) { inclusive = true } }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MainShell(
+    container: AppContainer,
+    nav: NavHostController,
+    current: Tab,
+    onSync: () -> Unit,
+    content: @Composable (Modifier) -> Unit,
+) {
+    val project by container.settings.activeProject.collectAsStateWithLifecycle()
+    val session by container.authRepository.session.collectAsStateWithLifecycle()
+    val pending by container.objectRepository.observePendingCount().collectAsStateWithLifecycle(0)
+    val backStack by nav.currentBackStackEntryAsState()
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Object Finder") })
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { showMap = false }) { Text("Archivio") }
-                TextButton(onClick = { showMap = true }) { Text("Mappa") }
-            }
-            if (showMap) {
-                ObjectMapScreen(objects = objects)
-                return@Column
-            }
-            Text("I tuoi oggetti", style = MaterialTheme.typography.headlineSmall)
-            Text("MVP · Archivio locale con sincronizzazione cloud predisposta")
-            OutlinedTextField(
-                value = name, onValueChange = { name = it },
-                label = { Text("Nome oggetto") }, modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = category, onValueChange = { category = it },
-                label = { Text("Categoria") }, modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = notes, onValueChange = { notes = it },
-                label = { Text("Note") }, modifier = Modifier.fillMaxWidth()
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    permissionLauncher.launch(arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    ))
-                }) { Text("Abilita GPS") }
-
-                Button(
-                    enabled = name.isNotBlank(),
-                    onClick = {
-                        scope.launch {
-                            val location = if (locationPermission) {
-                                runCatching { LocationProvider(context).currentLocation() }.getOrNull()
-                            } else null
-                            val item = ObjectEntity(
-                                projectId = "default-project",
-                                name = name.trim(),
-                                category = category.trim().ifBlank { "general" },
-                                notes = notes.trim(),
-                                latitude = location?.latitude,
-                                longitude = location?.longitude,
-                                accuracyMeters = location?.accuracyMeters
-                            )
-                            container.repository.create(item)
-                            name = ""; notes = ""
-                            message = if (location != null) "Oggetto salvato con GPS" else "Oggetto salvato senza coordinate GPS"
+            TopAppBar(
+                title = { Text(if (current == Tab.SETTINGS) "Impostazioni" else project?.name ?: "Object Finder") },
+                actions = {
+                    if (session != null) {
+                        IconButton(onClick = onSync) {
+                            BadgedBox(badge = { if (pending > 0) Badge { Text("$pending") } }) {
+                                Icon(Icons.Default.Sync, contentDescription = "Sincronizza")
+                            }
                         }
                     }
-                ) { Text("Registra oggetto") }
-            }
-            OutlinedButton(
-                onClick = {
-                    val request = OneTimeWorkRequestBuilder<ObjectSyncWorker>().build()
-                    WorkManager.getInstance(context).enqueue(request)
-                    message = "Sincronizzazione accodata"
                 },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Sincronizza con Supabase") }
-
-            if (message.isNotBlank()) Text(message, color = MaterialTheme.colorScheme.primary)
-            HorizontalDivider()
-            Text("Archivio (${objects.size})", style = MaterialTheme.typography.titleMedium)
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(objects, key = { it.id }) { item ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(item.name, style = MaterialTheme.typography.titleMedium)
-                            Text("${item.category} · ${item.status}")
-                            Text(
-                                if (item.latitude != null && item.longitude != null)
-                                    "GPS: ${"%.6f".format(item.latitude)}, ${"%.6f".format(item.longitude)} · ±${item.accuracyMeters ?: 0f} m"
-                                else "Posizione non acquisita"
-                            )
-                            if (item.notes.isNotBlank()) Text(item.notes)
-                            Text("Sync: ${item.syncStatus}", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
+            )
+        },
+        bottomBar = {
+            NavigationBar {
+                Tab.entries.forEach { tab ->
+                    NavigationBarItem(
+                        selected = backStack?.destination?.route == tab.route,
+                        onClick = {
+                            nav.navigate(tab.route) {
+                                // OBJECTS è sempre alla base dello stack (anche quando lo start è AUTH).
+                                popUpTo(Routes.OBJECTS) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Icon(tab.icon, contentDescription = null) },
+                        label = { Text(tab.label) },
+                    )
                 }
             }
-        }
+        },
+    ) { padding ->
+        content(Modifier.padding(padding))
     }
 }

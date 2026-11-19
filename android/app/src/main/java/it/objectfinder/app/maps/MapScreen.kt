@@ -20,6 +20,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -78,10 +79,10 @@ fun ObjectMapScreen(
             Text(
                 "Google Maps non configurato (API key assente): uso OpenStreetMap.",
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
             )
         }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
             when (engine) {
                 MapEngine.GOOGLE_MAPS -> GoogleObjectsMap(markers, onOpenObject, Modifier.fillMaxSize())
                 MapEngine.OPEN_STREET_MAP -> OsmObjectsMap(markers, onOpenObject, Modifier.fillMaxSize())
