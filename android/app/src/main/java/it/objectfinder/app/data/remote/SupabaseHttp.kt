@@ -26,11 +26,22 @@ data class AppConfig(val supabaseUrl: String, val supabaseAnonKey: String) {
             val props = Properties()
             runCatching { context.assets.open("config.properties").use { props.load(it) } }
             return AppConfig(
-                supabaseUrl = props.getProperty("SUPABASE_URL", "").trim().trimEnd('/'),
+                supabaseUrl = normalizeSupabaseUrl(props.getProperty("SUPABASE_URL", "")),
                 supabaseAnonKey = props.getProperty("SUPABASE_ANON_KEY", "").trim(),
             )
         }
     }
+}
+
+/**
+ * URL base del progetto (`https://<ref>.supabase.co`). Tollera gli URL copiati con il percorso di
+ * un servizio (es. `.../rest/v1/` dalla pagina API): l'app aggiunge da sé /rest/v1, /auth/v1, /storage/v1.
+ */
+internal fun normalizeSupabaseUrl(raw: String): String {
+    var url = raw.trim().trimEnd('/')
+    val servicePath = Regex("/(rest|auth|storage)/v1$", RegexOption.IGNORE_CASE)
+    while (servicePath.containsMatchIn(url)) url = url.replace(servicePath, "").trimEnd('/')
+    return url
 }
 
 /** Errori tipizzati: la UI e il worker decidono se ritentare, chiedere login o mostrare un messaggio. */

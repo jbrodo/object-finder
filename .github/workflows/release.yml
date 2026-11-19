@@ -72,6 +72,8 @@ jobs:
           if echo "$payload" | grep -q '"service_role"'; then
             echo "::error::SUPABASE_ANON_KEY è la service_role key: usare la anon key"; exit 1
           fi
+          # Solo l'URL base del progetto: l'app aggiunge da sé /rest/v1, /auth/v1, /storage/v1.
+          SUPABASE_URL=$(echo "$SUPABASE_URL" | sed -E 's#/+$##; s#/(rest|auth|storage)/v1/*$##; s#/+$##')
           if [[ "$SUPABASE_URL" != https://* ]]; then
             echo "::error::SUPABASE_URL deve iniziare con https://"; exit 1
           fi

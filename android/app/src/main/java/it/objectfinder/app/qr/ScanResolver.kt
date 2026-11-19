@@ -1,13 +1,10 @@
 package it.objectfinder.app.qr
 
-import android.os.Handler
-import android.os.Looper
 import androidx.activity.ComponentActivity
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.google.android.gms.common.moduleinstall.ModuleInstall
 import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
 import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import it.objectfinder.app.data.ActiveProject
@@ -77,49 +74,49 @@ class ScanResolver(
  * Al primo uso il modulo può essere scaricato on-demand.
  */
 object CodeScanner {
-    private const val UI_TIMEOUT_MS = 10_000L
     const val UNAVAILABLE_MESSAGE =
         "Scanner non disponibile: aggiorna Google Play services, oppure inquadra l'etichetta " +
             "con la fotocamera del telefono."
+    const val DOWNLOADING_MESSAGE =
+        "Sto scaricando lo scanner da Google Play services: riprova tra qualche secondo."
 
+    /**
+     * Verifica prima, con l'API ufficiale, che il modulo scanner sia installato (con Play services
+     * datati la verifica fallisce invece di lasciare la scansione in sospeso); se manca ne avvia il
+     * download. Chiudere lo scanner non è un errore: nessun messaggio.
+     */
     fun scan(activity: ComponentActivity, onResult: (ScannedCode) -> Unit, onError: (String) -> Unit) {
         val options = GmsBarcodeScannerOptions.Builder()
             .setBarcodeFormats(Barcode.FORMAT_QR_CODE, Barcode.FORMAT_ALL_FORMATS)
             .enableAutoZoom()
             .build()
         val scanner = GmsBarcodeScanning.getClient(activity, options)
-        // Richiesta di installazione anticipata del modulo (no-op se già presente).
-        ModuleInstall.getClient(activity)
-            .installModules(ModuleInstallRequest.newBuilder().addApi(scanner).build())
+        val modules = ModuleInstall.getClient(activity)
 
-        // L'interfaccia dello scanner è un'altra activity: se la nostra va in pausa, è comparsa.
-        var uiShown = false
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) uiShown = true }
-        activity.lifecycle.addObserver(observer)
-
-        var settled = false
-        fun settle(block: () -> Unit) {
-            if (settled) return
-            settled = true
-            activity.lifecycle.removeObserver(observer)
-            block()
-        }
-        scanner.startScan()
-            .addOnSuccessListener { barcode ->
-                settle {
-                    val raw = barcode.rawValue
-                    if (raw.isNullOrBlank()) onError("Codice vuoto")
-                    else onResult(ScannedCode(raw, isQr = barcode.format == Barcode.FORMAT_QR_CODE))
+        modules.areModulesAvailable(scanner)
+            .addOnSuccessListener { response ->
+                if (response.areModulesAvailable()) {
+                    startScan(scanner, onResult, onError)
+                } else {
+                    modules.installModules(ModuleInstallRequest.newBuilder().addApi(scanner).build())
+                    onError(DOWNLOADING_MESSAGE)
                 }
             }
-            // Annullato dall'utente solo se lo scanner era visibile; altrimenti non è disponibile.
-            .addOnCanceledListener { settle { if (!uiShown) onError(UNAVAILABLE_MESSAGE) } }
-            .addOnFailureListener { settle { onError(UNAVAILABLE_MESSAGE) } }
+            .addOnFailureListener { onError(UNAVAILABLE_MESSAGE) }
+    }
 
-        // Con Play services datati il task può non completarsi mai: se dopo il timeout
-        // l'interfaccia non è mai comparsa, si avvisa l'utente.
-        Handler(Looper.getMainLooper()).postDelayed({
-            if (!uiShown) settle { onError(UNAVAILABLE_MESSAGE) }
-        }, UI_TIMEOUT_MS)
+    private fun startScan(
+        scanner: GmsBarcodeScanner,
+        onResult: (ScannedCode) -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        scanner.startScan()
+            .addOnSuccessListener { barcode ->
+                val raw = barcode.rawValue
+                if (raw.isNullOrBlank()) onError("Codice vuoto")
+                else onResult(ScannedCode(raw, isQr = barcode.format == Barcode.FORMAT_QR_CODE))
+            }
+            .addOnFailureListener { e -> onError("Scansione non riuscita: ${e.message ?: "riprova"}") }
+        // Annullamento (finestra chiusa dall'utente): nessun messaggio.
     }
 }
