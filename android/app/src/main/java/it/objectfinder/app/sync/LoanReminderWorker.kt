@@ -14,6 +14,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -71,9 +73,31 @@ class LoanReminderWorker(context: Context, params: WorkerParameters) : Coroutine
         private const val CHANNEL = "loans"
         private const val WORK = "loan-reminders"
 
+        /** Controllo giornaliero alle 9 (non all'ora in cui l'app è stata installata). */
         fun schedule(context: Context) {
-            val request = PeriodicWorkRequestBuilder<LoanReminderWorker>(1, TimeUnit.DAYS).build()
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, request)
+            val request = PeriodicWorkRequestBuilder<LoanReminderWorker>(1, TimeUnit.DAYS)
+                .setInitialDelay(millisUntilNext(REMIND_HOUR), TimeUnit.MILLISECONDS)
+                .build()
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.UPDATE, request)
+        }
+
+        /**
+         * Controllo subito (apertura dell'app, prestito salvato): un prestito già scaduto avvisa
+         * senza aspettare il giorno dopo. Al massimo una notifica per oggetto e giorno.
+         */
+        fun checkNow(context: Context) {
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                "$WORK-now", ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<LoanReminderWorker>().build(),
+            )
+        }
+
+        private const val REMIND_HOUR = 9
+
+        /** Millisecondi fino alle [hour]:00 di oggi, o di domani se già passate. */
+        fun millisUntilNext(hour: Int, now: java.time.ZonedDateTime = java.time.ZonedDateTime.now()): Long {
+            var next = now.withHour(hour).withMinute(0).withSecond(0).withNano(0)
+            if (!next.isAfter(now)) next = next.plusDays(1)
+            return java.time.Duration.between(now, next).toMillis()
         }
 
         fun canNotify(context: Context): Boolean =

@@ -258,13 +258,14 @@ class ObjectEditorViewModel(
         viewModelScope.launch { _borrowers.value = runCatching { repository.recentBorrowers() }.getOrDefault(emptyList()) }
     }
 
-    fun lend(to: String, due: java.time.LocalDate?) {
+    fun lend(to: String, due: java.time.LocalDate?, onSaved: () -> Unit = {}) {
         val id = objectId ?: return
         viewModelScope.launch {
             runCatching { repository.lend(id, to, due) }
                 .onSuccess {
                     onLocalChange()
                     reload()
+                    onSaved()
                     _state.update { it.copy(message = "Prestato a ${to.trim()}") }
                 }
                 .onFailure { e -> _state.update { it.copy(message = e.message ?: "Prestito non salvato") } }

@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.sync.LoanReminderWorker
 import androidx.compose.material.icons.filled.Handshake
 import it.objectfinder.app.data.local.IdentifierType
 import it.objectfinder.app.maps.PickerStart
@@ -104,6 +105,7 @@ fun ObjectEditorScreen(
     var showNfc by remember { mutableStateOf(false) }
     var showPicker by remember { mutableStateOf(false) }
     var lending by remember { mutableStateOf(false) }
+    val appContext = LocalContext.current.applicationContext
     val borrowers by viewModel.borrowers.collectAsStateWithLifecycle()
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
@@ -284,7 +286,11 @@ fun ObjectEditorScreen(
                 initialName = state.loanedTo,
                 initialDue = state.loanDue,
                 borrowers = borrowers,
-                onConfirm = { to, due -> lending = false; viewModel.lend(to, due) },
+                onConfirm = { to, due ->
+                    lending = false
+                    // Scadenza già oggi o passata: promemoria subito, non domani mattina.
+                    viewModel.lend(to, due) { if (due != null && !due.isAfter(java.time.LocalDate.now())) LoanReminderWorker.checkNow(appContext) }
+                },
                 onDismiss = { lending = false },
             )
         }
