@@ -28,14 +28,30 @@ class AuthRepository(
         store.save(Session.from(token, clock(), email.trim()))
     }
 
-    suspend fun signUp(email: String, password: String): AuthOutcome =
-        when (val result = api.signUp(email.trim(), password)) {
+    suspend fun signUp(email: String, password: String): AuthOutcome {
+        // Il verifier resta sul telefono finché non si apre il link dell'email (anche giorni dopo).
+        val verifier = Pkce.newVerifier().also(settings::setPkceVerifier)
+        return when (val result = api.signUp(email.trim(), password, Pkce.challenge(verifier), Pkce.REDIRECT_URL)) {
             is SignUpResult.SignedIn -> {
                 store.save(Session.from(result.token, clock(), email.trim()))
                 AuthOutcome.SignedIn
             }
             is SignUpResult.ConfirmationRequired -> AuthOutcome.ConfirmEmail(result.email)
         }
+    }
+
+    /**
+     * Link di conferma aperto sul telefono: email confermata e accesso senza password.
+     * Se il verifier non c'è (registrazione da un altro telefono, dati cancellati) l'email è comunque
+     * confermata: si accede con email e password.
+     */
+    suspend fun completeEmailLink(code: String) {
+        val verifier = settings.pkceVerifier()
+            ?: throw IllegalStateException("Email confermata. Accedi con email e password.")
+        val token = api.exchangeCode(code, verifier)
+        settings.setPkceVerifier(null)
+        store.save(Session.from(token, clock()))
+    }
 
     /** Logout: il token viene revocato lato server best-effort; i dati locali restano sul dispositivo. */
     suspend fun signOut() {

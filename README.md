@@ -28,6 +28,16 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
    "Confirm email"**: gli inviti a progetto vengono accettati solo per email confermate; con
    l'auto-conferma chiunque potrebbe registrarsi con l'email invitata.
 
+### Link dell'email di conferma (Supabase Auth)
+Alla registrazione l'app chiede a Supabase di far tornare il link di conferma nell'app
+(`objectfinder://auth/callback`, flusso PKCE): aprendolo dal telefono si entra già autenticati.
+Supabase accetta solo indirizzi autorizzati, altrimenti usa il **Site URL** del progetto (di default
+`http://localhost:3000`, da cui il link a localhost). Una volta sola, nel pannello Supabase:
+
+- Authentication → URL Configuration → **Redirect URLs** → aggiungi `objectfinder://auth/callback`
+- **Site URL**: un indirizzo che non sia localhost (usato quando il link viene aperto altrove, ad
+  esempio dal PC). L'email risulta confermata comunque; poi si accede con email e password.
+
 ## Migration automatiche (GitHub Actions)
 La workflow `Database migrations` parte quando cambia un file in `backend/migrations/`:
 - **pull request**: applica tutte le migration su un Postgres+PostGIS temporaneo (con uno stub di

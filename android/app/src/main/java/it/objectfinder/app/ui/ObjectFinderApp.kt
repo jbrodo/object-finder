@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.data.Pkce
 import it.objectfinder.app.ui.objects.LinkCodeDialog
 import it.objectfinder.app.data.AddIdentifierResult
 import it.objectfinder.app.data.local.IdentifierType
@@ -176,10 +177,30 @@ fun ObjectFinderApp(
 
     // Deep link da etichetta QR (anche a freddo): si gestisce una volta pronta la navigazione.
     LaunchedEffect(pendingLink) {
-        pendingLink?.let {
-            onLinkHandled()
-            handleScanned(it)
-        }
+        val link = pendingLink ?: return@LaunchedEffect
+        onLinkHandled() // azzera pendingLink: questo effetto viene annullato, il lavoro va in `scope`
+        scope.launch { when (val callback = Pkce.parseCallback(link)) {
+            null -> handleScanned(link)
+            // Link dell'email di conferma: account confermato e accesso fatto, senza password.
+            is Pkce.Callback.Code -> runCatching { container.authRepository.completeEmailLink(callback.code) }
+                .onSuccess {
+                    container.settings.setOnboardingDone()
+                    requestSync()
+                    if (nav.currentDestination?.route == Routes.AUTH) nav.leaveAuth()
+                    snackbar.showSnackbar("Email confermata: benvenuto in Object Finder")
+                }
+                .onFailure { e ->
+                    snackbar.showSnackbar(
+                        (e as? IllegalStateException)?.message
+                            ?: "Il link è scaduto o già usato. L'email risulta confermata: accedi con email e password.",
+                        duration = SnackbarDuration.Long,
+                    )
+                }
+            is Pkce.Callback.Error -> snackbar.showSnackbar(
+                "Link di conferma non valido o scaduto (${callback.description}). Accedi e, se serve, registrati di nuovo.",
+                duration = SnackbarDuration.Long,
+            )
+        } }
     }
 
     Box(Modifier.fillMaxSize()) {

@@ -110,7 +110,8 @@ fun AuthScreen(
                     }
                     is AuthOutcome.ConfirmEmail -> {
                         offerSave()
-                        info = "Ti abbiamo inviato un'email di conferma a ${outcome.email}. Confermala e poi accedi."
+                        info = "Ti abbiamo inviato un'email di conferma a ${outcome.email}. Apri il link da questo " +
+                            "telefono: tornerai qui già dentro. Se lo apri altrove, poi accedi con email e password."
                         mode = AuthMode.SIGN_IN
                     }
                 }

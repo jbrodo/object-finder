@@ -74,6 +74,12 @@ class SettingsStore(context: Context) {
         _activeProject.value = project
     }
 
+    fun pkceVerifier(): String? = prefs.getString(KEY_PKCE, null)
+
+    fun setPkceVerifier(value: String?) {
+        prefs.edit().apply { if (value == null) remove(KEY_PKCE) else putString(KEY_PKCE, value) }.apply()
+    }
+
     fun setOnboardingDone() {
         prefs.edit().putBoolean(KEY_ONBOARDING, true).apply()
         _onboardingDone.value = true
@@ -112,6 +118,7 @@ class SettingsStore(context: Context) {
         const val KEY_PROJECT_NAME = "active_project_name"
         const val KEY_PROJECT_ROLE = "active_project_role"
         const val KEY_ONBOARDING = "onboarding_done"
+        const val KEY_PKCE = "pkce_verifier"
         const val KEY_CURSOR = "pull_cursor_"
     }
 }
