@@ -28,6 +28,7 @@ class InventoryExporter(
     private val identifiers: IdentifierDao,
     private val photos: PhotoDao,
     private val settings: SettingsStore,
+    private val places: it.objectfinder.app.data.local.PlaceDao? = null,
 ) {
     private val appContext = context.applicationContext
     private val exportDir = File(appContext.cacheDir, "exports")
@@ -43,6 +44,7 @@ class InventoryExporter(
             .filter { it.syncStatus != PhotoSyncStatus.PENDING_DELETE.wire }
             .sortedBy { it.createdAt }
             .groupBy { it.objectId }
+        val tree = it.objectfinder.app.data.PlaceTree(places?.allByProject(projectId).orEmpty())
         objects.allByProject(projectId)
             .filter { includeArchived || it.statusEnum != ObjectStatus.ARCHIVED }
             .map { item ->
@@ -51,6 +53,7 @@ class InventoryExporter(
                     codes = codes[item.id].orEmpty().map { InventoryCsv.codeLabel(it.typeEnum, it.value) },
                     photoCount = pics[item.id].orEmpty().size,
                     coverPath = pics[item.id].orEmpty().firstOrNull { it.localPath != null }?.localPath,
+                    placePath = tree.path(item.placeId),
                 )
             }
     }

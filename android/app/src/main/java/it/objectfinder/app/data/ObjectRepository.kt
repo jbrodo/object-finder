@@ -36,6 +36,7 @@ data class ObjectDraft(
     val accuracyMeters: Float?,
     val place: String = "",
     val locationSource: LocationSource = LocationSource.GPS,
+    val placeId: String? = null,
 )
 
 class ObjectRepository(
@@ -48,6 +49,8 @@ class ObjectRepository(
     private val identifiers: IdentifierRepository,
     private val history: LocationHistoryRepository,
     private val conflicts: ObjectConflictDao,
+    private val places: PlaceRepository,
+    private val placeDao: it.objectfinder.app.data.local.PlaceDao,
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     private val syncMutex = Mutex()
@@ -92,6 +95,7 @@ class ObjectRepository(
             longitude = draft.longitude,
             accuracyMeters = draft.accuracyMeters.takeIf { draft.locationSource == LocationSource.GPS },
             locationSource = draft.locationSource.wire,
+            placeId = draft.placeId,
             createdAt = now(),
             updatedAt = now(),
         )
@@ -122,6 +126,7 @@ class ObjectRepository(
                 longitude = draft.longitude,
                 accuracyMeters = draft.accuracyMeters.takeIf { draft.locationSource == LocationSource.GPS },
                 locationSource = draft.locationSource.wire,
+                placeId = draft.placeId,
                 syncStatus = statusAfterLocalEdit(existing),
                 updatedAt = now(),
             )
@@ -233,6 +238,7 @@ class ObjectRepository(
         auth.signOut()
         val ids = dao.syncedCloudObjectsWithoutPendingChanges(LOCAL_PROJECT_ID)
         ids.forEach { removeLocally(it) }
+        placeDao.deleteSyncedCloud(LOCAL_PROJECT_ID)
         ids.size
     }
 
@@ -250,6 +256,8 @@ class ObjectRepository(
         val result = runCatching {
             if (auth.session.value == null) throw SupabaseException.NotAuthenticated()
             val project = projects.ensureActiveProject()
+            // Luoghi prima degli oggetti: un oggetto può riferirsi a un luogo appena creato.
+            val placeChanges = places.sync(project.id, canWrite = project.canEditObjects)
             // Un viewer non può scrivere (RLS): si limita al pull.
             val pushed = if (project.canEditObjects) push(project.id) else 0
             val pulled = pull(project.id)
@@ -257,7 +265,7 @@ class ObjectRepository(
             val codeChanges = identifiers.sync(project.id, canWrite = project.canEditObjects)
             val positions = if (project.canEditObjects) history.push(project.id) else 0
             val photoReport = photos.sync(project.id, canWrite = project.canEditObjects)
-            SyncReport(pushed + codeChanges + positions, pulled, photoReport)
+            SyncReport(pushed + codeChanges + positions + placeChanges, pulled, photoReport)
         }
         settings.setSyncState(
             result.fold(

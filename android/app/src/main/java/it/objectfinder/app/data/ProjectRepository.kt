@@ -41,6 +41,7 @@ class ProjectRepository(
     private val auth: AuthRepository,
     private val settings: SettingsStore,
     private val dao: ObjectDao,
+    private val placeDao: it.objectfinder.app.data.local.PlaceDao,
 ) {
     private val mutex = Mutex()
     private val _projects = MutableStateFlow<List<ActiveProject>>(emptyList())
@@ -144,7 +145,10 @@ class ProjectRepository(
 
     private suspend fun activate(project: ActiveProject) {
         settings.setActiveProject(project)
-        if (project.canEditObjects) dao.reassignProject(from = LOCAL_PROJECT_ID, to = project.id)
+        if (project.canEditObjects) {
+            placeDao.reassignProject(from = LOCAL_PROJECT_ID, to = project.id)
+            dao.reassignProject(from = LOCAL_PROJECT_ID, to = project.id)
+        }
     }
 
     private suspend fun fetchProjects(userId: String): List<ActiveProject> =

@@ -16,6 +16,8 @@ data class InventoryRow(
     val photoCount: Int,
     /** Foto di copertina locale (per il PDF), se presente. */
     val coverPath: String?,
+    /** Luogo strutturato, es. "Casa › Garage". */
+    val placePath: String = "",
 )
 
 /**
@@ -28,7 +30,7 @@ object InventoryCsv {
     private const val BOM = "\uFEFF"
 
     val header = listOf(
-        "Nome", "Categoria", "Stato", "Dove", "Note", "Latitudine", "Longitudine", "Precisione (m)",
+        "Nome", "Categoria", "Stato", "Luogo", "Dove", "Note", "Latitudine", "Longitudine", "Precisione (m)",
         "Codici collegati", "Foto", "Prestato a", "Restituzione prevista", "Creato", "Aggiornato", "Id",
     )
 
@@ -43,6 +45,7 @@ object InventoryCsv {
                 field(o.name),
                 field(categoryLabel(o.category)),
                 field(o.statusEnum.label),
+                field(row.placePath),
                 field(o.place),
                 field(o.notes),
                 number(o.latitude?.let { String.format(Locale.ROOT, "%.6f", it) }),

@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material.icons.filled.Place
 import it.objectfinder.app.sync.LoanReminderWorker
 import androidx.compose.material.icons.filled.Handshake
 import it.objectfinder.app.data.local.IdentifierType
@@ -105,6 +106,8 @@ fun ObjectEditorScreen(
     var showNfc by remember { mutableStateOf(false) }
     var showPicker by remember { mutableStateOf(false) }
     var lending by remember { mutableStateOf(false) }
+    var pickingPlace by remember { mutableStateOf(false) }
+    val placeTree by viewModel.placeTree.collectAsStateWithLifecycle()
     val appContext = LocalContext.current.applicationContext
     val borrowers by viewModel.borrowers.collectAsStateWithLifecycle()
     var confirmDelete by remember { mutableStateOf(false) }
@@ -281,6 +284,18 @@ fun ObjectEditorScreen(
                 onDismiss = { showPicker = false },
             )
         }
+        if (pickingPlace) {
+            PlacePickerSheet(
+                tree = placeTree,
+                selectedId = state.placeId,
+                canEdit = !readOnly,
+                onPick = { viewModel.setPlaceId(it); pickingPlace = false },
+                onCreate = viewModel::createPlace,
+                onRename = viewModel::renamePlace,
+                onDelete = viewModel::deletePlace,
+                onDismiss = { pickingPlace = false },
+            )
+        }
         if (lending) {
             LendDialog(
                 initialName = state.loanedTo,
@@ -338,6 +353,7 @@ fun ObjectEditorScreen(
                 // ---- Consultazione ----
                 ObjectHeader(state)
                 WherePanel(
+                    placePath = placeTree.path(state.placeId),
                     state = state,
                     history = history,
                     readOnly = readOnly,
@@ -415,7 +431,8 @@ fun ObjectEditorScreen(
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                PlaceField(state.place, viewModel::setPlace)
+                PlaceSelector(path = placeTree.path(state.placeId), onClick = { pickingPlace = true })
+                PlaceField(state.place, viewModel::setPlace, detail = state.placeId != null)
                 PositionEditor(
                     state = state,
                     onCapture = { permission.withPermission(viewModel::captureLocation) },
@@ -474,6 +491,7 @@ private fun WherePanel(
     onPickOnMap: () -> Unit,
     onUseBestNow: () -> Unit,
     onDescribe: () -> Unit,
+    placePath: String = "",
 ) {
     val context = LocalContext.current
     val since = history.maxOfOrNull { it.recordedAt }
@@ -485,9 +503,10 @@ private fun WherePanel(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Dove si trova", style = MaterialTheme.typography.labelLarge, modifier = Modifier.semantics { heading() })
+            if (placePath.isNotBlank()) Text(placePath, style = MaterialTheme.typography.titleLarge)
             if (state.place.isNotBlank()) {
-                Text(state.place, style = MaterialTheme.typography.titleLarge)
-            } else if (!readOnly) {
+                Text(state.place, style = if (placePath.isBlank()) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge)
+            } else if (!readOnly && placePath.isBlank()) {
                 // Allineato al resto del pannello: niente rientro del TextButton.
                 TextButton(onClick = onDescribe, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp)) {
                     Icon(Icons.Default.Add, contentDescription = null, Modifier.size(18.dp))
@@ -544,12 +563,13 @@ private fun WherePanel(
 }
 
 @Composable
-private fun PlaceField(value: String, onChange: (String) -> Unit) {
+private fun PlaceField(value: String, onChange: (String) -> Unit, detail: Boolean) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text("Dove si trova") },
-        placeholder = { Text("es. garage, scaffale in alto a sinistra") },
+        // Con un luogo scelto il testo diventa il dettaglio dentro quel luogo.
+        label = { Text(if (detail) "Dettaglio (facoltativo)" else "Dove si trova") },
+        placeholder = { Text(if (detail) "es. scaffale in alto a sinistra" else "es. garage, scaffale in alto a sinistra") },
         supportingText = {
             Text(
                 if (value.length > PLACE_MAX - 40) "${value.length}/$PLACE_MAX"
@@ -560,6 +580,20 @@ private fun PlaceField(value: String, onChange: (String) -> Unit) {
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
         modifier = Modifier.fillMaxWidth(),
     )
+}
+
+/** Campo "Luogo": apre il selettore ad albero (Casa › Garage › Scaffale). */
+@Composable
+private fun PlaceSelector(path: String, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(4.dp)) {
+        Icon(Icons.Default.Place, contentDescription = null, Modifier.size(18.dp))
+        Text(
+            if (path.isBlank()) "  Scegli un luogo (es. Casa › Garage)" else "  $path",
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 /** Punto GPS nel modulo: stato dell'acquisizione sempre visibile. */

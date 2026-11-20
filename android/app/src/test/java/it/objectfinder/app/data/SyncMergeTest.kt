@@ -169,4 +169,13 @@ class SyncMergeTest {
         val returned = merged.copy(loanedTo = "", loanedAt = null, loanDue = null)
         assertEquals(listOf("Prestito"), SyncMerge.diff(returned, server).map { it.label })
     }
+
+    @Test
+    fun `place id travels with the object and is a real difference`() {
+        val server = remote().copy(placeId = "garage")
+        val merged = SyncMerge.mergeRemote(server, null)!!
+        assertEquals("garage", merged.placeId)
+        assertEquals("garage", SyncMerge.toWriteDto(merged).placeId)
+        assertEquals(listOf("Luogo"), SyncMerge.diff(merged.copy(placeId = null), server).map { it.label })
+    }
 }

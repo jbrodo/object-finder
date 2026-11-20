@@ -237,7 +237,7 @@ fun ObjectFinderApp(
             )
         }
         composable(Routes.OBJECTS) {
-            val vm = viewModel { ObjectListViewModel(container.objectRepository, container.photoRepository, container.identifierRepository) }
+            val vm = viewModel { ObjectListViewModel(container.objectRepository, container.photoRepository, container.identifierRepository, container.placeRepository) }
             MainShell(container, nav, Tab.OBJECTS, requestSync, startScan) { modifier ->
                 val active by container.settings.activeProject.collectAsStateWithLifecycle()
                 ObjectListScreen(
@@ -307,6 +307,7 @@ fun ObjectFinderApp(
                     onLocalChange = { requestSync(); container.indexPhotosInBackground() },
                     initialPhoto = initialPhoto,
                     mirage = container.mirageEngine,
+                    places = container.placeRepository,
                 )
             }
             val active by container.settings.activeProject.collectAsStateWithLifecycle()

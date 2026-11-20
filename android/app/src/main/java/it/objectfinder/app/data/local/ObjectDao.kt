@@ -67,6 +67,10 @@ interface ObjectDao {
     )
     suspend fun loansDueBy(day: String): List<ObjectEntity>
 
+    /** Luogo cancellato: gli oggetti restano senza luogo (il server fa lo stesso, ON DELETE SET NULL). */
+    @Query("UPDATE objects SET placeId = NULL WHERE placeId = :placeId")
+    suspend fun clearPlace(placeId: String)
+
     @Query("DELETE FROM objects WHERE id = :id")
     suspend fun delete(id: String)
 

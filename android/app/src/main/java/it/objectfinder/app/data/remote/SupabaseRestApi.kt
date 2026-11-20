@@ -146,6 +146,7 @@ data class ObjectWriteDto(
     @SerialName("loaned_to") val loanedTo: String = "",
     @SerialName("loaned_at") val loanedAt: String? = null,
     @SerialName("loan_due") val loanDue: String? = null,
+    @SerialName("place_id") val placeId: String? = null,
 )
 
 @Serializable
@@ -164,9 +165,18 @@ data class ObjectReadDto(
     @SerialName("loaned_to") val loanedTo: String = "",
     @SerialName("loaned_at") val loanedAt: String? = null,
     @SerialName("loan_due") val loanDue: String? = null,
+    @SerialName("place_id") val placeId: String? = null,
     val version: Int = 1,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String,
+)
+
+@Serializable
+data class PlaceRowDto(
+    val id: String,
+    @SerialName("project_id") val projectId: String,
+    @SerialName("parent_id") val parentId: String?,
+    val name: String,
 )
 
 /** Fornisce un access token valido (refresh incluso) per le chiamate PostgREST. */
@@ -376,6 +386,38 @@ class SupabaseRestApi(
         }
     }
 
+    // ---- Luoghi (tabella places, migration 015) ----
+
+    suspend fun listPlaces(projectId: String): List<PlaceRowDto> = authorized { token ->
+        http.client.get("$rest/places") {
+            auth(token)
+            parameter("select", "id,project_id,parent_id,name")
+            parameter("project_id", "eq.$projectId")
+        }
+    }.body()
+
+    /** Inserisce o aggiorna (nome, genitore) un luogo. */
+    suspend fun upsertPlace(row: PlaceRowDto) {
+        authorized { token ->
+            http.client.post("$rest/places") {
+                auth(token)
+                parameter("on_conflict", "id")
+                header("Prefer", "resolution=merge-duplicates,return=minimal")
+                contentType(ContentType.Application.Json)
+                setBody(row)
+            }
+        }
+    }
+
+    suspend fun deletePlace(id: String) {
+        authorized { token ->
+            http.client.delete("$rest/places") {
+                auth(token)
+                parameter("id", "eq.$id")
+            }
+        }
+    }
+
     // ---- Storico posizioni (tabella locations, migration 008) ----
 
     /** Inserimento idempotente (stesso id → ignorato): i retry dopo errori di rete sono sicuri. */
@@ -502,6 +544,6 @@ class SupabaseRestApi(
 
         const val PHOTO_BUCKET = "object-photos"
         private const val OBJECT_COLUMNS =
-            "id,project_id,name,category,notes,place,status,latitude,longitude,accuracy_meters,location_source,loaned_to,loaned_at,loan_due,version,created_at,updated_at"
+            "id,project_id,name,category,notes,place,status,latitude,longitude,accuracy_meters,location_source,loaned_to,loaned_at,loan_due,place_id,version,created_at,updated_at"
     }
 }

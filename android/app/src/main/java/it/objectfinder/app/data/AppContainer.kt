@@ -30,12 +30,13 @@ class AppContainer(context: Context) {
 
     val authRepository = AuthRepository(SupabaseAuthApi(http), sessionStore, settings)
     private val restApi = SupabaseRestApi(http, authRepository)
-    val projectRepository = ProjectRepository(restApi, authRepository, settings, database.objectDao())
+    val projectRepository = ProjectRepository(restApi, authRepository, settings, database.objectDao(), database.placeDao())
+    val placeRepository = PlaceRepository(database.placeDao(), database.objectDao(), restApi, settings)
     val photoRepository = PhotoRepository(appContext, database.photoDao(), restApi)
     val identifierRepository = IdentifierRepository(database.identifierDao(), restApi)
     val locationHistoryRepository = LocationHistoryRepository(database.locationHistoryDao(), restApi)
     val inventoryExporter = InventoryExporter(
-        appContext, database.objectDao(), database.identifierDao(), database.photoDao(), settings,
+        appContext, database.objectDao(), database.identifierDao(), database.photoDao(), settings, database.placeDao(),
     )
     val objectRepository = ObjectRepository(
         dao = database.objectDao(),
@@ -47,6 +48,8 @@ class AppContainer(context: Context) {
         identifiers = identifierRepository,
         history = locationHistoryRepository,
         conflicts = database.conflictDao(),
+        places = placeRepository,
+        placeDao = database.placeDao(),
     )
 
     /** Riconoscimento visivo on-device (MediaPipe): impronte delle foto e confronto. */

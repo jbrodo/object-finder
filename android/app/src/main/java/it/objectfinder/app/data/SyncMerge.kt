@@ -34,6 +34,7 @@ object SyncMerge {
             loanedTo = remote.loanedTo,
             loanedAt = parseEpochMillis(remote.loanedAt),
             loanDue = remote.loanDue,
+            placeId = remote.placeId,
             status = remote.status,
             syncStatus = SyncStatus.SYNCED.wire,
             createdAt = local?.createdAt ?: parseEpochMillis(remote.createdAt) ?: System.currentTimeMillis(),
@@ -75,7 +76,8 @@ object SyncMerge {
             local.accuracyMeters == server.accuracyMeters &&
             local.locationSource == server.locationSource &&
             local.loanedTo == server.loanedTo &&
-            local.loanDue == server.loanDue
+            local.loanDue == server.loanDue &&
+            local.placeId == server.placeId
 
     data class FieldDiff(val label: String, val mine: String, val theirs: String)
 
@@ -93,6 +95,7 @@ object SyncMerge {
                 ObjectStatus.fromWire(server.status).label,
             ).takeIf { it.mine != it.theirs },
             FieldDiff("Dove", local.place.ifBlank { "—" }, server.place.ifBlank { "—" }).takeIf { it.mine != it.theirs },
+            FieldDiff("Luogo", "il tuo", "quello dell'altro membro").takeIf { local.placeId != server.placeId },
             FieldDiff(
                 "Prestito",
                 loanText(local.loanedTo, local.loanDue),
@@ -163,6 +166,7 @@ object SyncMerge {
         loanedTo = entity.loanedTo,
         loanedAt = entity.loanedAt?.let { java.time.Instant.ofEpochMilli(it).toString() },
         loanDue = entity.loanDue,
+        placeId = entity.placeId,
     )
 
     private fun loanText(to: String, due: String?) =

@@ -1,5 +1,7 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.filled.Place
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import it.objectfinder.app.export.SheetLabel
@@ -100,6 +102,7 @@ fun ObjectListScreen(
     var selected by rememberSaveable(stateSaver = SelectionSaver) { mutableStateOf(emptySet<String>()) }
     val selecting = selected.isNotEmpty()
     BackHandler(enabled = selecting) { selected = emptySet() }
+    var choosingPlace by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf<Pair<java.io.File, Int>?>(null) }
     var preparing by remember { mutableStateOf(false) }
 
@@ -141,7 +144,7 @@ fun ObjectListScreen(
             onClear = { selected = emptySet() },
             onSelectAll = { selected = state.items.map { it.id }.toSet() },
             onLabels = {
-                val labels = chosen.map { SheetLabel(it.id, it.name, it.place) }
+                val labels = chosen.map { SheetLabel(it.id, it.name, listOf(state.placePath(it), it.place).filter(String::isNotBlank).joinToString(" · ")) }
                 preparing = true
                 scope.launch {
                     val file = withContext(Dispatchers.IO) { LabelSheetActions.create(context, labels) }
@@ -190,7 +193,32 @@ fun ObjectListScreen(
                 },
                 label = { Text("Vicini") },
             )
+            if (state.places.places.isNotEmpty() || state.placeFilter != null) FilterChip(
+                selected = state.placeFilter != null,
+                onClick = { choosingPlace = true },
+                leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, Modifier.size(16.dp)) },
+                label = {
+                    Text(
+                        state.placeFilter?.let { state.places.path(it) } ?: "Luogo",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 220.dp),
+                    )
+                },
+            )
         }
+        if (choosingPlace) PlacePickerSheet(
+            tree = state.places,
+            selectedId = state.placeFilter,
+            canEdit = false,
+            title = "Mostra gli oggetti in",
+            noneLabel = "Tutti i luoghi",
+            onPick = { viewModel.setPlaceFilter(it); choosingPlace = false },
+            onCreate = { _, _ -> error("sola lettura") },
+            onRename = { _, _ -> },
+            onDelete = { },
+            onDismiss = { choosingPlace = false },
+        )
       }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -213,6 +241,7 @@ fun ObjectListScreen(
                             item,
                             cover = state.covers[item.id],
                             distance = state.distanceTo(item),
+                            placePath = state.placePath(item),
                             showSyncState = showSyncState,
                             isSelected = { item.id in selected },
                             onClick = { if (selecting) toggle(item.id) else onOpenObject(item.id) },
@@ -237,6 +266,7 @@ private fun ObjectCard(
     item: ObjectEntity,
     cover: String?,
     distance: Double?,
+    placePath: String,
     showSyncState: Boolean,
     isSelected: () -> Boolean,
     onClick: () -> Unit,
@@ -296,9 +326,10 @@ private fun ObjectCard(
                 )
             }
             // Il "dove" è la risposta che si cerca: prima riga sotto il nome.
-            if (item.place.isNotBlank()) {
+            val where = listOf(placePath, item.place).filter { it.isNotBlank() }.joinToString(" · ")
+            if (where.isNotBlank()) {
                 Text(
-                    item.place,
+                    where,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

@@ -61,6 +61,8 @@ data class ObjectEntity(
     val notes: String = "",
     /** "Dove": descrizione libera del punto (es. "garage, scaffale alto"). */
     val place: String = "",
+    /** Luogo strutturato del progetto (migration 015); il testo [place] resta come dettaglio. */
+    val placeId: String? = null,
     val latitude: Double?,
     val longitude: Double?,
     val accuracyMeters: Float?,

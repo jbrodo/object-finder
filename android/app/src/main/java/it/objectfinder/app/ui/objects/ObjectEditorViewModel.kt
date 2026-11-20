@@ -1,5 +1,7 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.data.PlaceTree
+import it.objectfinder.app.data.PlaceRepository
 import it.objectfinder.app.recognition.MirageParse
 import kotlinx.coroutines.flow.onEach
 import it.objectfinder.app.recognition.MirageSuggestions
@@ -57,6 +59,8 @@ data class EditorState(
     val category: String = DEFAULT_CATEGORY,
     val notes: String = "",
     val place: String = "",
+    /** Luogo strutturato scelto (null = nessuno). */
+    val placeId: String? = null,
     val loanedTo: String = "",
     val loanedAt: Long? = null,
     val loanDue: java.time.LocalDate? = null,
@@ -83,7 +87,7 @@ data class EditorState(
     val hasLocation: Boolean get() = latitude != null && longitude != null
     val isArchived: Boolean get() = status == ObjectStatus.ARCHIVED
 
-    fun draft() = ObjectDraft(name, category, notes, status, latitude, longitude, accuracyMeters, place, locationSource)
+    fun draft() = ObjectDraft(name, category, notes, status, latitude, longitude, accuracyMeters, place, locationSource, placeId)
     val isManualLocation: Boolean get() = locationSource == LocationSource.MANUAL
     val isApproximate: Boolean
         get() = hasLocation && !isManualLocation && (accuracyMeters ?: 0f) > APPROXIMATE_ACCURACY_METERS
@@ -132,6 +136,8 @@ class ObjectEditorViewModel(
     initialPhoto: Uri? = null,
     /** Suggerimenti dalla foto (Cactus Mirage); null se non disponibile. */
     private val mirage: MirageEngine? = null,
+    /** Luoghi strutturati del progetto; null nei test. */
+    private val places: PlaceRepository? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(EditorState(isNew = objectId == null, loaded = objectId == null))
     val state: StateFlow<EditorState> = _state.asStateFlow()
@@ -409,7 +415,7 @@ class ObjectEditorViewModel(
             id,
             ObjectDraft(
                 current.name, current.category, current.notes, current.statusEnum,
-                latitude, longitude, accuracy, current.place, source,
+                latitude, longitude, accuracy, current.place, source, current.placeId,
             ),
         )
         onLocalChange()
@@ -476,6 +482,7 @@ class ObjectEditorViewModel(
                 category = categoryLabel(item.category),
                 notes = item.notes,
                 place = item.place,
+                placeId = item.placeId,
                 loanedTo = item.loanedTo,
                 loanedAt = item.loanedAt,
                 loanDue = item.loanDue?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() },
@@ -537,6 +544,18 @@ class ObjectEditorViewModel(
     fun setCategory(v: String) = _state.update { it.copy(category = v) }
     fun setNotes(v: String) = _state.update { it.copy(notes = v) }
     fun setPlace(v: String) = _state.update { it.copy(place = v.take(PLACE_MAX)) }
+    fun setPlaceId(id: String?) = _state.update { it.copy(placeId = id) }
+
+    val placeTree: StateFlow<PlaceTree> = (places?.observeTree() ?: flowOf(PlaceTree(emptyList())))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaceTree(emptyList()))
+
+    suspend fun createPlace(name: String, parentId: String?) = places!!.create(name, parentId).also { onLocalChange() }
+    suspend fun renamePlace(id: String, name: String) { places?.rename(id, name); onLocalChange() }
+    suspend fun deletePlace(id: String) {
+        places?.delete(id)
+        if (_state.value.placeId == id) setPlaceId(null)
+        onLocalChange()
+    }
     fun setStatus(v: ObjectStatus) = _state.update { it.copy(status = v) }
     fun clearLocation() = _state.update {
         it.copy(latitude = null, longitude = null, accuracyMeters = null, locationSource = LocationSource.GPS)
