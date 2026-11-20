@@ -20,6 +20,14 @@ data class PendingInvite(val id: String, val email: String, val role: ProjectRol
 
 enum class InviteResult { ADDED, INVITED }
 
+/** Esito dell'email di invito (Edge Function `send-invite`). */
+sealed interface InviteEmail {
+    data object Sent : InviteEmail
+    /** Funzione non pubblicata o servizio email non configurato: resta la condivisione manuale. */
+    data object NotConfigured : InviteEmail
+    data class NotSent(val reason: String) : InviteEmail
+}
+
 class ProjectRepository(
     private val api: SupabaseRestApi,
     private val auth: AuthRepository,
@@ -88,6 +96,15 @@ class ProjectRepository(
             "added" -> InviteResult.ADDED
             else -> InviteResult.INVITED
         }
+    }
+
+    suspend fun sendInviteEmail(email: String): InviteEmail = try {
+        api.sendInviteEmail(requireActiveCloudProject(), email.trim().lowercase())
+        InviteEmail.Sent
+    } catch (e: SupabaseException.Http) {
+        if (e.status == 404 || e.status == 503) InviteEmail.NotConfigured else InviteEmail.NotSent(e.message ?: "errore")
+    } catch (_: java.io.IOException) {
+        InviteEmail.NotSent("serve una connessione")
     }
 
     suspend fun listPendingInvites(): List<PendingInvite> =

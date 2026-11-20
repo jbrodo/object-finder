@@ -1,5 +1,7 @@
 package it.objectfinder.app.ui.projects
 
+import it.objectfinder.app.data.InviteEmail
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -201,6 +203,9 @@ fun MembersScreen(
                             supportingContent = { Text("${invite.role.label} · in attesa di registrazione") },
                             trailingContent = {
                                 Row {
+                                    IconButton(onClick = { viewModel.emailInvite(invite) }, enabled = !state.op.busy) {
+                                        Icon(Icons.Default.Email, contentDescription = "Invia di nuovo l'email")
+                                    }
                                     IconButton(onClick = { viewModel.shareInvite(invite) }) {
                                         Icon(Icons.Default.Share, contentDescription = "Condividi invito")
                                     }
@@ -270,21 +275,40 @@ fun MembersScreen(
     state.justInvited?.let { invite ->
         AlertDialog(
             onDismissRequest = viewModel::consumeInvite,
-            title = { Text("Invito creato") },
+            title = { Text(if (state.inviteEmail == InviteEmail.Sent) "Invito inviato" else "Invito creato") },
             text = {
+                val after = "Dopo la registrazione con questa email (e la conferma dell'indirizzo) entrerà nel " +
+                    "progetto come ${invite.role.label.lowercase()}."
                 Text(
-                    "${invite.email} non ha ancora un account. Mandagli l'invito: dopo la registrazione " +
-                        "con questa email (e la conferma dell'indirizzo) entrerà nel progetto come " +
-                        "${invite.role.label.lowercase()}."
+                    when (val mail = state.inviteEmail) {
+                        InviteEmail.Sent -> "Abbiamo mandato a ${invite.email} un'email con il link all'app. $after"
+                        is InviteEmail.NotSent ->
+                            "${invite.email} non ha ancora un account. L'email non è partita (${mail.reason}): " +
+                                "mandagli tu l'invito. $after"
+                        else -> "${invite.email} non ha ancora un account. Mandagli l'invito. $after"
+                    }
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.consumeInvite()
-                    shareInviteText(context, inviteMessage(project?.name ?: "Object Finder", invite))
-                }) { Text("Condividi invito") }
+                if (state.inviteEmail == InviteEmail.Sent) {
+                    TextButton(onClick = viewModel::consumeInvite) { Text("OK") }
+                } else {
+                    TextButton(onClick = {
+                        viewModel.consumeInvite()
+                        shareInviteText(context, inviteMessage(project?.name ?: "Object Finder", invite))
+                    }) { Text("Condividi invito") }
+                }
             },
-            dismissButton = { TextButton(onClick = viewModel::consumeInvite) { Text("Più tardi") } },
+            dismissButton = {
+                if (state.inviteEmail == InviteEmail.Sent) {
+                    TextButton(onClick = {
+                        viewModel.consumeInvite()
+                        shareInviteText(context, inviteMessage(project?.name ?: "Object Finder", invite))
+                    }) { Text("Condividi anche") }
+                } else {
+                    TextButton(onClick = viewModel::consumeInvite) { Text("Più tardi") }
+                }
+            },
         )
     }
     if (confirmLeave) {

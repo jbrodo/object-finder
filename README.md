@@ -98,17 +98,23 @@ disinstallata l'app.
   riassegnati al progetto e sincronizzati
 - Progetti multipli: creazione, cambio progetto attivo, ruolo dell'utente per progetto
 - Membri: elenco, aggiunta per email, cambio ruolo, rimozione, uscita dal progetto; chi non ha
-  ancora un account riceve un invito (messaggio da condividere) che si attiva alla registrazione;
+  ancora un account riceve un invito che si attiva alla registrazione: email automatica con il link
+  all'app (Edge Function `send-invite`, vedi "Email di invito") oppure messaggio da condividere;
   permessi in app allineati alle policy RLS (viewer in sola lettura, gestione membri a owner/admin)
 - Elenco oggetti con ricerca e filtri (in uso / archiviati / tutti), stato di sync per oggetto
-- Creazione e modifica oggetto: nome, categoria, stato, note, posizione GPS
+- Scheda oggetto in consultazione: "Dove si trova" (descrizione libera, distanza, da quando) con
+  "Portami lì" e "L'ho spostato qui"; modifica come azione esplicita
+- Creazione e modifica oggetto: nome, "Dove", posizione GPS, categoria, stato, note
 - Foto degli oggetti: scatto o galleria, ridimensionate (max 1920 px, JPEG) senza metadati EXIF,
   salvate in locale e caricate nel bucket privato `object-photos`; miniatura in elenco,
-  visualizzatore a schermo intero, eliminazione sincronizzata, download delle foto degli altri membri
+  visualizzatore a schermo intero, eliminazione sincronizzata; le foto degli altri membri si scaricano
+  su richiesta (in sync solo le copertine, le altre all'apertura della scheda) con una cache da 150 MB
 - Etichette QR: ogni oggetto ha un QR (`objectfinder://object/<id>`, solo l'identificativo) da
   condividere o stampare; scansione dall'app (scanner Google Play services, senza permesso
   fotocamera) o con la fotocamera di sistema tramite deep link; se l'oggetto è in un altro progetto
   l'app propone di passarci
+- Etichette NFC: dal menu della scheda si scrive su un tag NTAG lo stesso link del QR (più l'Android
+  Application Record); avvicinando il telefono al tag si apre la scheda, anche ad app chiusa
 - Codici esistenti collegati agli oggetti (barcode del prodotto, numero di serie, QR di terzi):
   scansionati o inseriti a mano; scansionandoli si apre l'oggetto (scelta se più oggetti hanno lo
   stesso codice); la ricerca in elenco trova anche per codice
@@ -119,17 +125,36 @@ disinstallata l'app.
   modificato (o eliminato) l'oggetto nel frattempo, nessuna versione viene persa e la scheda mostra
   le differenze campo per campo con la scelta "Tieni la mia" / "Usa quella del server"
 - Eliminazione definitiva (owner/admin) con foto, codici e storico, propagata agli altri dispositivi
-- Sincronizzazione bidirezionale: push delle modifiche pending + pull incrementale con cursore,
+- Sincronizzazione bidirezionale: push delle modifiche pending + pull incrementale con cursore
+  composto `(updated_at, id)` e finestra di ricontrollo; al logout le copie già sincronizzate
+  vengono tolte dal telefono,
   sync immediata dopo ogni modifica (appena c'è rete) e periodica ogni ora
-- Export dell'inventario (Impostazioni → Inventario): CSV per Excel/fogli di calcolo (separatore `;`,
+- Export dell'inventario (icona nella barra della lista oggetti): CSV per Excel/fogli di calcolo (separatore `;`,
   UTF-8, formule neutralizzate) o PDF A4 stampabile con foto, codici e QR di ogni oggetto;
   condivisione o salvataggio sul telefono
 - "Vicini": elenco ordinato per distanza dal telefono, con la distanza su ogni oggetto
 - Storico posizioni: ogni nuova posizione (oltre l'incertezza del GPS) viene registrata e sincronizzata
   (tabella `locations`, append-only); in scheda: data, coordinate, spostamento, apertura su mappa
 - "Portami lì": navigazione a piedi verso l'oggetto con Google Maps (o altra app mappe)
-- Mappa Google Maps / OpenStreetMap con preferenza salvata, fallback automatico su OSM senza API key,
-  apertura dell'oggetto dal marker
+- Mappa Google Maps / OpenStreetMap con preferenza salvata, fallback automatico su OSM senza API key;
+  segnaposti con il nome, oggetti nello stesso punto raggruppati, riquadro con apertura e "Portami lì"
+
+## Email di invito
+La Edge Function `backend/supabase/functions/send-invite` manda l'email a chi viene invitato senza
+account. La pubblica il workflow **Edge functions** a ogni modifica della funzione su `main`
+(environment `production`). Servono questi secret del repository:
+
+| Secret | Dove si trova |
+|---|---|
+| `SUPABASE_ACCESS_TOKEN` | supabase.com → Account → Access Tokens (token personale) |
+| `RESEND_API_KEY` | resend.com → API Keys (piano gratuito: 3.000 email/mese) |
+| `INVITE_FROM` | mittente su un dominio verificato in Resend, es. `Object Finder <inviti@tuodominio.it>` |
+
+`SUPABASE_URL` (già presente per l'APK) serve a ricavare il project ref. Dopo aver impostato i secret
+si avvia il workflow da Actions → Edge functions → Run workflow. Finché la funzione non è pubblicata,
+l'app propone la condivisione manuale dell'invito. Limiti anti-spam: un reinvio ogni 10 minuti per
+invito, 50 email al giorno per progetto (migration 011); il destinatario è sempre quello salvato
+nell'invito, mai un indirizzo scelto dal client.
 
 ## Note di sicurezza
 - Non inserire mai la `service_role` key nell'app: solo anon/publishable key con RLS.
@@ -143,5 +168,5 @@ disinstallata l'app.
 - `MapEngine` consente di aggiungere MapLibre come provider OSM avanzato in una milestone successiva.
 
 ## Stato e prossimi step
-Vedi `docs/NEXT_STEPS.md`. In breve: inviti a utenti non ancora registrati, upload foto su Storage, QR/NFC,
-tracker BLE/GPS, matching immagini.
+Vedi `docs/NEXT_STEPS.md`. In breve: fotocamera in-app (CameraX), riconoscimento visivo degli oggetti,
+distribuzione su Google Play/Firebase, tracker BLE/GPS e geofence.

@@ -3,6 +3,7 @@ package it.objectfinder.app.ui.projects
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import it.objectfinder.app.data.ActiveProject
+import it.objectfinder.app.data.InviteEmail
 import it.objectfinder.app.data.InviteResult
 import it.objectfinder.app.data.PendingInvite
 import it.objectfinder.app.data.ProjectMember
@@ -72,6 +73,8 @@ data class MembersUiState(
     val invites: List<PendingInvite> = emptyList(),
     /** Invito appena creato: la UI propone di condividerlo. */
     val justInvited: PendingInvite? = null,
+    /** Esito dell'email automatica per [justInvited] (null finché non è noto). */
+    val inviteEmail: InviteEmail? = null,
     val loaded: Boolean = false,
     val op: OpState = OpState(),
     /** true dopo l'uscita dal progetto: la schermata si chiude. */
@@ -95,7 +98,9 @@ class MembersViewModel(
         if (result == InviteResult.INVITED) {
             val invite = _state.value.invites.firstOrNull { it.email.equals(email.trim(), ignoreCase = true) }
                 ?: PendingInvite("", email.trim().lowercase(), role)
-            _state.update { it.copy(justInvited = invite) }
+            // Email automatica; se il server non può mandarla resta la condivisione manuale.
+            val mail = repository.sendInviteEmail(invite.email)
+            _state.update { it.copy(justInvited = invite, inviteEmail = mail) }
         } else {
             _state.update { it.copy(op = it.op.copy(message = "Membro aggiunto")) }
         }
@@ -106,9 +111,19 @@ class MembersViewModel(
         load()
     }
 
-    fun shareInvite(invite: PendingInvite) = _state.update { it.copy(justInvited = invite) }
+    fun shareInvite(invite: PendingInvite) = _state.update { it.copy(justInvited = invite, inviteEmail = null) }
 
-    fun consumeInvite() = _state.update { it.copy(justInvited = null) }
+    fun consumeInvite() = _state.update { it.copy(justInvited = null, inviteEmail = null) }
+
+    /** Reinvio dell'email per un invito in attesa (il server limita i reinvii ravvicinati). */
+    fun emailInvite(invite: PendingInvite) = run {
+        val text = when (val mail = repository.sendInviteEmail(invite.email)) {
+            InviteEmail.Sent -> "Email di invito inviata a ${invite.email}"
+            InviteEmail.NotConfigured -> "Invio email non attivo sul server: usa Condividi invito"
+            is InviteEmail.NotSent -> "Email non inviata: ${mail.reason}"
+        }
+        _state.update { it.copy(op = it.op.copy(message = text)) }
+    }
 
     fun changeRole(member: ProjectMember, role: ProjectRole) = run(done = "Ruolo aggiornato") {
         repository.addMember(member.email, role)

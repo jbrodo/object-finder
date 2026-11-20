@@ -120,6 +120,9 @@ private data class InviteArgs(
 )
 
 @Serializable
+private data class InviteEmailArgs(@SerialName("project_id") val projectId: String, val email: String)
+
+@Serializable
 private class NoArgs
 
 @Serializable
@@ -395,6 +398,17 @@ class SupabaseRestApi(
     suspend fun inviteMember(projectId: String, email: String, role: String): String =
         // PostgREST restituisce uno scalare JSON ("invited"): body<String>() darebbe il testo grezzo con le virgolette.
         supabaseJson.decodeFromString(String.serializer(), rpc("invite_project_member", InviteArgs(projectId, email, role)).bodyAsText())
+
+    /** Chiede alla Edge Function `send-invite` di mandare l'email all'invitato (indirizzo letto dal DB). */
+    suspend fun sendInviteEmail(projectId: String, email: String) {
+        authorized { token ->
+            http.client.post("${http.baseUrl}/functions/v1/send-invite") {
+                auth(token)
+                contentType(ContentType.Application.Json)
+                setBody(InviteEmailArgs(projectId, email))
+            }
+        }
+    }
 
     suspend fun acceptMyInvites(): Int = rpc("accept_my_invites", NoArgs()).body<Int>()
 

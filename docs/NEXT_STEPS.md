@@ -22,7 +22,7 @@
 - [x] Create project flow / selezione tra più progetti
 - [x] Membership flow: aggiunta per email, ruoli, rimozione, uscita (RPC migration 004)
 - [x] Inviti a email non ancora registrate (migration 007, accettazione al login con email confermata)
-- [ ] Invio email dell'invito lato server (Edge Function con service_role)
+- [x] Email di invito lato server (Edge Function `send-invite` + Resend, limiti anti-spam, migration 011)
 - [x] Conflitti multi-utente: concorrenza ottimistica su `version`, scelta guidata dall'utente
 - [x] Cifratura token con Android Keystore (AES-256-GCM)
 - [x] Eliminazione definitiva propagata (migration 009, tombstone `deleted_objects`)

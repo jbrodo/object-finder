@@ -1,0 +1,7 @@
+# Configurazione minima per la CLI Supabase (deploy delle Edge Function da CI).
+# Lo schema del database NON è gestito da qui: vedi backend/migrations e backend/scripts/migrate.sh.
+project_id = "object-finder"
+
+[functions.send-invite]
+# Il token del chiamante è verificato dentro la funzione (GET /auth/v1/user).
+verify_jwt = false
