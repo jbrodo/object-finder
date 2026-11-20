@@ -57,6 +57,9 @@ data class EditorState(
     val category: String = DEFAULT_CATEGORY,
     val notes: String = "",
     val place: String = "",
+    val loanedTo: String = "",
+    val loanedAt: Long? = null,
+    val loanDue: java.time.LocalDate? = null,
     val status: ObjectStatus = ObjectStatus.ACTIVE,
     val latitude: Double? = null,
     val longitude: Double? = null,
@@ -245,6 +248,38 @@ class ObjectEditorViewModel(
     fun retryMirage() = analyzePhotos()
 
     fun useSuggestedName(name: String) = setName(name)
+
+    // ---- Prestiti ----
+
+    private val _borrowers = MutableStateFlow<List<String>>(emptyList())
+    val borrowers: StateFlow<List<String>> = _borrowers.asStateFlow()
+
+    fun loadBorrowers() {
+        viewModelScope.launch { _borrowers.value = runCatching { repository.recentBorrowers() }.getOrDefault(emptyList()) }
+    }
+
+    fun lend(to: String, due: java.time.LocalDate?) {
+        val id = objectId ?: return
+        viewModelScope.launch {
+            runCatching { repository.lend(id, to, due) }
+                .onSuccess {
+                    onLocalChange()
+                    reload()
+                    _state.update { it.copy(message = "Prestato a ${to.trim()}") }
+                }
+                .onFailure { e -> _state.update { it.copy(message = e.message ?: "Prestito non salvato") } }
+        }
+    }
+
+    fun returnLoan() {
+        val id = objectId ?: return
+        viewModelScope.launch {
+            repository.returnLoan(id)
+            onLocalChange()
+            reload()
+            _state.update { it.copy(message = "Segnato come restituito") }
+        }
+    }
 
     fun addTextToNotes(text: String) = _state.update {
         it.copy(notes = if (it.notes.isBlank()) text else "${it.notes.trimEnd()}\n$text")
@@ -440,6 +475,9 @@ class ObjectEditorViewModel(
                 category = categoryLabel(item.category),
                 notes = item.notes,
                 place = item.place,
+                loanedTo = item.loanedTo,
+                loanedAt = item.loanedAt,
+                loanDue = item.loanDue?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() },
                 status = item.statusEnum,
                 locationSource = LocationSource.fromWire(item.locationSource),
                 latitude = item.latitude,

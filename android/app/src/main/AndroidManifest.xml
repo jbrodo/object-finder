@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Etichette NFC (facoltative: senza NFC resta il QR). -->
     <uses-permission android:name="android.permission.NFC" />
+    <!-- Promemoria dei prestiti in scadenza (chiesto quando si imposta una scadenza). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <!-- Fotocamera in-app (CameraX); senza permesso si usa l'app fotocamera di sistema. -->

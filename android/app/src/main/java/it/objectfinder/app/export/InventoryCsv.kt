@@ -29,7 +29,7 @@ object InventoryCsv {
 
     val header = listOf(
         "Nome", "Categoria", "Stato", "Dove", "Note", "Latitudine", "Longitudine", "Precisione (m)",
-        "Codici collegati", "Foto", "Creato", "Aggiornato", "Id",
+        "Codici collegati", "Foto", "Prestato a", "Restituzione prevista", "Creato", "Aggiornato", "Id",
     )
 
     fun build(rows: List<InventoryRow>, zone: ZoneId = ZoneId.systemDefault()): String {
@@ -50,6 +50,8 @@ object InventoryCsv {
                 number(o.accuracyMeters?.toInt()?.toString()),
                 field(row.codes.joinToString(" | ")),
                 number(row.photoCount.toString()),
+                field(o.loanedTo),
+                number(o.loanDue),
                 number(dates.format(Instant.ofEpochMilli(o.createdAt))),
                 number(dates.format(Instant.ofEpochMilli(o.updatedAt))),
                 number(o.id),

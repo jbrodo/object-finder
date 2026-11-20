@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material.icons.filled.Handshake
 import it.objectfinder.app.data.local.IdentifierType
 import it.objectfinder.app.maps.PickerStart
 import it.objectfinder.app.maps.MapEngine
@@ -102,6 +103,8 @@ fun ObjectEditorScreen(
     var showLabel by remember { mutableStateOf(false) }
     var showNfc by remember { mutableStateOf(false) }
     var showPicker by remember { mutableStateOf(false) }
+    var lending by remember { mutableStateOf(false) }
+    val borrowers by viewModel.borrowers.collectAsStateWithLifecycle()
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -276,6 +279,15 @@ fun ObjectEditorScreen(
                 onDismiss = { showPicker = false },
             )
         }
+        if (lending) {
+            LendDialog(
+                initialName = state.loanedTo,
+                initialDue = state.loanDue,
+                borrowers = borrowers,
+                onConfirm = { to, due -> lending = false; viewModel.lend(to, due) },
+                onDismiss = { lending = false },
+            )
+        }
         if (showNfc && objectId != null) {
             NfcWriteDialog(objectId = objectId, title = state.name, onDismiss = { showNfc = false })
         }
@@ -328,6 +340,21 @@ fun ObjectEditorScreen(
                     onUseBestNow = viewModel::useBestFixNow,
                     onDescribe = viewModel::startEditing,
                 )
+                if (state.loanedTo.isNotBlank()) {
+                    LoanPanel(
+                        loanedTo = state.loanedTo,
+                        loanedAt = state.loanedAt,
+                        due = state.loanDue,
+                        readOnly = readOnly,
+                        onReturned = viewModel::returnLoan,
+                        onEdit = { viewModel.loadBorrowers(); lending = true },
+                    )
+                } else if (!readOnly) {
+                    TextButton(onClick = { viewModel.loadBorrowers(); lending = true }) {
+                        Icon(Icons.Default.Handshake, contentDescription = null, Modifier.size(18.dp))
+                        Text("  Presta a qualcuno")
+                    }
+                }
                 PhotoSection(
                     photos = photos,
                     busy = photoBusy,

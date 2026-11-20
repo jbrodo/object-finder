@@ -31,6 +31,9 @@ object SyncMerge {
             longitude = remote.longitude,
             accuracyMeters = remote.accuracyMeters,
             locationSource = remote.locationSource,
+            loanedTo = remote.loanedTo,
+            loanedAt = parseEpochMillis(remote.loanedAt),
+            loanDue = remote.loanDue,
             status = remote.status,
             syncStatus = SyncStatus.SYNCED.wire,
             createdAt = local?.createdAt ?: parseEpochMillis(remote.createdAt) ?: System.currentTimeMillis(),
@@ -70,7 +73,9 @@ object SyncMerge {
             local.latitude == server.latitude &&
             local.longitude == server.longitude &&
             local.accuracyMeters == server.accuracyMeters &&
-            local.locationSource == server.locationSource
+            local.locationSource == server.locationSource &&
+            local.loanedTo == server.loanedTo &&
+            local.loanDue == server.loanDue
 
     data class FieldDiff(val label: String, val mine: String, val theirs: String)
 
@@ -88,6 +93,11 @@ object SyncMerge {
                 ObjectStatus.fromWire(server.status).label,
             ).takeIf { it.mine != it.theirs },
             FieldDiff("Dove", local.place.ifBlank { "—" }, server.place.ifBlank { "—" }).takeIf { it.mine != it.theirs },
+            FieldDiff(
+                "Prestito",
+                loanText(local.loanedTo, local.loanDue),
+                loanText(server.loanedTo, server.loanDue),
+            ).takeIf { it.mine != it.theirs },
             FieldDiff("Note", local.notes.ifBlank { "—" }, server.notes.ifBlank { "—" }).takeIf { it.mine != it.theirs },
             FieldDiff(
                 "Posizione",
@@ -150,7 +160,13 @@ object SyncMerge {
         longitude = entity.longitude,
         accuracyMeters = entity.accuracyMeters,
         locationSource = entity.locationSource,
+        loanedTo = entity.loanedTo,
+        loanedAt = entity.loanedAt?.let { java.time.Instant.ofEpochMilli(it).toString() },
+        loanDue = entity.loanDue,
     )
+
+    private fun loanText(to: String, due: String?) =
+        if (to.isBlank()) "non prestato" else "a $to" + (due?.let { " fino al $it" } ?: "")
 
     fun parseEpochMillis(iso: String?): Long? =
         iso?.let { runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull() }

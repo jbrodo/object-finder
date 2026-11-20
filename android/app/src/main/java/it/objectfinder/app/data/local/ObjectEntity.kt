@@ -67,6 +67,10 @@ data class ObjectEntity(
     /** Origine del punto: [LocationSource.GPS] (con incertezza) o [LocationSource.MANUAL] (scelto sulla mappa). */
     val locationSource: String = LocationSource.GPS.wire,
     val status: String = ObjectStatus.ACTIVE.wire,
+    /** Prestito: a chi ("" = non prestato), da quando (epoch ms) e scadenza facoltativa (yyyy-MM-dd). */
+    val loanedTo: String = "",
+    val loanedAt: Long? = null,
+    val loanDue: String? = null,
     val syncStatus: String = SyncStatus.PENDING.wire,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
@@ -85,4 +89,5 @@ data class ObjectEntity(
         get() = hasLocation && !isManualLocation && (accuracyMeters ?: 0f) > APPROXIMATE_ACCURACY_METERS
     val statusEnum: ObjectStatus get() = ObjectStatus.fromWire(status)
     val isPending: Boolean get() = syncStatus == SyncStatus.PENDING.wire
+    val isLoaned: Boolean get() = loanedTo.isNotBlank()
 }

@@ -318,6 +318,18 @@ private fun ObjectCard(
                     color = if (distance != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (item.isLoaned) {
+                val due = item.loanDue?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
+                val today = java.time.LocalDate.now()
+                Text(
+                    LoanFormat.summary(item.loanedTo, due, today),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (LoanFormat.isOverdue(due, today)) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.tertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             // Solo ciò che distingue l'oggetto: categoria e stato predefiniti sono rumore.
             metaLine(item)?.let {
                 Text(

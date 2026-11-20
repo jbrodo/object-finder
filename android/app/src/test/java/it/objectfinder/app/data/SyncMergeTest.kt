@@ -155,4 +155,18 @@ class SyncMergeTest {
         assertTrue(!SyncMerge.sameContent(gps, server))
         assertEquals("45.00000, 9.00000 (a mano)", SyncMerge.diff(gps, server).single { it.label == "Posizione" }.theirs)
     }
+
+    @Test
+    fun `loan travels with the object and is a real difference`() {
+        val server = remote().copy(loanedTo = "Marco", loanedAt = "2026-11-20T10:00:00Z", loanDue = "2026-11-30")
+        val merged = SyncMerge.mergeRemote(server, null)!!
+        assertTrue(merged.isLoaned)
+        assertEquals("2026-11-30", merged.loanDue)
+        val dto = SyncMerge.toWriteDto(merged)
+        assertEquals("Marco", dto.loanedTo)
+        assertEquals("2026-11-30", dto.loanDue)
+        assertEquals(java.time.Instant.parse("2026-11-20T10:00:00Z").toString(), dto.loanedAt)
+        val returned = merged.copy(loanedTo = "", loanedAt = null, loanDue = null)
+        assertEquals(listOf("Prestito"), SyncMerge.diff(returned, server).map { it.label })
+    }
 }

@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-enum class ObjectFilter(val label: String) { ACTIVE("Attuali"), ARCHIVED("Archiviati"), ALL("Tutti") }
+enum class ObjectFilter(val label: String) { ACTIVE("Attuali"), LOANED("In prestito"), ARCHIVED("Archiviati"), ALL("Tutti") }
 
 data class ObjectListState(
     val items: List<ObjectEntity> = emptyList(),
@@ -89,6 +89,7 @@ internal fun filterObjects(
         val archived = item.statusEnum == ObjectStatus.ARCHIVED
         val statusOk = when (filter) {
             ObjectFilter.ACTIVE -> !archived
+            ObjectFilter.LOANED -> !archived && item.isLoaned
             ObjectFilter.ARCHIVED -> archived
             ObjectFilter.ALL -> true
         }

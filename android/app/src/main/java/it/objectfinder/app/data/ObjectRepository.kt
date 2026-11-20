@@ -136,6 +136,41 @@ class ObjectRepository(
         dao.upsert(existing.copy(status = status.wire, syncStatus = statusAfterLocalEdit(existing), updatedAt = now()))
     }
 
+    // ---- Prestiti ----
+
+    /** Presta l'oggetto a [to], con scadenza facoltativa; sincronizzato come ogni altra modifica. */
+    suspend fun lend(id: String, to: String, due: java.time.LocalDate?) {
+        val existing = dao.getById(id) ?: return
+        val name = to.trim().take(LOAN_NAME_MAX)
+        require(name.isNotBlank()) { "Indica a chi è prestato" }
+        dao.upsert(
+            existing.copy(
+                loanedTo = name,
+                loanedAt = now(),
+                loanDue = due?.toString(),
+                syncStatus = statusAfterLocalEdit(existing),
+                updatedAt = now(),
+            )
+        )
+    }
+
+    /** Oggetto restituito: torna "non prestato". */
+    suspend fun returnLoan(id: String) {
+        val existing = dao.getById(id) ?: return
+        dao.upsert(
+            existing.copy(
+                loanedTo = "", loanedAt = null, loanDue = null,
+                syncStatus = statusAfterLocalEdit(existing), updatedAt = now(),
+            )
+        )
+    }
+
+    /** Nomi usati nei prestiti del progetto, per proporli mentre si scrive. */
+    suspend fun recentBorrowers(): List<String> = dao.borrowers(projects.currentProjectId)
+
+    /** Prestiti con scadenza entro [day] (compresa), di tutti i progetti sul telefono. */
+    suspend fun loansDueBy(day: java.time.LocalDate): List<ObjectEntity> = dao.loansDueBy(day.toString())
+
     // ---- Conflitti ----
 
     /** Tieni la versione locale: sovrascrive quella del server (o ricrea l'oggetto eliminato). */
@@ -333,6 +368,7 @@ class ObjectRepository(
     }
 
     private companion object {
+        const val LOAN_NAME_MAX = 120
         const val PAGE_SIZE = 500
     }
 }

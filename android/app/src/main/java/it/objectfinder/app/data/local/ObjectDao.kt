@@ -54,6 +54,19 @@ interface ObjectDao {
     )
     suspend fun syncedCloudObjectsWithoutPendingChanges(localProject: String): List<String>
 
+    @Query(
+        "SELECT DISTINCT loanedTo FROM objects WHERE projectId = :projectId AND loanedTo != '' " +
+            "ORDER BY loanedAt DESC LIMIT 20"
+    )
+    suspend fun borrowers(projectId: String): List<String>
+
+    /** Date ISO (yyyy-MM-dd): il confronto testuale coincide con quello cronologico. */
+    @Query(
+        "SELECT * FROM objects WHERE loanedTo != '' AND loanDue IS NOT NULL AND loanDue <= :day " +
+            "AND status != 'archived' ORDER BY loanDue"
+    )
+    suspend fun loansDueBy(day: String): List<ObjectEntity>
+
     @Query("DELETE FROM objects WHERE id = :id")
     suspend fun delete(id: String)
 
