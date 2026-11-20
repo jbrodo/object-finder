@@ -77,9 +77,11 @@ class IdentifierTest {
     }
 
     @Test
-    fun `unlinked code explains how to link it`() = runTest {
+    fun `unlinked code or tag is offered for linking`() = runTest {
         val outcome = resolver(emptyList()).resolve("8001234567890")
-        assertTrue(outcome is ScanOutcome.Message && "«Scansiona» in Codici collegati" in outcome.text)
+        assertEquals(ScanOutcome.Unlinked("8001234567890", IdentifierType.BARCODE), outcome)
+        val tag = resolver(emptyList()).resolve("04A1B2C3D4E5F6", IdentifierType.NFC)
+        assertEquals(ScanOutcome.Unlinked("04A1B2C3D4E5F6", IdentifierType.NFC), tag)
     }
 
     @Test

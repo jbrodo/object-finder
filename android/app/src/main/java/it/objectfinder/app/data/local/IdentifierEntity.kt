@@ -14,6 +14,8 @@ enum class IdentifierType(val wire: String, val label: String) {
     BARCODE("barcode", "Barcode"),
     SERIAL("serial", "Numero di serie"),
     QR("qr", "QR"),
+    /** UID del chip di un tag NFC esistente (biglietto da visita, portachiavi, tag in sola lettura). */
+    NFC("nfc", "Tag NFC"),
     EXTERNAL("external", "Codice esterno");
 
     companion object {

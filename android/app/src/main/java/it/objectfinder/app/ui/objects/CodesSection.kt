@@ -1,5 +1,9 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.nfc.NfcTags
+import it.objectfinder.app.nfc.NfcSession
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material.icons.filled.Nfc
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +61,9 @@ fun CodesSection(
 ) {
     val activity = LocalActivity.current as? ComponentActivity
     var manualEntry by rememberSaveable { mutableStateOf(false) }
+    var waitingTag by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val hasNfc = remember(context) { NfcTags.availability(context) != NfcTags.Availability.MISSING }
     var confirmDelete by remember { mutableStateOf<IdentifierEntity?>(null) }
 
     Card(Modifier.fillMaxWidth()) {
@@ -65,7 +72,7 @@ fun CodesSection(
             if (codes.isEmpty()) {
                 Text(
                     if (readOnly) "Nessun codice collegato"
-                    else "Collega il barcode del prodotto o il numero di serie: scansionandoli ritroverai l'oggetto.",
+                    else "Collega il barcode del prodotto, il numero di serie o un tag NFC: scansionandoli ritroverai l'oggetto.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -75,7 +82,15 @@ fun CodesSection(
                         InputChip(
                             selected = false,
                             onClick = { if (!readOnly) confirmDelete = code },
-                            label = { Text("${code.typeEnum.label}: ${code.value}", maxLines = 1) },
+                            // Valori lunghi (URL, UID): una riga con i puntini, non tagliata a metà.
+                            label = {
+                                Text(
+                                    "${code.typeEnum.label}: ${code.value}",
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    softWrap = false,
+                                )
+                            },
                             trailingIcon = if (readOnly) null else {
                                 { Icon(Icons.Default.Close, contentDescription = "Rimuovi codice", Modifier.size(16.dp)) }
                             },
@@ -84,7 +99,7 @@ fun CodesSection(
                 }
             }
             if (!readOnly) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         enabled = activity != null,
                         onClick = {
@@ -106,9 +121,41 @@ fun CodesSection(
                         Icon(Icons.Default.Keyboard, contentDescription = null, Modifier.size(18.dp))
                         Text("  Scrivi")
                     }
+                    if (hasNfc) OutlinedButton(onClick = { waitingTag = true }) {
+                        Icon(Icons.Default.Nfc, contentDescription = null, Modifier.size(18.dp))
+                        Text("  Tag NFC")
+                    }
                 }
             }
         }
+    }
+
+    if (waitingTag) {
+        // Un tag esistente (anche in sola lettura) si collega con il suo identificativo, senza riscriverlo.
+        DisposableEffect(Unit) {
+            NfcSession.exclusive = { tag ->
+                val read = NfcSession.read(tag)
+                waitingTag = false
+                when {
+                    read.link != null -> onError("È un'etichetta Object Finder: identifica già un oggetto, non va collegata.")
+                    read.uid.isEmpty() -> onError("Questo tag non ha un identificativo leggibile: usa un'etichetta QR.")
+                    else -> onAdd(IdentifierType.NFC, read.uid)
+                }
+            }
+            onDispose { NfcSession.exclusive = null }
+        }
+        AlertDialog(
+            onDismissRequest = { waitingTag = false },
+            icon = { Icon(Icons.Default.Nfc, contentDescription = null) },
+            title = { Text("Collega un tag NFC") },
+            text = {
+                Text(
+                    "Avvicina al retro del telefono il tag da collegare: biglietto da visita, portachiavi o " +
+                        "qualsiasi tag NFC. Non viene modificato: si usa il suo identificativo."
+                )
+            },
+            confirmButton = { TextButton(onClick = { waitingTag = false }) { Text("Annulla") } },
+        )
     }
 
     if (manualEntry) {

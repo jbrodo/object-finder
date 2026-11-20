@@ -1,10 +1,6 @@
 package it.objectfinder.app.nfc
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
-import android.nfc.NfcAdapter
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,7 +39,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun NfcWriteDialog(objectId: String, title: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val activity = remember(context) { context.findActivity() }
     val scope = rememberCoroutineScope()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     // Si rilegge al ritorno dalle impostazioni NFC.
@@ -52,26 +47,21 @@ fun NfcWriteDialog(objectId: String, title: String, onDismiss: () -> Unit) {
     var result by remember { mutableStateOf<NfcTags.WriteResult?>(null) }
 
     val active = availability == NfcTags.Availability.READY && lifecycle.isAtLeast(Lifecycle.State.RESUMED)
-    DisposableEffect(active, activity) {
-        val adapter = NfcAdapter.getDefaultAdapter(context)
-        if (active && adapter != null && activity != null) {
+    // La sessione NFC dell'app è già attiva: la scrittura prende il primo tag finché il dialogo è aperto.
+    DisposableEffect(active) {
+        if (active) {
             val message = NfcTags.message(objectId, context.packageName)
-            adapter.enableReaderMode(
-                activity,
-                { tag ->
-                    if (writing) return@enableReaderMode
+            NfcSession.exclusive = { tag ->
+                if (!writing) {
                     writing = true
                     scope.launch {
                         result = NfcTags.write(tag, message)
                         writing = false
                     }
-                },
-                NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or
-                    NfcAdapter.FLAG_READER_NFC_F or NfcAdapter.FLAG_READER_NFC_V,
-                null,
-            )
+                }
+            }
         }
-        onDispose { if (adapter != null && activity != null) runCatching { adapter.disableReaderMode(activity) } }
+        onDispose { NfcSession.exclusive = null }
     }
 
     val done = result == NfcTags.WriteResult.Written
@@ -125,10 +115,4 @@ fun NfcWriteDialog(objectId: String, title: String, onDismiss: () -> Unit) {
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(if (done) "Fatto" else "Chiudi") } },
     )
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }

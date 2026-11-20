@@ -26,4 +26,10 @@ class NfcTagsTest {
             assertTrue(text, listOf("usa", "riprova").any { it in text })
         }
     }
+
+    @Test
+    fun `tag uid becomes an uppercase hex code`() {
+        assertEquals("04A1FF00", NfcSession.uidHex(byteArrayOf(0x04, 0xA1.toByte(), 0xFF.toByte(), 0x00)))
+        assertEquals("", NfcSession.uidHex(null))
+    }
 }

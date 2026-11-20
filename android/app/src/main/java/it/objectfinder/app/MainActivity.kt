@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.objectfinder.app.nfc.NfcSession
 import it.objectfinder.app.ui.ObjectFinderApp
 import it.objectfinder.app.ui.theme.ObjectFinderTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +28,17 @@ class MainActivity : ComponentActivity() {
                 ObjectFinderApp(container, pendingLink = link, onLinkHandled = { pendingLink.value = null })
             }
         }
+    }
+
+    // App in primo piano: i tag NFC li gestisce l'app (non l'app Tag di sistema).
+    override fun onResume() {
+        super.onResume()
+        NfcSession.start(this)
+    }
+
+    override fun onPause() {
+        NfcSession.stop(this)
+        super.onPause()
     }
 
     override fun onNewIntent(intent: Intent) {

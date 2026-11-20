@@ -1,5 +1,9 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.objects.LinkCodeDialog
+import it.objectfinder.app.data.AddIdentifierResult
+import it.objectfinder.app.data.local.IdentifierType
+import it.objectfinder.app.nfc.NfcSession
 import it.objectfinder.app.ui.settings.ExportSection
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -121,11 +125,13 @@ fun ObjectFinderApp(
     }
 
     var choosing by remember { mutableStateOf<ScanOutcome.Choose?>(null) }
+    var unlinked by remember { mutableStateOf<ScanOutcome.Unlinked?>(null) }
 
-    /** Gestisce un contenuto scansionato o un deep link: apre l'oggetto o spiega perché no. */
-    fun handleScanned(raw: String) {
+    /** Gestisce un contenuto scansionato, un deep link o un tag NFC: apre l'oggetto o propone di collegarlo. */
+    fun handleScanned(raw: String, type: IdentifierType = IdentifierType.BARCODE) {
         scope.launch {
-            when (val outcome = resolver.resolve(raw)) {
+            when (val outcome = resolver.resolve(raw, type)) {
+                is ScanOutcome.Unlinked -> { choosing = null; unlinked = outcome }
                 is ScanOutcome.Open -> nav.openObject(outcome.objectId)
                 is ScanOutcome.Message -> snackbar.showSnackbar(outcome.text, duration = SnackbarDuration.Long)
                 is ScanOutcome.Choose -> choosing = outcome
@@ -148,7 +154,7 @@ fun ObjectFinderApp(
         if (act != null) {
             CodeScanner.scan(
                 act,
-                onResult = { handleScanned(it.raw) },
+                onResult = { handleScanned(it.raw, if (it.isQr) IdentifierType.QR else IdentifierType.BARCODE) },
                 onError = { msg -> scope.launch { snackbar.showSnackbar(msg, duration = SnackbarDuration.Long) } },
             )
         }
@@ -159,6 +165,14 @@ fun ObjectFinderApp(
 
     // Primo avvio senza sessione → onboarding/login; poi l'app resta usabile anche offline.
     val start = remember { if (session == null && !onboardingDone) Routes.AUTH else Routes.OBJECTS }
+
+    // Tag NFC avvicinati con l'app aperta: link Object Finder o UID del chip da collegare.
+    LaunchedEffect(Unit) {
+        NfcSession.reads.collect { read ->
+            if (read.link != null) handleScanned(read.link)
+            else if (read.uid.isNotEmpty()) handleScanned(read.uid, IdentifierType.NFC)
+        }
+    }
 
     // Deep link da etichetta QR (anche a freddo): si gestisce una volta pronta la navigazione.
     LaunchedEffect(pendingLink) {
@@ -280,6 +294,30 @@ fun ObjectFinderApp(
                 }
             },
             confirmButton = { TextButton(onClick = { choosing = null }) { Text("Chiudi") } },
+        )
+    }
+
+    unlinked?.let { code ->
+        val objects by container.objectRepository.observeObjects().collectAsStateWithLifecycle(emptyList())
+        val active by container.settings.activeProject.collectAsStateWithLifecycle()
+        LinkCodeDialog(
+            code = code.code,
+            type = code.type,
+            objects = objects,
+            canLink = active?.canEditObjects ?: true,
+            onPick = { item ->
+                unlinked = null
+                scope.launch {
+                    val text = when (container.identifierRepository.add(item.id, code.type, code.code)) {
+                        AddIdentifierResult.Added -> { requestSync(); "Collegato a «${item.name}»" }
+                        AddIdentifierResult.Duplicate -> "Già collegato a «${item.name}»"
+                        AddIdentifierResult.Invalid -> "Codice non valido"
+                    }
+                    nav.openObject(item.id)
+                    snackbar.showSnackbar(text)
+                }
+            },
+            onDismiss = { unlinked = null },
         )
     }
 

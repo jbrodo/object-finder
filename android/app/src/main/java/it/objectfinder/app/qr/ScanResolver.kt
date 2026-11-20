@@ -9,6 +9,7 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import it.objectfinder.app.data.ActiveProject
+import it.objectfinder.app.data.local.IdentifierType
 import it.objectfinder.app.data.local.ObjectEntity
 
 sealed interface ScanOutcome {
@@ -18,6 +19,8 @@ sealed interface ScanOutcome {
     /** Più oggetti del progetto attivo condividono il codice (es. stesso modello di prodotto). */
     data class Choose(val code: String, val objects: List<ObjectEntity>) : ScanOutcome
     data class Message(val text: String) : ScanOutcome
+    /** Codice (o tag NFC) non collegato a nessun oggetto: si può collegarlo subito. */
+    data class Unlinked(val code: String, val type: IdentifierType) : ScanOutcome
 }
 
 /** Contenuto letto dallo scanner. */
@@ -30,8 +33,9 @@ class ScanResolver(
     private val currentProjectId: () -> String,
     private val knownProjects: suspend () -> List<ActiveProject>,
 ) {
-    suspend fun resolve(raw: String?): ScanOutcome {
-        val id = QrCodes.parseObjectId(raw) ?: return resolveLinkedCode(raw.orEmpty().trim())
+    /** [type]: come salvarlo se non è collegato (QR di terzi, barcode, UID di un tag NFC). */
+    suspend fun resolve(raw: String?, type: IdentifierType = IdentifierType.BARCODE): ScanOutcome {
+        val id = QrCodes.parseObjectId(raw) ?: return resolveLinkedCode(raw.orEmpty().trim(), type)
         val item = findObject(id)
             ?: return ScanOutcome.Message(
                 "Oggetto non presente su questo dispositivo. Se è di un tuo progetto, sincronizza e riprova."
@@ -43,15 +47,10 @@ class ScanResolver(
     }
 
     /** Barcode/seriale/QR di terzi: cerca gli oggetti che hanno quel codice collegato. */
-    private suspend fun resolveLinkedCode(code: String): ScanOutcome {
+    private suspend fun resolveLinkedCode(code: String, type: IdentifierType): ScanOutcome {
         if (code.isEmpty()) return ScanOutcome.Message("Codice vuoto")
         val matches = findObjectsByCode(code)
-        if (matches.isEmpty()) {
-            return ScanOutcome.Message(
-                "Il codice ${code.take(40)} non è collegato a nessun oggetto. " +
-                    "Aprine uno e usa «Scansiona» in Codici collegati."
-            )
-        }
+        if (matches.isEmpty()) return ScanOutcome.Unlinked(code, type)
         val current = currentProjectId()
         val here = matches.filter { it.projectId == current }
         return when {

@@ -73,8 +73,8 @@ class QrCodesTest {
     }
 
     @Test
-    fun `resolver explains unknown codes and missing objects`() = runTest {
-        assertTrue(resolver(null, "p1").resolve("hello") is ScanOutcome.Message)
+    fun `resolver offers linking for unknown codes and explains missing objects`() = runTest {
+        assertTrue(resolver(null, "p1").resolve("hello") is ScanOutcome.Unlinked) // codice di terzi: si propone di collegarlo
         assertTrue(resolver(null, "p1").resolve(QrCodes.payloadFor(id)) is ScanOutcome.Message)
         assertTrue(resolver(entity("p9"), "p1").resolve(QrCodes.payloadFor(id)) is ScanOutcome.Message)
     }
