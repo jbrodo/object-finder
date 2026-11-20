@@ -157,11 +157,20 @@ disinstallata l'app.
 - Riconoscimento visivo ("Riconosci oggetto" nella lista): una foto e l'app propone gli oggetti del
   progetto più simili, tutto sul telefono (MediaPipe Image Embedder, modello scaricato dalla build con
   SHA-256 fissato); a parità di aspetto vince l'oggetto più vicino; se nessuno corrisponde si
-  registra come nuovo con quella foto. Le impronte delle foto restano locali e non si sincronizzano
+  registra come nuovo con quella foto. Le impronte delle foto si condividono sul server
+  (`photo_embeddings`, migration 016: lettura per i membri, scrittura per gli editor), così un
+  telefono nuovo le scarica invece di riscaricare e rielaborare tutte le foto
 - Suggerimenti dalla foto (Cactus Mirage, Apache-2.0, sul telefono): registrando un oggetto l'app
   propone fino a 3 nomi e legge scritte e numeri di serie; un tocco li usa (nome, note o codice
   collegato). Motore 4.1.4 collegato via JNI (`src/main/cpp`, NDK r28), solo ARM; il modello (22 MB)
   si scarica una volta su richiesta, con revisione e SHA-256 fissati
+- Prestiti: "Presta a qualcuno" dalla scheda (a chi, data di restituzione facoltativa), riquadro
+  "In prestito" con "Restituito", filtro "In prestito" e riga sulla scheda in lista; promemoria
+  giornaliero alle 9 (e subito per i prestiti già scaduti), una notifica per oggetto al giorno
+- Luoghi strutturati: albero di luoghi per progetto (Casa › Garage › Scaffale, tabella `places`,
+  migration 015); nel modulo si sceglie il luogo (o se ne crea uno dentro quello scelto) e il testo
+  libero diventa il dettaglio; filtro "Luogo" che include i sotto-luoghi; eliminare un luogo non
+  elimina nulla (gli oggetti restano senza luogo, i sotto-luoghi salgono di livello)
 - Posizione corretta a mano: mirino fisso sulla mappa ("Correggi il punto sulla mappa"), salvata
   come posizione indicata a mano; rilevamento GPS che tiene il fix migliore dei primi secondi
 

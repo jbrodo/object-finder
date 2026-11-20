@@ -40,6 +40,7 @@
 - [x] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`, migration 005)
 - [x] Selezione multipla nella lista e foglio A4 di etichette QR (3 × 7)
 - [x] Riconoscimento visivo on-device (MediaPipe Image Embedder, MobileNetV3 large): impronte locali delle foto, classifica per somiglianza + vicinanza, "Registra come nuovo"
+- [x] Impronte condivise sul server (migration 016): un telefono nuovo o un altro membro le scarica invece di riscaricare le foto
 - [ ] Taratura delle soglie di somiglianza sulle foto reali (negli APK debug si vede la percentuale)
 - [x] Suggerimenti dalla foto con Cactus Mirage (nome, testo letto → note o numero di serie), JNI su ARM
 - [ ] Verificare Mirage su telefono ARM reale (velocità, qualità dei nomi in italiano); emulatore x86 non supportato
@@ -53,6 +54,8 @@
 - [x] Precisione GPS visibile (approssimata oltre ±25 m) e rilevamento del fix migliore entro 15 s
 - [x] Mappa: raggruppamento in base allo zoom, zoom sul gruppo, ventaglio per oggetti nello stesso punto
 - [x] Password: autofill/Credential Manager, mostra password, robustezza
+- [x] Prestiti (migration 014): "prestato a … fino al …", promemoria alle 9 e subito se già scaduto, filtro "In prestito"
+- [x] Luoghi strutturati (migration 015): albero per progetto (Casa › Garage › Scaffale), selettore con creazione/rinomina/eliminazione, filtro per luogo con i sotto-luoghi, percorso in etichette ed export
 
 ## Distribuzione e qualità
 - [x] Export inventario CSV / PDF
@@ -60,11 +63,8 @@
 - [ ] Test interno su Google Play
 
 ## Backlog (prioritizzato)
-- [ ] Prestiti: "prestato a … fino al …", promemoria alla scadenza, filtro "In prestito"
-- [ ] Luoghi strutturati (Casa → Garage → Scaffale) al posto del solo testo libero; filtro per luogo
 - [ ] Scorciatoie dell'app (Riconosci, Scansiona, Nuovo oggetto) e widget di ricerca
 - [ ] Taratura delle soglie del riconoscimento sulle foto reali (percentuali dalle prove con la v1.7.1)
-- [ ] Impronte del riconoscimento salvate sul server (un telefono nuovo non riscarica tutte le foto)
 - [ ] Segnalazione crash (Firebase Crashlytics, stesso progetto di App Distribution)
 - [ ] Spostare oggetti in un altro progetto (anche in blocco): serve una migrazione che sposti le foto su Storage (`<project>/<object>/…`) e verifichi i permessi su entrambi i progetti
 - [ ] R8 in release con regole verificate (Ktor, serialization, Room, MediaPipe, JNI di Mirage) e Baseline Profiles per avvio e scorrimento (prerequisiti della skill jetpack-compose-performance)
