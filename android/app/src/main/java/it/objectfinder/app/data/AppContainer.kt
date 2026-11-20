@@ -51,6 +51,7 @@ class AppContainer(context: Context) {
     /** Riconoscimento visivo on-device (MediaPipe): impronte delle foto e confronto. */
     val recognitionRepository = RecognitionRepository(
         ImageEmbedderEngine(appContext), database.photoEmbeddingDao(), database.objectDao(), settings,
+        withTemporaryCopy = { photo, use -> photoRepository.withTemporaryCopy(photo, use) },
     )
 
     /** Calcolo in background delle impronte mancanti (foto nuove, scaricate, cambio modello). */

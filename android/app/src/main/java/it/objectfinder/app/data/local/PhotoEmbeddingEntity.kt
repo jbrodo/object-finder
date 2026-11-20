@@ -39,11 +39,16 @@ interface PhotoEmbeddingDao {
     )
     suspend fun forProject(projectId: String, model: String): List<PhotoEmbeddingEntity>
 
-    /** Foto con il file sul telefono ma senza impronta (o con un modello vecchio). */
+    /**
+     * Foto senza impronta (o con un modello vecchio): sul telefono o solo sul server (da scaricare
+     * temporaneamente). Prima quelle locali, che non costano rete.
+     */
     @Query(
         "SELECT p.* FROM object_photos p " +
             "LEFT JOIN photo_embeddings e ON e.photoId = p.id AND e.model = :model " +
-            "WHERE p.localPath IS NOT NULL AND p.syncStatus != 'pending_delete' AND e.photoId IS NULL"
+            "WHERE (p.localPath IS NOT NULL OR p.storagePath IS NOT NULL) " +
+            "AND p.syncStatus != 'pending_delete' AND e.photoId IS NULL " +
+            "ORDER BY (p.localPath IS NULL), p.createdAt"
     )
     suspend fun photosWithoutEmbedding(model: String): List<PhotoEntity>
 

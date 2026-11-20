@@ -18,7 +18,11 @@ class ObjectSyncWorker(
         }
         val outcome = container.objectRepository.sync()
         return when (val error = outcome.exceptionOrNull()) {
-            null -> Result.success()
+            null -> {
+                // Foto nuove degli altri membri: impronte per il riconoscimento.
+                runCatching { container.recognitionRepository.indexMissing() }
+                Result.success()
+            }
             is SupabaseException.NotAuthenticated, is SupabaseException.NotConfigured -> Result.failure()
             // 4xx (RLS, validazione) non si risolvono ritentando: si mostra l'errore in UI.
             is SupabaseException.Http -> if (error.status >= 500 || error.status == 429) Result.retry() else Result.failure()

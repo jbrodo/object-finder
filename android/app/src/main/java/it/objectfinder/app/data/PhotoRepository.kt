@@ -181,6 +181,22 @@ class PhotoRepository(
         return true
     }
 
+    /**
+     * Scarica una foto remota in un file temporaneo (non nella cache delle foto) e lo passa a [use];
+     * il file viene cancellato subito dopo. Serve a calcolare l'impronta senza occupare spazio.
+     */
+    suspend fun <T> withTemporaryCopy(photo: PhotoEntity, use: suspend (File) -> T): T? = withContext(Dispatchers.IO) {
+        val path = photo.storagePath ?: return@withContext null
+        val bytes = runCatching { api.downloadPhoto(path) }.getOrNull() ?: return@withContext null
+        val temp = File.createTempFile("embed-", ".jpg", appContext.cacheDir)
+        try {
+            temp.writeBytes(bytes)
+            use(temp)
+        } finally {
+            temp.delete()
+        }
+    }
+
     /** Oltre il limite si liberano le foto usate meno di recente (restano scaricabili dal server). */
     suspend fun trimCache(limitBytes: Long = CACHE_LIMIT_BYTES) = withContext(Dispatchers.IO) {
         val synced = dao.syncedWithLocalFile()

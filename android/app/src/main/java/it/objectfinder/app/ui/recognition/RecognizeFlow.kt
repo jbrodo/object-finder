@@ -42,7 +42,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
-import it.objectfinder.app.BuildConfig
 import it.objectfinder.app.data.AppContainer
 import it.objectfinder.app.data.local.ObjectEntity
 import it.objectfinder.app.location.LocationProvider
@@ -56,7 +55,8 @@ import java.io.File
 
 private sealed interface Step {
     data object Camera : Step
-    data class Analyzing(val photo: Uri) : Step
+    /** [done]/[total]: impronte delle foto del progetto in preparazione (la prima volta). */
+    data class Analyzing(val photo: Uri, val done: Int = 0, val total: Int = 0) : Step
     data class Done(val photo: Uri, val result: RecognitionResult) : Step
 }
 
@@ -89,9 +89,14 @@ fun RecognizeFlow(
         step = Step.Analyzing(photo)
         scope.launch {
             val here = runCatching { LocationProvider(context).lastKnownLocation() }.getOrNull()
-            val result = runCatching { container.recognitionRepository.recognize(photo, here) }
+            val result = runCatching {
+                container.recognitionRepository.recognize(photo, here) { done, total ->
+                    // Solo se il riquadro è ancora aperto su questa foto (chiuso = niente da aggiornare).
+                    if (total > 0 && (step as? Step.Analyzing)?.photo == photo) step = Step.Analyzing(photo, done, total)
+                }
+            }
                 .getOrDefault(RecognitionResult.Failed)
-            step = Step.Done(photo, result)
+            if ((step as? Step.Analyzing)?.photo == photo) step = Step.Done(photo, result)
         }
     }
 
@@ -137,7 +142,13 @@ fun RecognizeFlow(
                 if (current is Step.Analyzing) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
-                        Text("Confronto con le foto dei tuoi oggetti…", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            // La prima volta (o dopo foto nuove) si preparano le impronte: può volerci un po'.
+                            if (current.total > 0 && current.done < current.total)
+                                "Preparo le foto dei tuoi oggetti (${current.done}/${current.total})…"
+                            else "Confronto con le foto dei tuoi oggetti…",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
                     }
                 } else if (current is Step.Done) {
                     val photo = current.photo
@@ -175,7 +186,7 @@ fun RecognizeFlow(
                             Text("Riprova")
                         }
                         Button(onClick = { onRegisterNew(photo) }, modifier = Modifier.weight(1f)) {
-                            Text("Registra come nuovo", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("Nuovo oggetto", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -213,8 +224,8 @@ private fun MatchRow(item: ObjectEntity, cover: String?, match: RecognitionMatch
                 listOfNotNull(
                     match.confidence.label,
                     match.distanceMeters?.let(PlaceFormat::distanceFromYou),
-                    // Solo negli APK di prova: il valore grezzo, per tarare le soglie sulle foto vere.
-                    if (BuildConfig.DEBUG) "somiglianza ${(match.similarity * 100).toInt()}%" else null,
+                    // Percentuale sempre visibile: dice quanto fidarsi e serve a tarare le soglie.
+                    "${(match.similarity.coerceIn(0f, 1f) * 100).toInt()}%",
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (match.confidence == Confidence.HIGH) MaterialTheme.colorScheme.primary
