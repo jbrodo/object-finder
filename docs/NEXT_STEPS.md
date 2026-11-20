@@ -68,8 +68,9 @@
 - `invite_project_member` rivela a owner/admin se un'email ha già un account ("aggiunto" vs
   "invitato"): enumerazione limitata ai gestori di progetto.
 - Gli inviti non hanno scadenza; si revocano manualmente dalla schermata Membri.
-- Login, sync e gestione membri sono verificati su Postgres con le migration, ma non ancora
-  end-to-end contro un'istanza Supabase reale (GoTrue + PostgREST).
+- Verifiche end-to-end contro il progetto Supabase reale (account di test, emulatore): login,
+  sync con cursore composto, foto su richiesta, logout, inviti; non coperti ruoli multipli e conflitti
+  tra due account reali.
 - Le foto non ancora scaricate richiedono la rete all'apertura della scheda; offline compare l'icona
   "non ancora scaricata".
 - Le etichette NFC sono verificate con intent simulati e test unitari; la scrittura reale va provata su
