@@ -36,6 +36,13 @@
       "skillPath": "skills/api-design/SKILL.md",
       "computedHash": "81d497a208fd9e18972b4a4a6fadc1a1af1de691382f02fd6d387bb505160a78"
     },
+    "app-store-screenshots": {
+      "source": "ceorkm/aso-shots",
+      "commit": "1856b909bc8a521a80a98d50d44415b2eb28a12f",
+      "sourceType": "github",
+      "skillPath": "skills/app-store-screenshots/SKILL.md",
+      "computedHash": "4e631c5aa14f8ab5e135b187809fc7d23a5966ee639933bf9e506d5e5930ad65"
+    },
     "architecture-decision-records": {
       "source": "affaan-m/ECC",
       "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
