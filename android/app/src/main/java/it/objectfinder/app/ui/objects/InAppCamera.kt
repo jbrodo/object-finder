@@ -83,6 +83,9 @@ fun InAppCamera(
     onDismiss: () -> Unit,
     /** La fotocamera in-app non si avvia (dispositivo, driver, emulatore): si usa quella di sistema. */
     onUnavailable: () -> Unit,
+    /** Uno scatto solo (riconoscimento): dopo la foto la fotocamera si chiude. */
+    single: Boolean = false,
+    hint: String? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -140,6 +143,7 @@ fun InAppCamera(
                     capturing = false
                     shots++
                     onShot(target)
+                    if (single) onDismiss()
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -215,7 +219,7 @@ fun InAppCamera(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    if (shots == 0) "Inquadra l'oggetto intero, con un po' di contesto attorno"
+                    hint ?: if (shots == 0) "Inquadra l'oggetto intero, con un po' di contesto attorno"
                     else "Ancora una da un altro lato, oppure Fatto",
                     color = Color.White,
                     style = MaterialTheme.typography.bodyMedium,

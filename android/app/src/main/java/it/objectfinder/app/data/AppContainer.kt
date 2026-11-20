@@ -5,6 +5,9 @@ import it.objectfinder.app.export.InventoryExporter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import it.objectfinder.app.recognition.ImageEmbedderEngine
+import it.objectfinder.app.recognition.RecognitionRepository
 import it.objectfinder.app.data.local.ObjectDatabase
 import it.objectfinder.app.data.remote.AppConfig
 import it.objectfinder.app.data.remote.SupabaseAuthApi
@@ -44,4 +47,14 @@ class AppContainer(context: Context) {
         history = locationHistoryRepository,
         conflicts = database.conflictDao(),
     )
+
+    /** Riconoscimento visivo on-device (MediaPipe): impronte delle foto e confronto. */
+    val recognitionRepository = RecognitionRepository(
+        ImageEmbedderEngine(appContext), database.photoEmbeddingDao(), database.objectDao(), settings,
+    )
+
+    /** Calcolo in background delle impronte mancanti (foto nuove, scaricate, cambio modello). */
+    fun indexPhotosInBackground() {
+        appScope.launch { runCatching { recognitionRepository.indexMissing() } }
+    }
 }

@@ -152,6 +152,10 @@ disinstallata l'app.
   segnaposti con il nome raggruppati in base allo zoom (toccando un gruppo la mappa si avvicina; gli
   oggetti nello stesso punto si aprono a ventaglio), cerchio di incertezza del GPS, posizioni
   approssimate tratteggiate, riquadro con apertura e "Portami lì"
+- Riconoscimento visivo ("Riconosci oggetto" nella lista): una foto e l'app propone gli oggetti del
+  progetto più simili, tutto sul telefono (MediaPipe Image Embedder, modello scaricato dalla build con
+  SHA-256 fissato); a parità di aspetto vince l'oggetto più vicino; se nessuno corrisponde si
+  registra come nuovo con quella foto. Le impronte delle foto restano locali e non si sincronizzano
 - Posizione corretta a mano: mirino fisso sulla mappa ("Correggi il punto sulla mappa"), salvata
   come posizione indicata a mano; rilevamento GPS che tiene il fix migliore dei primi secondi
 

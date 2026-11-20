@@ -1,4 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.net.URI
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -69,8 +71,17 @@ android {
             // R8 disattivato finché non ci sono regole verificate per Ktor/serialization/Room.
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            // Librerie native (MediaPipe) solo per i telefoni: x86 serve unicamente agli emulatori.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+        }
+        debug {
+            // Telefono (arm64) ed emulatore (x86_64): APK di CI installabile su entrambi.
+            ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         }
     }
+
+    // APK scaricato fuori dallo Store: librerie native compresse (download molto più piccolo).
+    packaging { jniLibs { useLegacyPackaging = true } }
 
     buildFeatures {
         compose = true
@@ -85,6 +96,40 @@ android {
         // Digital Asset Links servono solo a condividere le password con un sito web dello stesso
         // dominio (Credential Manager); Object Finder non ne ha. Da riattivare se nascerà un sito.
         disable += "CredManMissingDal"
+        // Release solo ARM (telefoni): x86_64 per i Chromebook costerebbe ~19 MB di librerie MediaPipe.
+        disable += "ChromeOsAbiSupport"
+    }
+}
+
+// Modello per il riconoscimento visivo (MediaPipe Image Embedder, MobileNetV3 large, Apache-2.0):
+// scaricato dalla build con versione e SHA-256 fissati invece di tenere 11 MB di binario nel repository.
+abstract class DownloadEmbedderModel : DefaultTask() {
+    @get:Input abstract val url: Property<String>
+    @get:Input abstract val sha256: Property<String>
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun download() {
+        val target = outputDir.file("image_embedder.tflite").get().asFile
+        fun digest(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+        if (target.exists() && digest(target.readBytes()) == sha256.get()) return
+        val bytes = URI(url.get()).toURL().openStream().use { it.readBytes() }
+        check(digest(bytes) == sha256.get()) { "Checksum del modello non valido: ${url.get()}" }
+        target.parentFile.mkdirs()
+        target.writeBytes(bytes)
+    }
+}
+
+val downloadEmbedderModel = tasks.register<DownloadEmbedderModel>("downloadEmbedderModel") {
+    url.set("https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_large/float32/1/mobilenet_v3_large.tflite")
+    sha256.set("11af3c560dfeed7737cb4c03c23bf52a8403020784192d4dea0b74862a12828d")
+    outputDir.set(layout.buildDirectory.dir("generated/embedderModel"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(downloadEmbedderModel, DownloadEmbedderModel::outputDir)
     }
 }
 
@@ -133,6 +178,9 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.6.2")
     implementation("androidx.camera:camera-lifecycle:1.6.2")
     implementation("androidx.camera:camera-compose:1.6.2")
+
+    // Riconoscimento visivo on-device (impronte delle foto, confronto per somiglianza).
+    implementation("com.google.mediapipe:tasks-vision:1.2.2")
     implementation("androidx.exifinterface:exifinterface:1.4.2")
 
     // Etichette QR: generazione (ZXing core), scansione (Google code scanner, senza permesso

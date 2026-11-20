@@ -107,6 +107,8 @@ class ObjectEditorViewModel(
     private val locationProvider: LocationProvider,
     private val appScope: CoroutineScope,
     private val onLocalChange: () -> Unit,
+    /** Foto da allegare subito a un oggetto nuovo (scattata per il riconoscimento). */
+    initialPhoto: Uri? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(EditorState(isNew = objectId == null, loaded = objectId == null))
     val state: StateFlow<EditorState> = _state.asStateFlow()
@@ -205,6 +207,7 @@ class ObjectEditorViewModel(
         if (objectId != null) viewModelScope.launch { reload() }
         if (objectId != null) viewModelScope.launch { locateUser() }
         if (objectId != null) viewModelScope.launch { runCatching { photoRepository.ensureDownloaded(objectId) } }
+        if (objectId == null && initialPhoto != null) addPhoto(initialPhoto)
     }
 
     /** Posizione del telefono per la distanza: subito l'ultima nota, poi un fix fresco. Mai richiesta di permesso qui. */

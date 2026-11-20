@@ -10,9 +10,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [
         ObjectEntity::class, PhotoEntity::class, IdentifierEntity::class,
-        LocationHistoryEntity::class, ObjectConflictEntity::class,
+        LocationHistoryEntity::class, ObjectConflictEntity::class, PhotoEmbeddingEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class ObjectDatabase : RoomDatabase() {
@@ -21,6 +21,7 @@ abstract class ObjectDatabase : RoomDatabase() {
     abstract fun identifierDao(): IdentifierDao
     abstract fun locationHistoryDao(): LocationHistoryDao
     abstract fun conflictDao(): ObjectConflictDao
+    abstract fun photoEmbeddingDao(): PhotoEmbeddingDao
 
     companion object {
         /** v1 → v2: colonna remoteUpdatedAt e indici su projectId/syncStatus. Nessuna perdita di dati. */
@@ -104,9 +105,20 @@ abstract class ObjectDatabase : RoomDatabase() {
             }
         }
 
+        /** v8 → v9: impronte delle foto per il riconoscimento visivo (solo locali). */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS photo_embeddings (" +
+                        "photoId TEXT NOT NULL PRIMARY KEY, objectId TEXT NOT NULL, vector BLOB NOT NULL, " +
+                        "model TEXT NOT NULL, createdAt INTEGER NOT NULL)"
+                )
+            }
+        }
+
         fun create(context: Context): ObjectDatabase =
             Room.databaseBuilder(context, ObjectDatabase::class.java, "object-finder.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .build()
     }
 }

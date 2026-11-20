@@ -15,5 +15,7 @@ class ObjectFinderApplication : Application() {
         container = AppContainer(this)
         SyncScheduler.schedulePeriodic(this)
         container.appScope.launch { container.photoRepository.purgeStaleCameraFiles() }
+        // Impronte per il riconoscimento delle foto già presenti (aggiornamento o foto scaricate).
+        container.indexPhotosInBackground()
     }
 }

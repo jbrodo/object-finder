@@ -1,5 +1,10 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.recognition.RecognizeFlow
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ImageSearch
 import it.objectfinder.app.ui.auth.NewPasswordDialog
 import it.objectfinder.app.data.EmailLinkFlow
 import it.objectfinder.app.data.Pkce
@@ -89,10 +94,12 @@ private object Routes {
     const val OBJECTS = "objects"
     const val MAP = "map"
     const val SETTINGS = "settings"
-    const val EDITOR = "editor?id={id}"
+    const val EDITOR = "editor?id={id}&photo={photo}"
     const val PROJECTS = "projects"
     const val MEMBERS = "members"
     fun editor(id: String? = null) = if (id == null) "editor" else "editor?id=$id"
+    /** Nuovo oggetto con una foto già scattata (es. dal riconoscimento senza risultati). */
+    fun newObjectWithPhoto(photo: String) = "editor?photo=${android.net.Uri.encode(photo)}"
 }
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
@@ -281,7 +288,8 @@ fun ObjectFinderApp(
         }
         composable(Routes.EDITOR) { entry ->
             val id = entry.arguments?.getString("id")
-            val vm = viewModel(key = "editor-$id") {
+            val initialPhoto = entry.arguments?.getString("photo")?.let(android.net.Uri::parse)
+            val vm = viewModel(key = "editor-$id-$initialPhoto") {
                 ObjectEditorViewModel(
                     objectId = id,
                     repository = container.objectRepository,
@@ -295,7 +303,8 @@ fun ObjectFinderApp(
                     },
                     locationProvider = LocationProvider(context),
                     appScope = container.appScope,
-                    onLocalChange = requestSync,
+                    onLocalChange = { requestSync(); container.indexPhotosInBackground() },
+                    initialPhoto = initialPhoto,
                 )
             }
             val active by container.settings.activeProject.collectAsStateWithLifecycle()
@@ -399,6 +408,20 @@ private fun MainShell(
     val pending by container.objectRepository.observePendingCount().collectAsStateWithLifecycle(0)
     val backStack by nav.currentBackStackEntryAsState()
     var exportOpen by rememberSaveable { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var recognizing by remember { mutableStateOf(false) }
+    if (recognizing) {
+        val objects by container.objectRepository.observeObjects().collectAsStateWithLifecycle(emptyList())
+        val covers by container.photoRepository.observeCovers().collectAsStateWithLifecycle(emptyMap())
+        RecognizeFlow(
+            container = container,
+            objects = objects,
+            covers = covers,
+            onOpenObject = { id -> recognizing = false; nav.navigate(Routes.editor(id)) },
+            onRegisterNew = { photo -> recognizing = false; nav.navigate(Routes.newObjectWithPhoto(photo.toString())) },
+            onClose = { recognizing = false },
+        )
+    }
 
     if (exportOpen) {
         ModalBottomSheet(onDismissRequest = { exportOpen = false }) {
@@ -422,10 +445,10 @@ private fun MainShell(
                             Icon(Icons.Default.QrCodeScanner, contentDescription = "Scansiona etichetta")
                         }
                     }
-                    // Export vicino agli oggetti che esporta, non nascosto nelle impostazioni.
+                    // Riconoscimento visivo: inquadri l'oggetto e l'app propone quale dei tuoi è.
                     if (current == Tab.OBJECTS) {
-                        IconButton(onClick = { exportOpen = true }) {
-                            Icon(Icons.Default.IosShare, contentDescription = "Esporta inventario")
+                        IconButton(onClick = { recognizing = true }) {
+                            Icon(Icons.Default.ImageSearch, contentDescription = "Riconosci oggetto")
                         }
                     }
                     if (session != null) {
@@ -433,6 +456,19 @@ private fun MainShell(
                             BadgedBox(badge = { if (pending > 0) Badge { Text("$pending") } }) {
                                 Icon(Icons.Default.Sync, contentDescription = "Sincronizza")
                             }
+                        }
+                    }
+                    // Export vicino agli oggetti che esporta, in un menu per non affollare la barra.
+                    if (current == Tab.OBJECTS) Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Altre azioni")
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Esporta inventario") },
+                                leadingIcon = { Icon(Icons.Default.IosShare, contentDescription = null) },
+                                onClick = { menuOpen = false; exportOpen = true },
+                            )
                         }
                     }
                 },

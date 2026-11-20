@@ -38,7 +38,9 @@
 - [x] Collegare codici esistenti (barcode prodotto, seriale) tramite `object_identifiers` (migration 006)
 - [x] Etichette NFC: scrittura del link dell'oggetto (+ AAR) su tag NTAG, apertura della scheda avvicinando il telefono
 - [x] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`, migration 005)
-- [ ] Visual embeddings and similarity search
+- [x] Riconoscimento visivo on-device (MediaPipe Image Embedder, MobileNetV3 large): impronte locali delle foto, classifica per somiglianza + vicinanza, "Registra come nuovo"
+- [ ] Taratura delle soglie di somiglianza sulle foto reali (negli APK debug si vede la percentuale)
+- [ ] Valutare Cactus/Mirage per proporre nome e categoria alla registrazione e leggere testo/targhette
 
 ## M3.5 — Ritrovare gli oggetti
 - [x] "Vicini": ordinamento per distanza dal telefono
