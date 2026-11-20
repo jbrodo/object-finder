@@ -44,6 +44,9 @@
 - [x] Storico posizioni (migration 008, append-only) con spostamenti
 - [x] "Portami lì" (navigazione verso l'oggetto)
 - [x] Scheda in consultazione con "Dove si trova", campo "Dove" (migration 010), segnaposti raggruppati sulla mappa
+- [x] Correzione manuale della posizione con mirino sulla mappa (migration 012, `location_source`)
+- [x] Precisione GPS visibile (approssimata oltre ±25 m) e rilevamento del fix migliore entro 15 s
+- [x] Mappa: raggruppamento in base allo zoom, zoom sul gruppo, ventaglio per oggetti nello stesso punto
 - [x] Password: autofill/Credential Manager, mostra password, robustezza
 
 ## Distribuzione e qualità

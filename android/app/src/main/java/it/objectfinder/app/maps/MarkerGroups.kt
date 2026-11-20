@@ -9,6 +9,9 @@ import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
 import it.objectfinder.app.data.Geo
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
 
 /**
  * Oggetti nello stesso punto (entro l'incertezza del GPS) diventano un solo segnaposto con il
@@ -34,6 +37,62 @@ fun groupMarkers(markers: List<MapMarker>, radiusMeters: Double = 15.0): List<Ma
         if (home != null) home += marker else groups += mutableListOf(marker)
     }
     return groups.map { group -> MarkerGroup(group.first().latitude, group.first().longitude, group.toList()) }
+}
+
+/**
+ * Scala della mappa (Web Mercator, tile da 256 dp come Google Maps e osmdroid scalato in dp):
+ * serve a raggruppare per distanza sullo schermo invece che in metri fissi.
+ */
+object MapScale {
+    /** Distanza sullo schermo sotto cui due segnaposti si sovrappongono (etichette comprese). */
+    const val CLUSTER_DP = 56.0
+    /** Zoom massimo utile dei tile OSM: oltre, i punti non si separano più. */
+    const val MAX_ZOOM = 19.0
+    /** Raggio del ventaglio per i punti che restano insieme anche allo zoom massimo. */
+    const val SPIDER_DP = 72.0
+
+    fun metersPerDp(latitude: Double, zoom: Double): Double =
+        156_543.03392 * cos(Math.toRadians(latitude)) / 2.0.pow(zoom)
+
+    fun clusterRadiusMeters(latitude: Double, zoom: Double): Double = CLUSTER_DP * metersPerDp(latitude, zoom)
+
+    /** Zoom arrotondato a mezzo livello: si ricalcola il raggruppamento solo quando serve davvero. */
+    fun step(zoom: Double): Double = kotlin.math.round(zoom * 2) / 2
+}
+
+/** Massima distanza tra due oggetti del gruppo (in metri). */
+fun MarkerGroup.spreadMeters(): Double {
+    var max = 0.0
+    for (i in items.indices) for (j in i + 1 until items.size) {
+        val d = Geo.distanceMeters(items[i].latitude, items[i].longitude, items[j].latitude, items[j].longitude)
+        if (d > max) max = d
+    }
+    return max
+}
+
+/** Zoomando ancora si separano? Altrimenti sono "nello stesso punto" e vanno aperti a ventaglio. */
+fun MarkerGroup.canSplitByZooming(currentZoom: Double): Boolean =
+    currentZoom < MapScale.MAX_ZOOM && spreadMeters() > MapScale.clusterRadiusMeters(latitude, MapScale.MAX_ZOOM)
+
+/** Un oggetto del ventaglio: posizione solo visiva attorno al punto vero del gruppo. */
+data class SpiderLeg(val item: MapMarker, val latitude: Double, val longitude: Double)
+
+/**
+ * Ventaglio: oggetti disposti su un cerchio attorno al punto del gruppo, il primo in alto, poi in
+ * senso orario. Il raggio cresce con il numero di oggetti per non sovrapporre le etichette.
+ */
+fun spiderLegs(group: MarkerGroup, zoom: Double): List<SpiderLeg> {
+    val n = group.items.size
+    val radiusDp = maxOf(MapScale.SPIDER_DP, n * 16.0)
+    val radiusMeters = radiusDp * MapScale.metersPerDp(group.latitude, zoom)
+    val metersPerDegLat = 111_320.0
+    val metersPerDegLon = metersPerDegLat * cos(Math.toRadians(group.latitude))
+    return group.items.mapIndexed { i, item ->
+        val angle = -Math.PI / 2 + 2 * Math.PI * i / n
+        val east = radiusMeters * cos(angle)
+        val north = -radiusMeters * sin(angle) // angolo in coordinate schermo (y verso il basso)
+        SpiderLeg(item, group.latitude + north / metersPerDegLat, group.longitude + east / metersPerDegLon)
+    }
 }
 
 /**

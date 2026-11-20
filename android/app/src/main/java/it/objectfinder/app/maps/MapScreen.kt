@@ -1,5 +1,7 @@
 package it.objectfinder.app.maps
 
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.mutableDoubleStateOf
 import android.content.Context
 import android.view.ViewGroup
 import android.widget.Toast
@@ -105,11 +107,22 @@ fun ObjectMapScreen(
 ) {
     val engine = MapEngine.resolve(preferredEngine)
     val markers = remember(objects) { objects.toMarkers() }
-    val groups = remember(markers) { groupMarkers(markers) }
     val withoutLocation = objects.size - markers.size
-    var selectedKey by remember { mutableStateOf<String?>(null) }
-    val selected = groups.firstOrNull { it.key == selectedKey }
-    BackHandler(enabled = selected != null) { selectedKey = null }
+    // Raggruppamento per distanza sullo schermo: dipende dallo zoom (a mezzi livelli).
+    var zoom by remember { mutableDoubleStateOf(15.0) }
+    val zoomStep = MapScale.step(zoom)
+    val refLatitude = remember(markers) { markers.map { it.latitude }.average().takeIf { !it.isNaN() } ?: 45.0 }
+    val groups = remember(markers, zoomStep) {
+        groupMarkers(markers, MapScale.clusterRadiusMeters(refLatitude, zoomStep))
+    }
+    // Pannello aperto (gruppo o singolo oggetto) e gruppo aperto a ventaglio.
+    var selected by remember { mutableStateOf<MarkerGroup?>(null) }
+    var expandedKey by remember { mutableStateOf<String?>(null) }
+    val expanded = groups.firstOrNull { it.key == expandedKey && it.items.size > 1 }
+    val legs = remember(expanded, zoomStep) { expanded?.let { spiderLegs(it, zoomStep) }.orEmpty() }
+    // Cambiando zoom i gruppi cambiano: il ventaglio si richiude.
+    LaunchedEffect(zoomStep) { expandedKey = null }
+    BackHandler(enabled = selected != null || expanded != null) { selected = null; expandedKey = null }
     val pinColors = PinColors(
         MaterialTheme.colorScheme.primary.toArgb(),
         MaterialTheme.colorScheme.onPrimary.toArgb(),
@@ -125,12 +138,16 @@ fun ObjectMapScreen(
     var locating by remember { mutableStateOf(false) }
     var focus by remember { mutableStateOf<MapFocus?>(null) }
 
+    // Dopo un gesto dell'utente sulla mappa un fix arrivato in ritardo non deve più spostarla.
+    var userMovedMap by remember { mutableStateOf(false) }
+
     fun centerOnMe() {
         if (locating) return
         locating = true
+        userMovedMap = false
         scope.launch {
             // Centraggio immediato sull'ultima posizione nota, poi affinamento con un fix fresco.
-            locationProvider.lastKnownLocation()?.let {
+            val quick = locationProvider.lastKnownLocation()?.also {
                 myLocation = it
                 focus = MapFocus.Point(it.latitude, it.longitude)
             }
@@ -138,7 +155,12 @@ fun ObjectMapScreen(
             locating = false
             if (location != null) {
                 myLocation = location
-                focus = MapFocus.Point(location.latitude, location.longitude)
+                val drift = quick?.let { Geo.distanceMeters(it.latitude, it.longitude, location.latitude, location.longitude) }
+                // Si ricentra solo se serve davvero (niente posizione rapida o spostamento sensibile)
+                // e se nel frattempo l'utente non ha già mosso la mappa.
+                if (!userMovedMap && (drift == null || drift > 30)) {
+                    focus = MapFocus.Point(location.latitude, location.longitude)
+                }
             } else if (myLocation == null) {
                 Toast.makeText(context, "Posizione non disponibile: verifica che il GPS sia attivo", Toast.LENGTH_SHORT).show()
             }
@@ -147,6 +169,29 @@ fun ObjectMapScreen(
 
     // All'apertura: centra sul telefono se il permesso è già concesso (nessuna richiesta invasiva).
     LaunchedEffect(Unit) { if (hasPermission) centerOnMe() }
+    /**
+     * Tocco su un segnaposto: un oggetto → riquadro; un gruppo che zoomando si separa → zoom sul
+     * gruppo; oggetti nello stesso punto → ventaglio sulla mappa ed elenco nel riquadro.
+     */
+    fun onGroupTap(group: MarkerGroup) {
+        userMovedMap = true
+        when {
+            group.items.size == 1 -> { selected = group; expandedKey = null }
+            group.canSplitByZooming(zoom) -> { selected = null; focus = MapFocus.Fit(group.items) }
+            else -> {
+                selected = group
+                expandedKey = group.key
+                // Il riquadro occupa la parte bassa: il ventaglio va portato sopra (≈140 dp più in alto).
+                val shift = 140 * MapScale.metersPerDp(group.latitude, zoom) / 111_320.0
+                focus = MapFocus.Point(group.latitude - shift, group.longitude, zoom.toFloat())
+            }
+        }
+    }
+
+    fun onLegTap(leg: SpiderLeg) {
+        selected = MarkerGroup(leg.item.latitude, leg.item.longitude, listOf(leg.item))
+    }
+
     // Fallback: finché non c'è una posizione del telefono, inquadra gli oggetti.
     LaunchedEffect(markers.map { it.id }) {
         if (focus !is MapFocus.Point && markers.isNotEmpty()) focus = MapFocus.Fit(markers)
@@ -171,10 +216,14 @@ fun ObjectMapScreen(
         }
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
             when (engine) {
-                MapEngine.GOOGLE_MAPS ->
-                    GoogleObjectsMap(groups, focus, hasPermission, pinColors, selected, { selectedKey = it.key }, Modifier.fillMaxSize())
-                MapEngine.OPEN_STREET_MAP ->
-                    OsmObjectsMap(groups, focus, hasPermission, pinColors, selected, { selectedKey = it.key }, Modifier.fillMaxSize())
+                MapEngine.GOOGLE_MAPS -> GoogleObjectsMap(
+                    groups.filter { it.key != expanded?.key }, expanded, legs, focus, hasPermission, pinColors, selected,
+                    ::onGroupTap, ::onLegTap, { if (it != zoom) { zoom = it; if (!locating) userMovedMap = true } }, Modifier.fillMaxSize(),
+                )
+                MapEngine.OPEN_STREET_MAP -> OsmObjectsMap(
+                    groups.filter { it.key != expanded?.key }, expanded, legs, focus, hasPermission, pinColors, selected,
+                    ::onGroupTap, ::onLegTap, { if (it != zoom) { zoom = it; if (!locating) userMovedMap = true } }, Modifier.fillMaxSize(),
+                )
             }
             SmallFloatingActionButton(
                 onClick = {
@@ -188,12 +237,13 @@ fun ObjectMapScreen(
                 if (locating) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 else Icon(Icons.Default.MyLocation, contentDescription = "La mia posizione")
             }
-            if (selected != null) {
+            val panel = selected
+            if (panel != null) {
                 SelectedGroupPanel(
-                    group = selected,
+                    group = panel,
                     myLocation = myLocation,
                     onOpen = onOpenObject,
-                    onDismiss = { selectedKey = null },
+                    onDismiss = { selected = null; expandedKey = null },
                     modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
                 )
             } else if (markers.isEmpty() || withoutLocation > 0) {
@@ -218,15 +268,20 @@ fun ObjectMapScreen(
 @Composable
 private fun GoogleObjectsMap(
     groups: List<MarkerGroup>,
+    expanded: MarkerGroup?,
+    legs: List<SpiderLeg>,
     focus: MapFocus?,
     showMyLocation: Boolean,
     colors: PinColors,
     selected: MarkerGroup?,
     onSelect: (MarkerGroup) -> Unit,
+    onLegTap: (SpiderLeg) -> Unit,
+    onZoom: (Double) -> Unit,
     modifier: Modifier,
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current.density
     val camera = rememberCameraPositionState()
+    LaunchedEffect(camera) { snapshotFlow { camera.position.zoom }.collect { onZoom(it.toDouble()) } }
     LaunchedEffect(focus) {
         when (focus) {
             null -> Unit
@@ -273,6 +328,40 @@ private fun GoogleObjectsMap(
                 )
             }
         }
+        // Ventaglio: linee dal punto vero a ogni oggetto, poi i segnaposti.
+        expanded?.let { group ->
+            legs.forEach { leg ->
+                key("leg-${leg.item.id}") {
+                    com.google.maps.android.compose.Polyline(
+                        points = listOf(LatLng(group.latitude, group.longitude), LatLng(leg.latitude, leg.longitude)),
+                        color = androidx.compose.ui.graphics.Color(colors.background),
+                        width = 2f * density,
+                    )
+                    val icon = remember(leg.item.title, leg.item.approximate, colors) {
+                        BitmapDescriptorFactory.fromBitmap(
+                            labelPinBitmap(
+                                leg.item.title, colors.background, colors.foreground, density,
+                                outlined = leg.item.approximate, surface = colors.surface,
+                            )
+                        )
+                    }
+                    Marker(
+                        state = rememberUpdatedMarkerState(position = LatLng(leg.latitude, leg.longitude)),
+                        title = leg.item.title,
+                        icon = icon,
+                        anchor = Offset(0.5f, 1f),
+                        onClick = { onLegTap(leg); true },
+                    )
+                }
+            }
+            com.google.maps.android.compose.Circle(
+                center = LatLng(group.latitude, group.longitude),
+                radius = 1.5 * MapScale.metersPerDp(group.latitude, camera.position.zoom.toDouble()) * 4,
+                fillColor = androidx.compose.ui.graphics.Color(colors.background),
+                strokeColor = androidx.compose.ui.graphics.Color(colors.surface),
+                strokeWidth = 2f * density,
+            )
+        }
         // Area in cui il GPS colloca il punto toccato.
         selected?.uncertaintyMeters?.let { radius ->
             com.google.maps.android.compose.Circle(
@@ -289,16 +378,29 @@ private fun GoogleObjectsMap(
 @Composable
 private fun OsmObjectsMap(
     groups: List<MarkerGroup>,
+    expanded: MarkerGroup?,
+    legs: List<SpiderLeg>,
     focus: MapFocus?,
     showMyLocation: Boolean,
     colors: PinColors,
     selected: MarkerGroup?,
     onSelect: (MarkerGroup) -> Unit,
+    onLegTap: (SpiderLeg) -> Unit,
+    onZoom: (Double) -> Unit,
     modifier: Modifier,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val mapView = remember { createOsmMapView(context) }
+    val mapView = remember {
+        createOsmMapView(context).apply {
+            addMapListener(object : org.osmdroid.events.MapListener {
+                override fun onScroll(event: org.osmdroid.events.ScrollEvent?) = false
+                override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
+                    onZoom(zoomLevelDouble); return false
+                }
+            })
+        }
+    }
     val myLocationOverlay = remember(mapView) { MyLocationNewOverlay(GpsMyLocationProvider(context), mapView) }
 
     DisposableEffect(lifecycle, mapView, showMyLocation) {
@@ -362,6 +464,39 @@ private fun OsmObjectsMap(
                 })
             }
             val density = map.resources.displayMetrics.density
+            // Ventaglio: linee dal punto vero, segnaposti spostati solo visivamente, punto vero sopra.
+            expanded?.let { group ->
+                val center = GeoPoint(group.latitude, group.longitude)
+                legs.forEach { leg ->
+                    map.overlays.add(org.osmdroid.views.overlay.Polyline(map).apply {
+                        setPoints(listOf(center, GeoPoint(leg.latitude, leg.longitude)))
+                        outlinePaint.color = colors.background
+                        outlinePaint.strokeWidth = 2f * density
+                        setOnClickListener { _, _, _ -> false }
+                    })
+                }
+                legs.forEach { leg ->
+                    map.overlays.add(org.osmdroid.views.overlay.Marker(map).apply {
+                        position = GeoPoint(leg.latitude, leg.longitude)
+                        title = leg.item.title
+                        icon = android.graphics.drawable.BitmapDrawable(
+                            map.resources,
+                            labelPinBitmap(
+                                leg.item.title, colors.background, colors.foreground, density,
+                                outlined = leg.item.approximate, surface = colors.surface,
+                            ),
+                        )
+                        setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
+                        setOnMarkerClickListener { _, _ -> onLegTap(leg); true }
+                    })
+                }
+                map.overlays.add(org.osmdroid.views.overlay.Marker(map).apply {
+                    position = center
+                    icon = android.graphics.drawable.BitmapDrawable(map.resources, centerDotBitmap(colors, density))
+                    setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
+                    setOnMarkerClickListener { _, _ -> true }
+                })
+            }
             groups.forEach { group ->
                 val marker = org.osmdroid.views.overlay.Marker(map).apply {
                     position = GeoPoint(group.latitude, group.longitude)
@@ -392,6 +527,8 @@ internal fun createOsmMapView(context: Context): MapView {
     return MapView(context).apply {
         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         setTileSource(TileSourceFactory.MAPNIK)
+        // Tile in dp (come Google Maps): stessa scala per il raggruppamento e testo leggibile.
+        isTilesScaledToDpi = true
         setMultiTouchControls(true)
         controller.setZoom(15.0)
     }
@@ -399,11 +536,26 @@ internal fun createOsmMapView(context: Context): MapView {
 
 /** Dove portare la camera: un punto (es. posizione del telefono) o l'inquadratura degli oggetti. */
 sealed interface MapFocus {
-    data class Point(val latitude: Double, val longitude: Double, val zoom: Float = 16f) : MapFocus
-    data class Fit(val markers: List<MapMarker>) : MapFocus
+    // Classi normali (uguaglianza per identità): ogni richiesta muove la camera, anche se uguale
+    // alla precedente (es. toccare il gruppo di tutti gli oggetti già inquadrati all'apertura).
+    class Point(val latitude: Double, val longitude: Double, val zoom: Float = 16f) : MapFocus
+    class Fit(val markers: List<MapMarker>) : MapFocus
 }
 
 data class PinColors(val background: Int, val foreground: Int, val surface: Int)
+
+/** Punto vero di un gruppo aperto a ventaglio. */
+internal fun centerDotBitmap(colors: PinColors, density: Float): android.graphics.Bitmap {
+    val size = (14 * density).toInt()
+    val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    paint.color = colors.surface
+    canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+    paint.color = colors.background
+    canvas.drawCircle(size / 2f, size / 2f, size / 2f - 2.5f * density, paint)
+    return bitmap
+}
 
 /** Riga del riquadro: il "dove" scritto e quanto è affidabile il punto. */
 internal fun markerDetail(item: MapMarker): String = listOfNotNull(

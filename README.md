@@ -137,7 +137,11 @@ disinstallata l'app.
   (tabella `locations`, append-only); in scheda: data, coordinate, spostamento, apertura su mappa
 - "Portami lì": navigazione a piedi verso l'oggetto con Google Maps (o altra app mappe)
 - Mappa Google Maps / OpenStreetMap con preferenza salvata, fallback automatico su OSM senza API key;
-  segnaposti con il nome, oggetti nello stesso punto raggruppati, riquadro con apertura e "Portami lì"
+  segnaposti con il nome raggruppati in base allo zoom (toccando un gruppo la mappa si avvicina; gli
+  oggetti nello stesso punto si aprono a ventaglio), cerchio di incertezza del GPS, posizioni
+  approssimate tratteggiate, riquadro con apertura e "Portami lì"
+- Posizione corretta a mano: mirino fisso sulla mappa ("Correggi il punto sulla mappa"), salvata
+  come posizione indicata a mano; rilevamento GPS che tiene il fix migliore dei primi secondi
 
 ## Email di invito
 La Edge Function `backend/supabase/functions/send-invite` manda l'email a chi viene invitato senza
