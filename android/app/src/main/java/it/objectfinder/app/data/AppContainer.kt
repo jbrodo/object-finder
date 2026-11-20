@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import it.objectfinder.app.recognition.ImageEmbedderEngine
+import it.objectfinder.app.recognition.MirageEngine
 import it.objectfinder.app.recognition.RecognitionRepository
 import it.objectfinder.app.data.local.ObjectDatabase
 import it.objectfinder.app.data.remote.AppConfig
@@ -53,6 +54,9 @@ class AppContainer(context: Context) {
         ImageEmbedderEngine(appContext), database.photoEmbeddingDao(), database.objectDao(), settings,
         withTemporaryCopy = { photo, use -> photoRepository.withTemporaryCopy(photo, use) },
     )
+
+    /** Suggerimenti dalla foto (Cactus Mirage), solo su ARM e dopo il download del modello. */
+    val mirageEngine = MirageEngine(appContext)
 
     /** Calcolo in background delle impronte mancanti (foto nuove, scaricate, cambio modello). */
     fun indexPhotosInBackground() {

@@ -156,6 +156,10 @@ disinstallata l'app.
   progetto più simili, tutto sul telefono (MediaPipe Image Embedder, modello scaricato dalla build con
   SHA-256 fissato); a parità di aspetto vince l'oggetto più vicino; se nessuno corrisponde si
   registra come nuovo con quella foto. Le impronte delle foto restano locali e non si sincronizzano
+- Suggerimenti dalla foto (Cactus Mirage, Apache-2.0, sul telefono): registrando un oggetto l'app
+  propone fino a 3 nomi e legge scritte e numeri di serie; un tocco li usa (nome, note o codice
+  collegato). Motore 4.1.4 collegato via JNI (`src/main/cpp`, NDK r28), solo ARM; il modello (22 MB)
+  si scarica una volta su richiesta, con revisione e SHA-256 fissati
 - Posizione corretta a mano: mirino fisso sulla mappa ("Correggi il punto sulla mappa"), salvata
   come posizione indicata a mano; rilevamento GPS che tiene il fix migliore dei primi secondi
 

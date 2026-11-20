@@ -305,6 +305,7 @@ fun ObjectFinderApp(
                     appScope = container.appScope,
                     onLocalChange = { requestSync(); container.indexPhotosInBackground() },
                     initialPhoto = initialPhoto,
+                    mirage = container.mirageEngine,
                 )
             }
             val active by container.settings.activeProject.collectAsStateWithLifecycle()

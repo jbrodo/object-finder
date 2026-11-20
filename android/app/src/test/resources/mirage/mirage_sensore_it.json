@@ -1,0 +1,101 @@
+{
+ "scene": {
+  "background": "scuro",
+  "lighting": "illuminazione interna",
+  "style": "fotografia di prodotto"
+ },
+ "objects": [
+  {
+   "id": 1,
+   "name": "indicatore di indicazione",
+   "bbox": [
+    3,
+    206,
+    62,
+    278
+   ],
+   "score": 0.32,
+   "position": "destra",
+   "description": {
+    "color": "arancione",
+    "state": "acceso"
+   }
+  },
+  {
+   "id": 2,
+   "name": "display digitale",
+   "bbox": [
+    9,
+    0,
+    691,
+    425
+   ],
+   "score": 0.372,
+   "position": "centro",
+   "description": {
+    "color": "bianco",
+    "state": "acceso"
+   }
+  },
+  {
+   "id": 3,
+   "name": "indicatore di indicazione",
+   "bbox": [
+    595,
+    177,
+    658,
+    240
+   ],
+   "score": 0.439,
+   "position": "destra",
+   "description": {
+    "color": "arancione",
+    "state": "acceso"
+   }
+  },
+  {
+   "id": 4,
+   "name": "testo",
+   "bbox": [
+    171,
+    176,
+    593,
+    375
+   ],
+   "score": 0.589,
+   "position": "centro",
+   "description": {
+    "color": "giallo",
+    "content": "scaglie"
+   }
+  },
+  {
+   "id": 5,
+   "name": "smartphone",
+   "bbox": [
+    0,
+    0,
+    1000,
+    1000
+   ],
+   "score": 0.733,
+   "position": "centro",
+   "description": {
+    "color": "nero",
+    "state": "acceso"
+   }
+  }
+ ],
+ "text": [
+  {
+   "string": "232u",
+   "bbox": [
+    150,
+    146,
+    614,
+    406
+   ],
+   "score": 0.617
+  }
+ ]
+}

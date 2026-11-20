@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui.objects
 
+import kotlinx.coroutines.flow.onEach
+import it.objectfinder.app.recognition.MirageSuggestions
+import it.objectfinder.app.recognition.MirageEngine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.cancelAndJoin
@@ -91,6 +94,16 @@ data class EditorState(
         }
 }
 
+/** Stato della scheda "Suggerimenti dalla foto". */
+sealed interface MirageUi {
+    data object Hidden : MirageUi
+    data object NeedsModel : MirageUi
+    data class Downloading(val progress: Float) : MirageUi
+    data object Analyzing : MirageUi
+    data class Ready(val suggestions: MirageSuggestions) : MirageUi
+    data class Failed(val message: String) : MirageUi
+}
+
 data class ConflictUi(val deletedOnServer: Boolean, val differences: List<SyncMerge.FieldDiff>)
 
 /** Gestisce creazione e modifica: `objectId == null` → nuovo oggetto. */
@@ -109,6 +122,8 @@ class ObjectEditorViewModel(
     private val onLocalChange: () -> Unit,
     /** Foto da allegare subito a un oggetto nuovo (scattata per il riconoscimento). */
     initialPhoto: Uri? = null,
+    /** Suggerimenti dalla foto (Cactus Mirage); null se non disponibile. */
+    private val mirage: MirageEngine? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(EditorState(isNew = objectId == null, loaded = objectId == null))
     val state: StateFlow<EditorState> = _state.asStateFlow()
@@ -121,6 +136,7 @@ class ObjectEditorViewModel(
     private var baseline: ObjectDraft? = null
 
     val photos: StateFlow<List<PhotoEntity>> = photoRepository.observeForObject(effectiveId)
+        .onEach { onPhotosChanged(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _photoBusy = MutableStateFlow(false)
@@ -156,6 +172,64 @@ class ObjectEditorViewModel(
     }
 
     fun showMessage(text: String) = _state.update { it.copy(message = text) }
+
+    // ---- Suggerimenti dalla foto (Mirage) ----
+
+    private val _mirage = MutableStateFlow<MirageUi>(MirageUi.Hidden)
+    val mirageState: StateFlow<MirageUi> = _mirage.asStateFlow()
+    private var analyzedPhotoId: String? = null
+
+    /** Ultima foto sul telefono: la si analizza se il modello c'è, altrimenti si propone il download. */
+    private fun onPhotosChanged(list: List<PhotoEntity>) {
+        val engine = mirage?.takeIf { it.isSupported } ?: return
+        val latest = list.lastOrNull { it.localPath != null } ?: return
+        if (latest.id == analyzedPhotoId) return
+        when {
+            _mirage.value is MirageUi.Downloading || _mirage.value is MirageUi.Analyzing -> Unit
+            engine.isModelReady -> analyze(latest)
+            else -> _mirage.value = MirageUi.NeedsModel
+        }
+    }
+
+    private fun analyze(photo: PhotoEntity) {
+        val engine = mirage ?: return
+        val file = photo.localPath?.let { java.io.File(it) } ?: return
+        analyzedPhotoId = photo.id
+        _mirage.value = MirageUi.Analyzing
+        viewModelScope.launch {
+            _mirage.value = runCatching { engine.describe(file) }
+                .fold(
+                    { if (it.isEmpty) MirageUi.Failed("Nessun suggerimento per questa foto") else MirageUi.Ready(it) },
+                    { MirageUi.Failed(it.message ?: "Analisi non riuscita") },
+                )
+        }
+    }
+
+    fun downloadMirageModel() {
+        val engine = mirage ?: return
+        _mirage.value = MirageUi.Downloading(0f)
+        viewModelScope.launch {
+            runCatching { engine.downloadModel { p -> _mirage.value = MirageUi.Downloading(p) } }
+                .onSuccess {
+                    analyzedPhotoId = null
+                    _mirage.value = MirageUi.Hidden
+                    onPhotosChanged(photos.value)
+                }
+                .onFailure { e -> _mirage.value = MirageUi.Failed("Download non riuscito: ${e.message ?: "errore"}. Riprova in Wi-Fi.") }
+        }
+    }
+
+    fun retryMirage() {
+        analyzedPhotoId = null
+        _mirage.value = MirageUi.Hidden
+        onPhotosChanged(photos.value)
+    }
+
+    fun useSuggestedName(name: String) = setName(name)
+
+    fun addTextToNotes(text: String) = _state.update {
+        it.copy(notes = if (it.notes.isBlank()) text else "${it.notes.trimEnd()}\n$text")
+    }
 
     fun newCameraUri(): Uri = photoRepository.newCameraUri()
 

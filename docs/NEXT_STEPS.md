@@ -40,7 +40,8 @@
 - [x] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`, migration 005)
 - [x] Riconoscimento visivo on-device (MediaPipe Image Embedder, MobileNetV3 large): impronte locali delle foto, classifica per somiglianza + vicinanza, "Registra come nuovo"
 - [ ] Taratura delle soglie di somiglianza sulle foto reali (negli APK debug si vede la percentuale)
-- [ ] Valutare Cactus/Mirage per proporre nome e categoria alla registrazione e leggere testo/targhette
+- [x] Suggerimenti dalla foto con Cactus Mirage (nome, testo letto → note o numero di serie), JNI su ARM
+- [ ] Verificare Mirage su telefono ARM reale (velocità, qualità dei nomi in italiano); emulatore x86 non supportato
 
 ## M3.5 — Ritrovare gli oggetti
 - [x] "Vicini": ordinamento per distanza dal telefono

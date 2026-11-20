@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.data.local.IdentifierType
 import it.objectfinder.app.maps.PickerStart
 import it.objectfinder.app.maps.MapEngine
 import it.objectfinder.app.maps.LocationPickerDialog
@@ -110,6 +111,7 @@ fun ObjectEditorScreen(
     val photoBusy by viewModel.photoBusy.collectAsStateWithLifecycle()
     val codes by viewModel.identifiers.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
+    val mirageState by viewModel.mirageState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val permission = rememberLocationPermissionRequester()
     val editingExisting = state.editing && !state.isNew
@@ -358,6 +360,16 @@ fun ObjectEditorScreen(
                         newCameraUri = viewModel::newCameraUri,
                         onAdd = viewModel::addPhoto,
                         onDelete = viewModel::deletePhoto,
+                    )
+                }
+                if (state.isNew) {
+                    MirageCard(
+                        state = mirageState,
+                        onDownload = viewModel::downloadMirageModel,
+                        onRetry = viewModel::retryMirage,
+                        onUseName = viewModel::useSuggestedName,
+                        onAddToNotes = viewModel::addTextToNotes,
+                        onLinkAsCode = { viewModel.addCode(IdentifierType.SERIAL, it) },
                     )
                 }
                 OutlinedTextField(

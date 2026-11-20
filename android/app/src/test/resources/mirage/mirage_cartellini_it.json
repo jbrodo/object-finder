@@ -1,0 +1,173 @@
+{
+ "scene": {
+  "background": "tessuto blu",
+  "surface": "tessuto",
+  "lighting": "uniforme",
+  "style": "fotografia di prodotto"
+ },
+ "objects": [
+  {
+   "id": 1,
+   "name": "testo",
+   "bbox": [
+    475,
+    137,
+    531,
+    166
+   ],
+   "score": 0.359,
+   "position": "sulla scatola",
+   "description": {
+    "color": "bianco"
+   }
+  },
+  {
+   "id": 2,
+   "name": "scatola di cartone",
+   "bbox": [
+    266,
+    130,
+    719,
+    790
+   ],
+   "score": 0.846,
+   "position": "centro",
+   "description": {
+    "color": "blu e bianco",
+    "shape": "rettangolare",
+    "state": "chiuso"
+   }
+  },
+  {
+   "id": 3,
+   "name": "tessuto",
+   "bbox": [
+    12,
+    1,
+    986,
+    997
+   ],
+   "score": 0.865,
+   "position": "sfondo",
+   "description": {
+    "color": "blu",
+    "material": "tessuto"
+   }
+  },
+  {
+   "id": 4,
+   "name": "logo",
+   "bbox": [
+    447,
+    346,
+    629,
+    538
+   ],
+   "score": 0.669,
+   "position": "sulla scatola",
+   "description": {
+    "color": "blu",
+    "shape": "circolare"
+   }
+  },
+  {
+   "id": 5,
+   "name": "testo",
+   "bbox": [
+    311,
+    526,
+    702,
+    584
+   ],
+   "score": 0.569,
+   "position": "sulla scatola",
+   "description": {
+    "color": "bianco"
+   }
+  },
+  {
+   "id": 6,
+   "name": "codice a barre",
+   "bbox": [
+    290,
+    668,
+    394,
+    773
+   ],
+   "score": 0.317,
+   "position": "sulla scatola",
+   "description": {
+    "color": "bianco e nero",
+    "shape": "rettangolare"
+   }
+  },
+  {
+   "id": 7,
+   "name": "etichetta",
+   "bbox": [
+    405,
+    663,
+    512,
+    767
+   ],
+   "score": 0.466,
+   "position": "sulla scatola",
+   "description": {
+    "color": "verde",
+    "shape": "circolare"
+   }
+  }
+ ],
+ "text": [
+  {
+   "string": "2023",
+   "bbox": [
+    473,
+    137,
+    533,
+    165
+   ],
+   "score": 0.63
+  },
+  {
+   "string": "MIT",
+   "bbox": [
+    273,
+    279,
+    358,
+    320
+   ],
+   "score": 0.535
+  },
+  {
+   "string": "CLOUDERA",
+   "bbox": [
+    390,
+    535,
+    623,
+    571
+   ],
+   "score": 0.53
+  },
+  {
+   "string": "hureTEyo",
+   "bbox": [
+    297,
+    586,
+    443,
+    605
+   ],
+   "score": 0.317
+  },
+  {
+   "string": "WEF",
+   "bbox": [
+    546,
+    638,
+    606,
+    662
+   ],
+   "score": 0.45
+  }
+ ]
+}

@@ -39,6 +39,11 @@ android {
     defaultConfig {
         applicationId = "it.objectfinder.app"
         minSdk = 26
+        externalNativeBuild {
+            cmake {
+                arguments += "-DCACTUS_LIB_ROOT=${layout.buildDirectory.dir("generated/cactus").get().asFile.absolutePath}"
+            }
+        }
         targetSdk = 37
         versionCode = appVersionCode
         versionName = appVersionName
@@ -83,6 +88,15 @@ android {
     // APK scaricato fuori dallo Store: librerie native compresse (download molto più piccolo).
     packaging { jniLibs { useLegacyPackaging = true } }
 
+    // Ponte JNI verso il motore Cactus (Mirage): src/main/cpp. NDK r28 = stessa libc++ della release.
+    ndkVersion = "28.2.13676358"
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.31.6"
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -126,6 +140,39 @@ val downloadEmbedderModel = tasks.register<DownloadEmbedderModel>("downloadEmbed
     sha256.set("11af3c560dfeed7737cb4c03c23bf52a8403020784192d4dea0b74862a12828d")
     outputDir.set(layout.buildDirectory.dir("generated/embedderModel"))
 }
+
+// Motore Cactus (Mirage) per Android: librerie statiche ARM della release 4.1.4, stessa revisione
+// usata dal pacchetto ufficiale cactus-compute; versione e SHA-256 fissati.
+abstract class DownloadCactusEngine : DefaultTask() {
+    @get:Input abstract val files: MapProperty<String, String>
+    @get:Input abstract val baseUrl: Property<String>
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun download() {
+        fun digest(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        files.get().forEach { (abi, sha) ->
+            val source = mapOf("arm64-v8a" to "android-arm64", "armeabi-v7a" to "android-armv7").getValue(abi)
+            val target = outputDir.file("$abi/libcactus.a").get().asFile
+            if (target.exists() && digest(target.readBytes()) == sha) return@forEach
+            val bytes = URI("${baseUrl.get()}/$source/libcactus.a").toURL().openStream().use { it.readBytes() }
+            check(digest(bytes) == sha) { "Checksum di libcactus.a non valido per $abi" }
+            target.parentFile.mkdirs()
+            target.writeBytes(bytes)
+        }
+    }
+}
+
+val cactusEngineDir = layout.buildDirectory.dir("generated/cactus")
+val downloadCactusEngine = tasks.register<DownloadCactusEngine>("downloadCactusEngine") {
+    baseUrl.set("https://huggingface.co/Cactus-Compute/cactus/resolve/f4ab2741203a282c6e7b89983de2b5e5b2e805a8/releases/4.1.4")
+    files.put("arm64-v8a", "67dbd7b856a3e9d8b0fbb68f0c59592e7572cf859238ba7f3074f74b6fa9a5da")
+    files.put("armeabi-v7a", "6f7daade8587c714a2f46fdccf90535660b78d22e3c4a89518d53ea857568afa")
+    outputDir.set(cactusEngineDir)
+}
+// La configurazione CMake legge le librerie: devono esserci prima.
+tasks.matching { it.name.startsWith("configureCMake") || it.name.startsWith("buildCMake") }
+    .configureEach { dependsOn(downloadCactusEngine) }
 
 androidComponents {
     onVariants { variant ->
