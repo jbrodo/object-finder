@@ -47,4 +47,13 @@ class MirageParseTest {
         assertTrue(MirageParse.parse("non è json").isEmpty)
         assertTrue(MirageParse.parse("{}").isEmpty)
     }
+
+    @Test
+    fun `names seen in several photos come first, details drop`() {
+        val front = MirageSuggestions(listOf("Statuina di cavallo", "Tavolo"), listOf(ReadText("SN-12345", true)))
+        val side = MirageSuggestions(listOf("Mano", "Statuina di cavallo"), listOf(ReadText("sn-12345", true), ReadText("Made in Italy", false)))
+        val merged = MirageParse.merge(listOf(front, side))
+        assertEquals("Statuina di cavallo", merged.names.first())
+        assertEquals(listOf("SN-12345", "Made in Italy"), merged.texts.map { it.value })
+    }
 }

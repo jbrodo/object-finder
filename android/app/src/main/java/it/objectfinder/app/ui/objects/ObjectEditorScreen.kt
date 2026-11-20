@@ -362,16 +362,16 @@ fun ObjectEditorScreen(
                         onDelete = viewModel::deletePhoto,
                     )
                 }
-                if (state.isNew) {
-                    MirageCard(
-                        state = mirageState,
-                        onDownload = viewModel::downloadMirageModel,
-                        onRetry = viewModel::retryMirage,
-                        onUseName = viewModel::useSuggestedName,
-                        onAddToNotes = viewModel::addTextToNotes,
-                        onLinkAsCode = { viewModel.addCode(IdentifierType.SERIAL, it) },
-                    )
-                }
+                // Anche in modifica: nomi e testo letto si possono ricalcolare su richiesta.
+                MirageCard(
+                    state = mirageState,
+                    onDownload = viewModel::downloadMirageModel,
+                    onRetry = viewModel::retryMirage,
+                    onAnalyze = viewModel::analyzePhotos,
+                    onUseName = viewModel::useSuggestedName,
+                    onAddToNotes = viewModel::addTextToNotes,
+                    onLinkAsCode = { viewModel.addCode(IdentifierType.SERIAL, it) },
+                )
                 OutlinedTextField(
                     value = state.name,
                     onValueChange = viewModel::setName,

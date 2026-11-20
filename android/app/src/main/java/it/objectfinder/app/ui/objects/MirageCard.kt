@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,6 +39,7 @@ fun MirageCard(
     state: MirageUi,
     onDownload: () -> Unit,
     onRetry: () -> Unit,
+    onAnalyze: () -> Unit,
     onUseName: (String) -> Unit,
     onAddToNotes: (String) -> Unit,
     onLinkAsCode: (String) -> Unit,
@@ -51,6 +53,17 @@ fun MirageCard(
             }
             when (state) {
                 MirageUi.Hidden -> Unit
+                MirageUi.Idle -> {
+                    Text(
+                        "Posso proporre un nome e leggere scritte e numeri di serie dalle foto di questo oggetto.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(onClick = onAnalyze) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, Modifier.size(18.dp))
+                        Text("  Analizza le foto")
+                    }
+                }
                 MirageUi.NeedsModel -> {
                     Text(
                         "Dalla foto posso proporre un nome e leggere scritte e numeri di serie, tutto sul telefono. " +
@@ -66,7 +79,7 @@ fun MirageCard(
                 }
                 MirageUi.Analyzing -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Text("Guardo la foto…", style = MaterialTheme.typography.bodyMedium)
+                    Text("Guardo le foto…", style = MaterialTheme.typography.bodyMedium)
                 }
                 is MirageUi.Failed -> {
                     Text(state.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -101,11 +114,19 @@ fun MirageCard(
                             }
                         }
                     }
-                    Text(
-                        "Tocca per usare. I suggerimenti possono sbagliare.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Tocca per usare. I suggerimenti possono sbagliare.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // Ricalcolo su tutte le foto (es. dopo averne aggiunta una più nitida).
+                        TextButton(onClick = onAnalyze) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, Modifier.size(18.dp))
+                            Text(" Rianalizza")
+                        }
+                    }
                 }
             }
         }

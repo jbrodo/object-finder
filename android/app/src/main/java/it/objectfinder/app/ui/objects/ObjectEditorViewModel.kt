@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.recognition.MirageParse
 import kotlinx.coroutines.flow.onEach
 import it.objectfinder.app.recognition.MirageSuggestions
 import it.objectfinder.app.recognition.MirageEngine
@@ -97,6 +98,8 @@ data class EditorState(
 /** Stato della scheda "Suggerimenti dalla foto". */
 sealed interface MirageUi {
     data object Hidden : MirageUi
+    /** Oggetto esistente: si analizza solo su richiesta. */
+    data object Idle : MirageUi
     data object NeedsModel : MirageUi
     data class Downloading(val progress: Float) : MirageUi
     data object Analyzing : MirageUi
@@ -107,6 +110,8 @@ sealed interface MirageUi {
 data class ConflictUi(val deletedOnServer: Boolean, val differences: List<SyncMerge.FieldDiff>)
 
 /** Gestisce creazione e modifica: `objectId == null` → nuovo oggetto. */
+private const val MAX_ANALYZED_PHOTOS = 4
+
 private const val NO_FIX_MESSAGE = "Posizione non disponibile: verifica che il GPS sia attivo, o indicala sulla mappa."
 
 class ObjectEditorViewModel(
@@ -177,32 +182,54 @@ class ObjectEditorViewModel(
 
     private val _mirage = MutableStateFlow<MirageUi>(MirageUi.Hidden)
     val mirageState: StateFlow<MirageUi> = _mirage.asStateFlow()
-    private var analyzedPhotoId: String? = null
 
-    /** Ultima foto sul telefono: la si analizza se il modello c'è, altrimenti si propone il download. */
+    /** Firma delle foto analizzate: se cambiano (foto aggiunta o tolta) si rianalizza. */
+    private var analyzedPhotos: List<String> = emptyList()
+
+    /**
+     * Oggetto nuovo: a ogni foto aggiunta si analizzano le foto (se il modello c'è, altrimenti si
+     * propone il download). Oggetto esistente: si aspetta "Analizza le foto" (niente lavoro inutile
+     * per chi entra solo a correggere un dato).
+     */
     private fun onPhotosChanged(list: List<PhotoEntity>) {
         val engine = mirage?.takeIf { it.isSupported } ?: return
-        val latest = list.lastOrNull { it.localPath != null } ?: return
-        if (latest.id == analyzedPhotoId) return
+        val local = localPhotos(list)
+        if (local.isEmpty() || local.map { it.id } == analyzedPhotos) return
         when {
             _mirage.value is MirageUi.Downloading || _mirage.value is MirageUi.Analyzing -> Unit
-            engine.isModelReady -> analyze(latest)
-            else -> _mirage.value = MirageUi.NeedsModel
+            !engine.isModelReady -> _mirage.value = MirageUi.NeedsModel
+            _state.value.isNew -> analyze(local)
+            _mirage.value == MirageUi.Hidden -> _mirage.value = MirageUi.Idle
         }
     }
 
-    private fun analyze(photo: PhotoEntity) {
+    /** Fino alle ultime 4 foto presenti sul telefono. */
+    private fun localPhotos(list: List<PhotoEntity>) = list.filter { it.localPath != null }.takeLast(MAX_ANALYZED_PHOTOS)
+
+    private fun analyze(photos: List<PhotoEntity>) {
         val engine = mirage ?: return
-        val file = photo.localPath?.let { java.io.File(it) } ?: return
-        analyzedPhotoId = photo.id
+        analyzedPhotos = photos.map { it.id }
         _mirage.value = MirageUi.Analyzing
         viewModelScope.launch {
-            _mirage.value = runCatching { engine.describe(file) }
-                .fold(
-                    { if (it.isEmpty) MirageUi.Failed("Nessun suggerimento per questa foto") else MirageUi.Ready(it) },
-                    { MirageUi.Failed(it.message ?: "Analisi non riuscita") },
-                )
+            val results = photos.mapNotNull { photo ->
+                runCatching { engine.describe(java.io.File(photo.localPath!!)) }.getOrNull()
+            }
+            _mirage.value = when {
+                results.isEmpty() -> MirageUi.Failed("Analisi non riuscita")
+                else -> MirageParse.merge(results).let {
+                    if (it.isEmpty) MirageUi.Failed("Nessun suggerimento per queste foto") else MirageUi.Ready(it)
+                }
+            }
         }
+    }
+
+    /** "Rianalizza" / "Analizza le foto": ricalcola nomi e testo letto su tutte le foto. */
+    fun analyzePhotos() {
+        val engine = mirage?.takeIf { it.isSupported } ?: return
+        if (!engine.isModelReady) { _mirage.value = MirageUi.NeedsModel; return }
+        val local = localPhotos(photos.value)
+        if (local.isEmpty()) { _mirage.value = MirageUi.Failed("Aggiungi una foto da analizzare"); return }
+        analyze(local)
     }
 
     fun downloadMirageModel() {
@@ -210,20 +237,12 @@ class ObjectEditorViewModel(
         _mirage.value = MirageUi.Downloading(0f)
         viewModelScope.launch {
             runCatching { engine.downloadModel { p -> _mirage.value = MirageUi.Downloading(p) } }
-                .onSuccess {
-                    analyzedPhotoId = null
-                    _mirage.value = MirageUi.Hidden
-                    onPhotosChanged(photos.value)
-                }
+                .onSuccess { analyzePhotos() }
                 .onFailure { e -> _mirage.value = MirageUi.Failed("Download non riuscito: ${e.message ?: "errore"}. Riprova in Wi-Fi.") }
         }
     }
 
-    fun retryMirage() {
-        analyzedPhotoId = null
-        _mirage.value = MirageUi.Hidden
-        onPhotosChanged(photos.value)
-    }
+    fun retryMirage() = analyzePhotos()
 
     fun useSuggestedName(name: String) = setName(name)
 

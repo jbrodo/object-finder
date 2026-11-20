@@ -26,8 +26,9 @@ enum class Confidence(val label: String) { HIGH("molto simile"), MEDIUM("simile"
 object Recognition {
     /** Sotto questa somiglianza l'oggetto non viene proposto. */
     const val MIN_SIMILARITY = 0.35f
-    const val HIGH_SIMILARITY = 0.75f
-    const val MEDIUM_SIMILARITY = 0.55f
+    // Prima taratura su foto reali (telefono, novembre 2026): stesso oggetto 60%, oggetto diverso 46%.
+    const val HIGH_SIMILARITY = 0.60f
+    const val MEDIUM_SIMILARITY = 0.50f
     /** Vantaggio massimo per un oggetto proprio qui; si dimezza ogni ~20 m. */
     const val NEARBY_BONUS = 0.12f
     const val NEARBY_SCALE_METERS = 30.0

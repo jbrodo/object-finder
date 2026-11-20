@@ -59,6 +59,31 @@ object MirageParse {
         return MirageSuggestions(names, texts)
     }
 
+    /**
+     * Unisce i suggerimenti di più foto dello stesso oggetto: un nome visto in più foto sale in cima
+     * (a parità, conta l'ordine delle singole foto); il testo letto si somma senza doppioni.
+     */
+    fun merge(results: List<MirageSuggestions>): MirageSuggestions {
+        if (results.size == 1) return results.single()
+        val firstSeen = LinkedHashMap<String, Int>()
+        val count = HashMap<String, Int>()
+        val label = HashMap<String, String>()
+        results.forEach { r ->
+            r.names.forEachIndexed { rank, name ->
+                val key = name.lowercase()
+                label.putIfAbsent(key, name)
+                count[key] = (count[key] ?: 0) + 1
+                firstSeen[key] = minOf(firstSeen[key] ?: Int.MAX_VALUE, rank)
+            }
+        }
+        val names = firstSeen.keys
+            .sortedWith(compareByDescending<String> { count[it] ?: 0 }.thenBy { firstSeen[it] ?: 0 })
+            .map { label.getValue(it) }
+            .take(3)
+        val texts = results.flatMap { it.texts }.distinctBy { it.value.lowercase() }.take(6)
+        return MirageSuggestions(names, texts)
+    }
+
     /** Lettere e cifre insieme, oppure solo cifre lunghe: numeri di serie, modelli, matricole. */
     fun codeLike(value: String): Boolean {
         val compact = value.replace(Regex("[\\s\\-_/.:]"), "")
