@@ -3,6 +3,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Etichette NFC (facoltative: senza NFC resta il QR). -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <!-- Fotocamera opzionale: lo scatto avviene tramite l'app fotocamera di sistema. -->
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
@@ -47,6 +50,12 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="objectfinder" android:host="object" />
+            </intent-filter>
+            <!-- Etichette NFC: lo stesso link, letto avvicinando il telefono al tag. -->
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="objectfinder" android:host="object" />
             </intent-filter>
         </activity>

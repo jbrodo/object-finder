@@ -56,7 +56,7 @@ class ConflictAndCryptoTest {
     @Test
     fun `pull never overwrites an open conflict and records the server version`() {
         assertNull(SyncMerge.mergeRemote(server(name = "nuovo"), local(status = SyncStatus.CONFLICT)))
-        assertEquals(3, SyncMerge.mergeRemote(server(), local(status = SyncStatus.SYNCED))!!.remoteVersion)
+        assertEquals(4, SyncMerge.mergeRemote(server(version = 4, updatedAt = "2026-11-19T11:00:00+00:00"), local(status = SyncStatus.SYNCED))!!.remoteVersion)
     }
 
     private val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()

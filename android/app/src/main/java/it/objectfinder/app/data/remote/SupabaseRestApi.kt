@@ -1,5 +1,7 @@
 package it.objectfinder.app.data.remote
 
+import it.objectfinder.app.data.SyncMerge
+
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.delete
@@ -277,15 +279,19 @@ class SupabaseRestApi(
         }
     }.body<List<JsonObject>>().mapNotNull { it["storage_path"]?.jsonPrimitive?.contentOrNull }
 
-    /** Pull incrementale ordinato per `updated_at` (cursore esclusivo). */
-    suspend fun objectsUpdatedSince(projectId: String, cursor: String?, limit: Int = 500): List<ObjectReadDto> =
+    /** Pull incrementale con keyset `(updated_at, id)` esclusivo: nessuna riga saltata tra le pagine. */
+    suspend fun objectsUpdatedSince(
+        projectId: String,
+        cursor: SyncMerge.PullCursor?,
+        limit: Int = 500,
+    ): List<ObjectReadDto> =
         authorized { token ->
             http.client.get("$rest/objects") {
                 auth(token)
                 parameter("select", OBJECT_COLUMNS)
                 parameter("project_id", "eq.$projectId")
-                if (cursor != null) parameter("updated_at", "gt.$cursor")
-                parameter("order", "updated_at.asc")
+                if (cursor != null) parameter("or", keysetAfter(cursor))
+                parameter("order", "updated_at.asc,id.asc")
                 parameter("limit", limit)
             }
         }.body()
@@ -464,6 +470,13 @@ class SupabaseRestApi(
     }
 
     companion object {
+        /** Filtro PostgREST "dopo il cursore": updated_at maggiore, oppure uguale con id maggiore. */
+        fun keysetAfter(cursor: SyncMerge.PullCursor): String {
+            val at = "\"${cursor.updatedAt}\""
+            return if (cursor.id.isEmpty()) "(updated_at.gt.$at)"
+            else "(updated_at.gt.$at,and(updated_at.eq.$at,id.gt.${cursor.id}))"
+        }
+
         const val PHOTO_BUCKET = "object-photos"
         private const val OBJECT_COLUMNS =
             "id,project_id,name,category,notes,place,status,latitude,longitude,accuracy_meters,version,created_at,updated_at"

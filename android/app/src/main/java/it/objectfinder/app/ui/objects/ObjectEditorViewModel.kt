@@ -190,6 +190,7 @@ class ObjectEditorViewModel(
         if (objectId != null) viewModelScope.launch { runCatching { refreshHistory(objectId) } }
         if (objectId != null) viewModelScope.launch { reload() }
         if (objectId != null) viewModelScope.launch { locateUser() }
+        if (objectId != null) viewModelScope.launch { runCatching { photoRepository.ensureDownloaded(objectId) } }
     }
 
     /** Posizione del telefono per la distanza: subito l'ultima nota, poi un fix fresco. Mai richiesta di permesso qui. */

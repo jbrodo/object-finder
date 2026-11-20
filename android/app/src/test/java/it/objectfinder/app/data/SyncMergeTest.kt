@@ -6,6 +6,7 @@ import it.objectfinder.app.data.remote.ObjectReadDto
 import it.objectfinder.app.data.remote.parseSupabaseError
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -51,12 +52,13 @@ class SyncMergeTest {
         // Lessicograficamente "…T10…+02:00" > "…T09…+00:00", ma cronologicamente è prima.
         val earlier = "2026-11-19T10:00:00+02:00" // 08:00Z
         val later = "2026-11-19T09:00:00+00:00"   // 09:00Z
-        assertEquals(later, SyncMerge.nextCursor(null, listOf(remote(updatedAt = later), remote(updatedAt = earlier))))
+        assertEquals(later, SyncMerge.nextCursor(null, listOf(remote(updatedAt = later), remote(updatedAt = earlier)))?.updatedAt)
     }
 
     @Test
     fun `cursor keeps current value on empty page`() {
-        assertEquals("2026-11-19T09:00:00+00:00", SyncMerge.nextCursor("2026-11-19T09:00:00+00:00", emptyList()))
+        val current = SyncMerge.PullCursor("2026-11-19T09:00:00+00:00", "o9")
+        assertEquals(current, SyncMerge.nextCursor(current, emptyList()))
         assertNull(SyncMerge.nextCursor(null, emptyList()))
     }
 
@@ -64,7 +66,7 @@ class SyncMergeTest {
     fun `cursor uses microsecond precision`() {
         val a = "2026-11-19T09:00:00.000001+00:00"
         val b = "2026-11-19T09:00:00.000002+00:00"
-        assertEquals(b, SyncMerge.nextCursor(a, listOf(remote(updatedAt = b))))
+        assertEquals(b, SyncMerge.nextCursor(SyncMerge.PullCursor(a), listOf(remote(updatedAt = b)))?.updatedAt)
     }
 
     @Test
@@ -106,5 +108,40 @@ class SyncMergeTest {
         val moved = merged.copy(place = "Cantina")
         assertTrue(!SyncMerge.sameContent(moved, server))
         assertEquals(listOf("Dove"), SyncMerge.diff(moved, server).map { it.label })
+    }
+
+    @Test
+    fun `same timestamp across a page boundary is ordered by id`() {
+        val at = "2026-11-19T09:00:00.5+00:00"
+        val next = SyncMerge.nextCursor(null, listOf(remote(id = "a", updatedAt = at), remote(id = "c", updatedAt = at)))
+        assertEquals(SyncMerge.PullCursor(at, "c"), next)
+        assertEquals(
+            "(updated_at.gt.\"$at\",and(updated_at.eq.\"$at\",id.gt.c))",
+            it.objectfinder.app.data.remote.SupabaseRestApi.keysetAfter(next!!),
+        )
+    }
+
+    @Test
+    fun `cursor round trips and accepts the old timestamp-only format`() {
+        val c = SyncMerge.PullCursor("2026-11-19T09:00:00+00:00", "o1")
+        assertEquals(c, SyncMerge.PullCursor.decode(c.encode()))
+        assertEquals(SyncMerge.PullCursor("2026-11-19T09:00:00+00:00", ""), SyncMerge.PullCursor.decode("2026-11-19T09:00:00+00:00"))
+        assertNull(SyncMerge.PullCursor.decode(null))
+    }
+
+    @Test
+    fun `new pull starts two minutes before the cursor`() {
+        val back = SyncMerge.withLookback(SyncMerge.PullCursor("2026-11-19T09:00:00Z", "o1"))
+        assertEquals(SyncMerge.PullCursor("2026-11-19T08:58Z", ""), back)
+        assertEquals("2026-11-19T08:58Z", SyncMerge.lookbackTimestamp("2026-11-19T09:00:00Z"))
+        assertNull(SyncMerge.withLookback(null))
+    }
+
+    @Test
+    fun `rows reread in the lookback window are not applied twice`() {
+        val server = remote()
+        val known = SyncMerge.mergeRemote(server, null)!!
+        assertNull(SyncMerge.mergeRemote(server, known))
+        assertNotNull(SyncMerge.mergeRemote(server.copy(version = 4, updatedAt = "2026-11-19T11:00:00+00:00"), known))
     }
 }

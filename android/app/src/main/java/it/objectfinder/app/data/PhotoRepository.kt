@@ -120,6 +120,10 @@ class PhotoRepository(
         PhotoSyncReport(uploaded, deleted, downloaded)
     }
 
+    /**
+     * Pull: le foto nuove degli altri membri vengono registrate senza scaricarle; si scarica solo la
+     * copertina di ogni oggetto (serve all'elenco). Le altre arrivano quando si apre la scheda.
+     */
     private suspend fun pull(projectId: String): Int {
         val remote = api.listPhotos(projectId)
         val local = dao.allForProject(projectId).associateBy { it.id }
@@ -128,27 +132,69 @@ class PhotoRepository(
             local[id]?.localPath?.let { File(it).delete() }
             dao.delete(id)
         }
-        var downloaded = 0
-        plan.download.forEach { row ->
-            val bytes = try {
-                api.downloadPhoto(row.storagePath)
-            } catch (e: SupabaseException.Http) {
-                if (e.status == 404 || e.status == 400) return@forEach else throw e
-            }
-            val file = File(objectDir(row.objectId), "${row.id}.jpg").apply { writeBytes(bytes) }
+        plan.record.forEach { row ->
             dao.upsert(
                 PhotoEntity(
                     id = row.id,
                     objectId = row.objectId,
-                    localPath = file.absolutePath,
+                    localPath = null,
                     storagePath = row.storagePath,
                     syncStatus = PhotoSyncStatus.SYNCED.wire,
-                    createdAt = local[row.id]?.createdAt ?: System.currentTimeMillis(),
+                    createdAt = SyncMerge.parseEpochMillis(row.capturedAt) ?: System.currentTimeMillis(),
                 )
             )
-            downloaded++
         }
+        var downloaded = 0
+        PhotoMerge.coversToDownload(dao.allForProject(projectId)).forEach { photo ->
+            if (download(photo)) downloaded++
+        }
+        trimCache()
         return downloaded
+    }
+
+    /**
+     * Scheda aperta: scarica le foto dell'oggetto che mancano (in silenzio se offline) e le segna
+     * come usate di recente, così la pulizia della cache le tiene.
+     */
+    suspend fun ensureDownloaded(objectId: String): Unit = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        dao.allForObject(objectId)
+            .filter { it.syncStatus != PhotoSyncStatus.PENDING_DELETE.wire }
+            .forEach { photo ->
+                val file = photo.localPath?.let(::File)
+                if (file != null && file.exists()) file.setLastModified(now)
+                else runCatching { download(photo) }
+            }
+        trimCache()
+    }
+
+    /** Scarica una foto remota nella memoria privata; false se non più presente sul server. */
+    private suspend fun download(photo: PhotoEntity): Boolean {
+        val path = photo.storagePath ?: return false
+        val bytes = try {
+            api.downloadPhoto(path)
+        } catch (e: SupabaseException.Http) {
+            if (e.status == 404 || e.status == 400) return false else throw e
+        }
+        val file = File(objectDir(photo.objectId), "${photo.id}.jpg").apply { writeBytes(bytes) }
+        dao.setLocalPath(photo.id, file.absolutePath)
+        return true
+    }
+
+    /** Oltre il limite si liberano le foto usate meno di recente (restano scaricabili dal server). */
+    suspend fun trimCache(limitBytes: Long = CACHE_LIMIT_BYTES) = withContext(Dispatchers.IO) {
+        val synced = dao.syncedWithLocalFile()
+        val covers = PhotoMerge.coverIds(synced)
+        val cached = synced.mapNotNull { photo ->
+            val file = File(photo.localPath!!)
+            if (!file.exists()) { dao.setLocalPath(photo.id, null); return@mapNotNull null }
+            PhotoCache.Entry(photo.id, file.length(), file.lastModified(), isCover = photo.id in covers)
+        }
+        val byId = synced.associateBy { it.id }
+        PhotoCache.evict(cached, limitBytes).forEach { id ->
+            byId[id]?.localPath?.let { File(it).delete() }
+            dao.setLocalPath(id, null)
+        }
     }
 
     private fun objectDir(objectId: String) = File(photosDir, objectId).apply { mkdirs() }
@@ -160,26 +206,57 @@ class PhotoRepository(
     }
 
     companion object {
+        /** Spazio massimo per le copie locali di foto già sul server (quelle da caricare non contano). */
+        const val CACHE_LIMIT_BYTES = 150L * 1024 * 1024
+
         fun remotePath(projectId: String, objectId: String, photoId: String) = "$projectId/$objectId/$photoId.jpg"
     }
 }
 
 /** Riconciliazione pura (testabile) tra elenco remoto e foto locali di un progetto. */
 object PhotoMerge {
-    data class Plan(val download: List<PhotoRowDto>, val removeLocally: List<String>)
+    /** [record]: foto remote non ancora note, da registrare (senza file); [removeLocally]: tolte da altri. */
+    data class Plan(val record: List<PhotoRowDto>, val removeLocally: List<String>)
 
     fun plan(remote: List<PhotoRowDto>, local: List<PhotoEntity>): Plan {
         val remoteIds = remote.map { it.id }.toSet()
-        val localById = local.associateBy { it.id }
-        val download = remote.filter { row ->
-            val existing = localById[row.id]
-            // Nuova, oppure nota ma senza file locale; una cancellazione locale pendente vince.
-            existing == null || (existing.localPath == null && existing.syncStatus != PhotoSyncStatus.PENDING_DELETE.wire)
-        }
+        val localIds = local.map { it.id }.toSet()
+        // Una cancellazione locale pendente resta nota (riga presente): non viene ripristinata.
+        val record = remote.filter { it.id !in localIds }
         // Rimossa da un altro membro: elimina la copia locale già sincronizzata (non quelle in upload).
         val removeLocally = local
             .filter { it.syncStatus == PhotoSyncStatus.SYNCED.wire && it.id !in remoteIds }
             .map { it.id }
-        return Plan(download, removeLocally)
+        return Plan(record, removeLocally)
+    }
+
+    /** Prima foto (la più vecchia) di ogni oggetto: è la copertina mostrata nell'elenco. */
+    fun coverIds(photos: List<PhotoEntity>): Set<String> =
+        photos.filter { it.syncStatus != PhotoSyncStatus.PENDING_DELETE.wire }
+            .groupBy { it.objectId }
+            .mapNotNull { (_, list) -> list.minWithOrNull(compareBy<PhotoEntity>({ it.createdAt }, { it.id }))?.id }
+            .toSet()
+
+    /** Copertine sul server ma non ancora sul telefono. */
+    fun coversToDownload(photos: List<PhotoEntity>): List<PhotoEntity> {
+        val covers = coverIds(photos)
+        return photos.filter { it.id in covers && it.localPath == null && it.storagePath != null }
+    }
+}
+
+/** Politica della cache foto (pura, testabile): LRU, copertine per ultime. */
+object PhotoCache {
+    data class Entry(val id: String, val sizeBytes: Long, val lastUsed: Long, val isCover: Boolean)
+
+    fun evict(entries: List<Entry>, limitBytes: Long): List<String> {
+        var total = entries.sumOf { it.sizeBytes }
+        if (total <= limitBytes) return emptyList()
+        val out = mutableListOf<String>()
+        entries.sortedWith(compareBy<Entry>({ it.isCover }, { it.lastUsed })).forEach { entry ->
+            if (total <= limitBytes) return out
+            out += entry.id
+            total -= entry.sizeBytes
+        }
+        return out
     }
 }

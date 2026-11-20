@@ -66,6 +66,13 @@ interface PhotoDao {
     @Query("SELECT COUNT(*) FROM object_photos WHERE syncStatus != 'synced'")
     fun observePendingCount(): Flow<Int>
 
+    /** Foto già sul server con copia locale: le uniche che la cache può liberare. */
+    @Query("SELECT * FROM object_photos WHERE syncStatus = 'synced' AND localPath IS NOT NULL")
+    suspend fun syncedWithLocalFile(): List<PhotoEntity>
+
+    @Query("UPDATE object_photos SET localPath = :path WHERE id = :id")
+    suspend fun setLocalPath(id: String, path: String?)
+
     @Query("DELETE FROM object_photos WHERE id = :id")
     suspend fun delete(id: String)
 }

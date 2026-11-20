@@ -12,22 +12,38 @@ class PhotoMergeTest {
         PhotoEntity(id = id, objectId = "o", localPath = path, storagePath = "p/o/$id.jpg", syncStatus = status.wire)
 
     @Test
-    fun `new remote photos are downloaded, known ones skipped`() {
+    fun `new remote photos are recorded without downloading, known ones skipped`() {
         val plan = PhotoMerge.plan(listOf(row("a"), row("b")), listOf(local("a", PhotoSyncStatus.SYNCED)))
-        assertEquals(listOf("b"), plan.download.map { it.id })
+        assertEquals(listOf("b"), plan.record.map { it.id })
         assertEquals(emptyList<String>(), plan.removeLocally)
-    }
-
-    @Test
-    fun `known photo without local file is downloaded again`() {
-        val plan = PhotoMerge.plan(listOf(row("a")), listOf(local("a", PhotoSyncStatus.SYNCED, path = null)))
-        assertEquals(listOf("a"), plan.download.map { it.id })
     }
 
     @Test
     fun `pending local delete is not resurrected by pull`() {
         val plan = PhotoMerge.plan(listOf(row("a")), listOf(local("a", PhotoSyncStatus.PENDING_DELETE, path = null)))
-        assertEquals(emptyList<String>(), plan.download.map { it.id })
+        assertEquals(emptyList<String>(), plan.record.map { it.id })
+    }
+
+    @Test
+    fun `only the oldest photo of each object is a cover to download`() {
+        val photos = listOf(
+            local("o1-old", PhotoSyncStatus.SYNCED, path = null).copy(objectId = "o1", createdAt = 1),
+            local("o1-new", PhotoSyncStatus.SYNCED, path = null).copy(objectId = "o1", createdAt = 2),
+            local("o2-only", PhotoSyncStatus.SYNCED).copy(objectId = "o2", createdAt = 5), // già sul telefono
+        )
+        assertEquals(listOf("o1-old"), PhotoMerge.coversToDownload(photos).map { it.id })
+    }
+
+    @Test
+    fun `cache frees least recently used photos first and covers last`() {
+        val entries = listOf(
+            PhotoCache.Entry("cover-old", 40, lastUsed = 1, isCover = true),
+            PhotoCache.Entry("seen-long-ago", 40, lastUsed = 2, isCover = false),
+            PhotoCache.Entry("seen-today", 40, lastUsed = 9, isCover = false),
+        )
+        assertEquals(emptyList<String>(), PhotoCache.evict(entries, limitBytes = 120))
+        assertEquals(listOf("seen-long-ago"), PhotoCache.evict(entries, limitBytes = 80))
+        assertEquals(listOf("seen-long-ago", "seen-today", "cover-old"), PhotoCache.evict(entries, limitBytes = 0))
     }
 
     @Test

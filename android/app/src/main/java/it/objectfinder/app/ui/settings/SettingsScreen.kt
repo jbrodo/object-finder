@@ -74,16 +74,17 @@ fun SettingsScreen(
                     title = { Text("Uscire dall'account?") },
                     text = {
                         Text(
-                            if (pending > 0)
-                                "Ci sono $pending modifiche non ancora inviate: restano su questo telefono e " +
-                                    "partiranno quando rientri con ${current.email.ifBlank { "questo account" }}."
-                            else "Gli oggetti del progetto restano sul server: li ritrovi quando rientri."
+                            "Gli oggetti sincronizzati vengono tolti da questo telefono e restano sul server: " +
+                                "li ritrovi quando rientri." +
+                                if (pending > 0) " Le $pending modifiche non ancora inviate restano qui e partiranno " +
+                                    "quando rientri con ${current.email.ifBlank { "questo account" }}."
+                                else ""
                         )
                     },
                     confirmButton = {
                         TextButton(onClick = {
                             confirmSignOut = false
-                            scope.launch { container.authRepository.signOut() }
+                            scope.launch { container.objectRepository.signOut() }
                         }) { Text("Esci") }
                     },
                     dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text("Annulla") } },

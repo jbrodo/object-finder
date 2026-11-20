@@ -45,6 +45,15 @@ interface ObjectDao {
     @Query("SELECT COUNT(*) FROM objects WHERE syncStatus = 'conflict'")
     fun observeConflictCount(): Flow<Int>
 
+    /** Oggetti cloud senza nulla da inviare (né l'oggetto né foto, codici o posizioni). */
+    @Query(
+        "SELECT id FROM objects WHERE projectId != :localProject AND syncStatus = 'synced' " +
+            "AND id NOT IN (SELECT objectId FROM object_photos WHERE syncStatus != 'synced') " +
+            "AND id NOT IN (SELECT objectId FROM object_identifiers WHERE syncStatus != 'synced') " +
+            "AND id NOT IN (SELECT objectId FROM location_history WHERE syncStatus != 'synced')"
+    )
+    suspend fun syncedCloudObjectsWithoutPendingChanges(localProject: String): List<String>
+
     @Query("DELETE FROM objects WHERE id = :id")
     suspend fun delete(id: String)
 

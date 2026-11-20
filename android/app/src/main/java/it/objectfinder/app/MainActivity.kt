@@ -1,6 +1,7 @@
 package it.objectfinder.app
 
 import android.content.Intent
+import android.nfc.NfcAdapter
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -33,5 +34,7 @@ class MainActivity : ComponentActivity() {
         intent.viewData()?.let { pendingLink.value = it }
     }
 
-    private fun Intent?.viewData(): String? = this?.takeIf { it.action == Intent.ACTION_VIEW }?.dataString
+    /** Link da QR/browser (VIEW) o da etichetta NFC (NDEF_DISCOVERED): stesso formato. */
+    private fun Intent?.viewData(): String? =
+        this?.takeIf { it.action == Intent.ACTION_VIEW || it.action == NfcAdapter.ACTION_NDEF_DISCOVERED }?.dataString
 }

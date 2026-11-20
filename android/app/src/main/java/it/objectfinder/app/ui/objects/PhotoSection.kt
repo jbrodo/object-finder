@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -154,7 +155,13 @@ fun PhotoThumbnail(photo: PhotoEntity, size: Int, onClick: (() -> Unit)? = null)
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-        }
+        } ?: Icon(
+            // Sul server ma non ancora sul telefono: si scarica aprendo la scheda (serve la rete).
+            Icons.Default.CloudDownload,
+            contentDescription = "Foto non ancora scaricata",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.Center).size(24.dp),
+        )
         if (photo.syncStatus == PhotoSyncStatus.PENDING_UPLOAD.wire) {
             Icon(
                 Icons.Default.CloudUpload,

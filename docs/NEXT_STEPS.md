@@ -26,13 +26,16 @@
 - [x] Conflitti multi-utente: concorrenza ottimistica su `version`, scelta guidata dall'utente
 - [x] Cifratura token con Android Keystore (AES-256-GCM)
 - [x] Eliminazione definitiva propagata (migration 009, tombstone `deleted_objects`)
+- [x] Pull con cursore composto `(updated_at, id)` e finestra di ricontrollo di 2 minuti
+- [x] Logout: le copie locali già sincronizzate vengono tolte dal telefono (restano le modifiche non inviate)
+- [x] Foto su richiesta: in sync solo le copertine, le altre all'apertura della scheda; cache LRU da 150 MB
 
 ## M3 — Identification
 - [x] Foto oggetto: scatto (app fotocamera di sistema) e galleria, normalizzazione JPEG
 - [ ] CameraX capture in-app (inquadratura guidata per il riconoscimento)
 - [x] QR: etichetta per oggetto (condividi/stampa), scansione in-app, deep link `objectfinder://object/<id>`
 - [x] Collegare codici esistenti (barcode prodotto, seriale) tramite `object_identifiers` (migration 006)
-- [ ] NFC read/write policy
+- [x] Etichette NFC: scrittura del link dell'oggetto (+ AAR) su tag NTAG, apertura della scheda avvicinando il telefono
 - [x] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`, migration 005)
 - [ ] Visual embeddings and similarity search
 
@@ -40,6 +43,7 @@
 - [x] "Vicini": ordinamento per distanza dal telefono
 - [x] Storico posizioni (migration 008, append-only) con spostamenti
 - [x] "Portami lì" (navigazione verso l'oggetto)
+- [x] Scheda in consultazione con "Dove si trova", campo "Dove" (migration 010), segnaposti raggruppati sulla mappa
 - [x] Password: autofill/Credential Manager, mostra password, robustezza
 
 ## Distribuzione e qualità
@@ -54,18 +58,19 @@
 - [ ] Geofence evaluation and notifications
 
 ## Limiti noti
-- Il cursore di pull usa `updated_at > cursor`: righe aggiornate nella stessa transazione con
-  identico timestamp a cavallo di una pagina da 500 potrebbero essere saltate. Soluzione futura:
-  cursore composto `(updated_at, id)`.
-- Dopo il logout gli oggetti cloud restano sul dispositivo ma non sono visibili finché non si
-  riaccede allo stesso account.
+- La finestra di ricontrollo del pull (2 minuti) copre le transazioni lente; una scrittura che resta
+  aperta più a lungo sul server potrebbe ancora sfuggire fino alla sincronizzazione completa successiva.
+- Le modifiche non inviate di un account restano sul telefono dopo il logout e partono solo quando si
+  rientra con lo stesso account.
 - `invite_project_member` rivela a owner/admin se un'email ha già un account ("aggiunto" vs
   "invitato"): enumerazione limitata ai gestori di progetto.
 - Gli inviti non hanno scadenza; si revocano manualmente dalla schermata Membri.
 - Login, sync e gestione membri sono verificati su Postgres con le migration, ma non ancora
   end-to-end contro un'istanza Supabase reale (GoTrue + PostgREST).
-- Le foto vengono scaricate tutte durante la sync (nessun download on-demand né limite di spazio):
-  da rivedere per progetti con molte foto.
+- Le foto non ancora scaricate richiedono la rete all'apertura della scheda; offline compare l'icona
+  "non ancora scaricata".
+- Le etichette NFC sono verificate con intent simulati e test unitari; la scrittura reale va provata su
+  un telefono con NFC e tag NTAG213/215/216.
 - Il file picker su emulatore API 30 non mostra file copiati via adb: l'import da galleria è stato
   verificato solo per la parte comune con lo scatto (stessa pipeline `addPhoto`).
 - Lo scanner QR in-app richiede Google Play services recente (modulo scaricato on-demand); sul

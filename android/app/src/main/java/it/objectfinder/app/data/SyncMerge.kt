@@ -18,6 +18,8 @@ object SyncMerge {
     fun mergeRemote(remote: ObjectReadDto, local: ObjectEntity?): ObjectEntity? {
         // Modifiche locali non inviate o conflitto aperto: la copia locale non va toccata.
         if (local != null && (local.isPending || local.isConflict)) return null
+        // Già nota (es. riletta nella finestra di ricontrollo del cursore): niente da applicare.
+        if (local != null && local.remoteUpdatedAt == remote.updatedAt && local.remoteVersion == remote.version) return null
         return ObjectEntity(
             id = remote.id,
             projectId = remote.projectId,
@@ -92,10 +94,46 @@ object SyncMerge {
         )
     }
 
-    /** Cursore = `updated_at` massimo osservato (confronto cronologico, non lessicografico). */
-    fun nextCursor(current: String?, page: List<ObjectReadDto>): String? =
-        (page.map { it.updatedAt } + listOfNotNull(current))
-            .maxByOrNull { parseEpochMicros(it) ?: Long.MIN_VALUE }
+    /**
+     * Cursore di pull composto `(updated_at, id)`: righe con lo stesso `updated_at` a cavallo di due
+     * pagine non vengono saltate. Si salva come "updated_at|id"; un cursore delle versioni ≤ 1.2
+     * (solo timestamp) vale come id vuoto.
+     */
+    data class PullCursor(val updatedAt: String, val id: String = "") {
+        fun encode(): String = "$updatedAt|$id"
+
+        companion object {
+            fun decode(raw: String?): PullCursor? {
+                if (raw.isNullOrBlank()) return null
+                val at = raw.substringBefore('|')
+                return PullCursor(at, raw.substringAfter('|', ""))
+            }
+        }
+    }
+
+    /** Ultima riga osservata (ordine cronologico, poi id), o il cursore attuale se la pagina è vuota. */
+    fun nextCursor(current: PullCursor?, page: List<ObjectReadDto>): PullCursor? =
+        (page.map { PullCursor(it.updatedAt, it.id) } + listOfNotNull(current))
+            .maxWithOrNull(compareBy<PullCursor>({ parseEpochMicros(it.updatedAt) ?: Long.MIN_VALUE }, { it.id }))
+
+    /**
+     * Punto di partenza di un nuovo pull: qualche minuto prima dell'ultimo cursore. `updated_at` è
+     * l'ora di inizio della transazione sul server, quindi una scrittura lunga può diventare visibile
+     * dopo che il cursore l'ha già superata; ripassare la finestra la recupera (il merge è idempotente).
+     */
+    fun withLookback(cursor: PullCursor?, seconds: Long = LOOKBACK_SECONDS): PullCursor? {
+        val at = cursor?.updatedAt ?: return null
+        val time = runCatching { OffsetDateTime.parse(at) }.getOrNull() ?: return cursor
+        return PullCursor(time.minusSeconds(seconds).toString(), "")
+    }
+
+    /** Stessa finestra per le eliminazioni (cursore solo timestamp). */
+    fun lookbackTimestamp(at: String?, seconds: Long = LOOKBACK_SECONDS): String? {
+        if (at == null) return null
+        return runCatching { OffsetDateTime.parse(at).minusSeconds(seconds).toString() }.getOrDefault(at)
+    }
+
+    const val LOOKBACK_SECONDS = 120L
 
     fun toWriteDto(entity: ObjectEntity) = ObjectWriteDto(
         id = entity.id,

@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
@@ -74,6 +75,7 @@ import it.objectfinder.app.data.local.LocationHistoryEntity
 import it.objectfinder.app.data.local.ObjectStatus
 import it.objectfinder.app.data.local.PLACE_MAX
 import it.objectfinder.app.data.local.isDefaultCategory
+import it.objectfinder.app.nfc.NfcWriteDialog
 import it.objectfinder.app.qr.QrLabelDialog
 import it.objectfinder.app.ui.common.rememberLocationPermissionRequester
 
@@ -92,6 +94,7 @@ fun ObjectEditorScreen(
     canDelete: Boolean = false,
 ) {
     var showLabel by remember { mutableStateOf(false) }
+    var showNfc by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -151,12 +154,18 @@ fun ObjectEditorScreen(
                         if (objectId != null) IconButton(onClick = { showLabel = true }) {
                             Icon(Icons.Default.QrCode2, contentDescription = "Etichetta QR")
                         }
-                        if (!readOnly) Box {
+                        Box {
                             IconButton(onClick = { menuOpen = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "Altre azioni")
                             }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(
+                                // Scrivere un tag non cambia l'oggetto: possibile anche in sola lettura.
+                                if (objectId != null) DropdownMenuItem(
+                                    text = { Text("Scrivi etichetta NFC") },
+                                    leadingIcon = { Icon(Icons.Default.Nfc, contentDescription = null) },
+                                    onClick = { menuOpen = false; showNfc = true },
+                                )
+                                if (!readOnly) DropdownMenuItem(
                                     text = { Text(if (state.isArchived) "Ripristina" else "Archivia") },
                                     leadingIcon = {
                                         Icon(
@@ -246,6 +255,9 @@ fun ObjectEditorScreen(
                 },
                 dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Continua a modificare") } },
             )
+        }
+        if (showNfc && objectId != null) {
+            NfcWriteDialog(objectId = objectId, title = state.name, onDismiss = { showNfc = false })
         }
         if (showLabel && objectId != null) {
             QrLabelDialog(objectId = objectId, title = state.name, onDismiss = { showLabel = false })

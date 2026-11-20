@@ -182,6 +182,18 @@ class ObjectRepository(
         removeLocally(id)
     }
 
+    /**
+     * Logout: le copie locali degli oggetti cloud già sincronizzati vengono tolte dal telefono
+     * (sono sul server; un altro account sullo stesso telefono non le vede né le eredita).
+     * Restano solo oggetti con modifiche non inviate, che partono al prossimo accesso allo stesso account.
+     */
+    suspend fun signOut(): Int = syncMutex.withLock {
+        auth.signOut()
+        val ids = dao.syncedCloudObjectsWithoutPendingChanges(LOCAL_PROJECT_ID)
+        ids.forEach { removeLocally(it) }
+        ids.size
+    }
+
     private suspend fun removeLocally(id: String) {
         photos.discardAllForObject(id)
         identifiers.discardAllForObject(id)
@@ -263,7 +275,8 @@ class ObjectRepository(
     }
 
     private suspend fun pull(projectId: String): Int {
-        var cursor = settings.pullCursor(projectId)
+        // Si riparte un po' prima dell'ultimo cursore (vedi SyncMerge.withLookback).
+        var cursor = SyncMerge.withLookback(SyncMerge.PullCursor.decode(settings.pullCursor(projectId)))
         var applied = 0
         while (true) {
             val page = api.objectsUpdatedSince(projectId, cursor, PAGE_SIZE)
@@ -285,7 +298,7 @@ class ObjectRepository(
                 }
             }
             cursor = SyncMerge.nextCursor(cursor, page)
-            settings.setPullCursor(projectId, cursor)
+            settings.setPullCursor(projectId, cursor?.encode())
             if (page.size < PAGE_SIZE) break
         }
         return applied + pullDeletions(projectId)
@@ -295,7 +308,7 @@ class ObjectRepository(
     private suspend fun pullDeletions(projectId: String): Int {
         val key = "del_$projectId"
         var cursor = settings.pullCursor(key)
-        val deleted = api.deletedObjectsSince(projectId, cursor)
+        val deleted = api.deletedObjectsSince(projectId, SyncMerge.lookbackTimestamp(cursor))
         var removed = 0
         deleted.forEach { tombstone ->
             val local = dao.getById(tombstone.objectId) ?: return@forEach
