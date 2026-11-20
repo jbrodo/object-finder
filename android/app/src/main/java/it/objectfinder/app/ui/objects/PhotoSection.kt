@@ -75,6 +75,31 @@ fun PhotoSection(
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) onAdd(uri)
     }
+    var inAppCamera by rememberSaveable { mutableStateOf(false) }
+
+    /** Fotocamera di sistema: ripiego se il permesso della fotocamera in-app è negato. */
+    fun systemCamera() {
+        val uri = newCameraUri()
+        pendingCameraUri = uri.toString()
+        try {
+            camera.launch(uri)
+        } catch (_: ActivityNotFoundException) {
+            pendingCameraUri = null
+            android.widget.Toast.makeText(context, "Nessuna app fotocamera disponibile", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) inAppCamera = true else systemCamera()
+    }
+    if (inAppCamera) {
+        InAppCamera(
+            newTarget = newCameraUri,
+            onShot = onAdd,
+            onError = { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show() },
+            onDismiss = { inAppCamera = false },
+            onUnavailable = { inAppCamera = false; systemCamera() },
+        )
+    }
 
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -100,14 +125,11 @@ fun PhotoSection(
                     OutlinedButton(
                         enabled = !busy,
                         onClick = {
-                            val uri = newCameraUri()
-                            pendingCameraUri = uri.toString()
-                            try {
-                                camera.launch(uri)
-                            } catch (_: ActivityNotFoundException) {
-                                pendingCameraUri = null
-                                android.widget.Toast.makeText(context, "Nessuna app fotocamera disponibile", android.widget.Toast.LENGTH_SHORT).show()
-                            }
+                            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                                context, android.Manifest.permission.CAMERA,
+                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                            if (granted) inAppCamera = true
+                            else cameraPermission.launch(android.Manifest.permission.CAMERA)
                         },
                     ) {
                         Icon(Icons.Default.PhotoCamera, contentDescription = null, Modifier.size(18.dp))

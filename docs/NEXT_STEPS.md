@@ -32,7 +32,7 @@
 
 ## M3 — Identification
 - [x] Foto oggetto: scatto (app fotocamera di sistema) e galleria, normalizzazione JPEG
-- [ ] CameraX capture in-app (inquadratura guidata per il riconoscimento)
+- [x] Fotocamera in-app CameraX (anteprima Compose, cornice guida, scatti in serie, flash, tocco per mettere a fuoco; ripiego sulla fotocamera di sistema)
 - [x] QR: etichetta per oggetto (condividi/stampa), scansione in-app, deep link `objectfinder://object/<id>`
 - [x] Collegare codici esistenti (barcode prodotto, seriale) tramite `object_identifiers` (migration 006)
 - [x] Etichette NFC: scrittura del link dell'oggetto (+ AAR) su tag NTAG, apertura della scheda avvicinando il telefono

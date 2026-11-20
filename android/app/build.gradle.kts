@@ -128,6 +128,11 @@ dependencies {
 
     // Foto: rendering immagini locali e correzione orientamento EXIF.
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Fotocamera in-app (anteprima, scatti in serie, flash).
+    implementation("androidx.camera:camera-camera2:1.6.2")
+    implementation("androidx.camera:camera-lifecycle:1.6.2")
+    implementation("androidx.camera:camera-compose:1.6.2")
     implementation("androidx.exifinterface:exifinterface:1.4.2")
 
     // Etichette QR: generazione (ZXing core), scansione (Google code scanner, senza permesso
