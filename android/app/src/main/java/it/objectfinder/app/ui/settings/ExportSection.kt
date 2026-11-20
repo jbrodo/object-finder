@@ -14,7 +14,9 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -86,13 +88,18 @@ fun ExportSection(exporter: InventoryExporter) {
     }
 
     Text(
-        "Esporta gli oggetti del progetto «${exporter.projectName}». Il PDF include foto, codici e il QR di " +
+        "Oggetti del progetto «${exporter.projectName}». Il PDF include foto, codici e il QR di " +
             "ogni oggetto: scansionando la stampa si apre la sua scheda.",
         style = MaterialTheme.typography.bodyMedium,
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ExportFormat.entries.forEach { option ->
-            FilterChip(selected = format == option, onClick = { format = option }, label = { Text(option.label) })
+    // Scelta esclusiva: pulsanti segmentati con la spunta, come Accedi/Registrati.
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        ExportFormat.entries.forEachIndexed { index, option ->
+            SegmentedButton(
+                selected = format == option,
+                onClick = { format = option },
+                shape = SegmentedButtonDefaults.itemShape(index, ExportFormat.entries.size),
+            ) { Text(option.label, maxLines = 1) }
         }
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

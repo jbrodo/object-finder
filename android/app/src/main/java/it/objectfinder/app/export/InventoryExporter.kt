@@ -17,8 +17,8 @@ import java.io.OutputStream
 import java.time.LocalDate
 
 enum class ExportFormat(val label: String, val extension: String, val mimeType: String) {
-    CSV("CSV (foglio di calcolo)", "csv", "text/csv"),
-    PDF("PDF (stampabile)", "pdf", "application/pdf"),
+    CSV("Excel (CSV)", "csv", "text/csv"),
+    PDF("PDF da stampare", "pdf", "application/pdf"),
 }
 
 /** Raccoglie l'inventario del progetto attivo e lo scrive in CSV o PDF. */

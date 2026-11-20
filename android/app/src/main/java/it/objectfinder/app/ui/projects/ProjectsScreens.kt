@@ -229,6 +229,18 @@ fun MembersScreen(
                     )
                     HorizontalDivider()
                 }
+                // Da soli il progetto non si condivide: si spiega come farlo, anche con chi non ha un account.
+                if (canManage && state.members.size == 1 && state.invites.isEmpty() && !state.op.busy) {
+                    item(key = "alone-hint") {
+                        Text(
+                            "Sei l'unico membro. Aggiungi chi deve vedere e ritrovare questi oggetti: " +
+                                "se non ha ancora un account, l'invito vale quando si registra con quella email.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
             }
         }
     }

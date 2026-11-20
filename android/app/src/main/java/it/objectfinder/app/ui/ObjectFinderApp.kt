@@ -1,5 +1,11 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.settings.ExportSection
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material.icons.filled.IosShare
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
@@ -310,6 +316,19 @@ private fun MainShell(
     val session by container.authRepository.session.collectAsStateWithLifecycle()
     val pending by container.objectRepository.observePendingCount().collectAsStateWithLifecycle(0)
     val backStack by nav.currentBackStackEntryAsState()
+    var exportOpen by rememberSaveable { mutableStateOf(false) }
+
+    if (exportOpen) {
+        ModalBottomSheet(onDismissRequest = { exportOpen = false }) {
+            Column(
+                Modifier.padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Esporta inventario", style = MaterialTheme.typography.titleLarge)
+                ExportSection(container.inventoryExporter)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -319,6 +338,12 @@ private fun MainShell(
                     if (current != Tab.SETTINGS) {
                         IconButton(onClick = onScan) {
                             Icon(Icons.Default.QrCodeScanner, contentDescription = "Scansiona etichetta")
+                        }
+                    }
+                    // Export vicino agli oggetti che esporta, non nascosto nelle impostazioni.
+                    if (current == Tab.OBJECTS) {
+                        IconButton(onClick = { exportOpen = true }) {
+                            Icon(Icons.Default.IosShare, contentDescription = "Esporta inventario")
                         }
                     }
                     if (session != null) {

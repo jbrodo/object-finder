@@ -8,7 +8,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
+import it.objectfinder.app.ui.objects.PlaceFormat
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,6 +42,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    var confirmSignOut by remember { mutableStateOf(false) }
     val session by container.authRepository.session.collectAsStateWithLifecycle()
     val project by container.settings.activeProject.collectAsStateWithLifecycle()
     val syncState by container.settings.syncState.collectAsStateWithLifecycle()
@@ -61,7 +68,26 @@ fun SettingsScreen(
                 }
             } else {
                 Text(current.email.ifBlank { current.userId })
-                OutlinedButton(onClick = { scope.launch { container.authRepository.signOut() } }) { Text("Esci") }
+                OutlinedButton(onClick = { confirmSignOut = true }) { Text("Esci") }
+                if (confirmSignOut) AlertDialog(
+                    onDismissRequest = { confirmSignOut = false },
+                    title = { Text("Uscire dall'account?") },
+                    text = {
+                        Text(
+                            if (pending > 0)
+                                "Ci sono $pending modifiche non ancora inviate: restano su questo telefono e " +
+                                    "partiranno quando rientri con ${current.email.ifBlank { "questo account" }}."
+                            else "Gli oggetti del progetto restano sul server: li ritrovi quando rientri."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirmSignOut = false
+                            scope.launch { container.authRepository.signOut() }
+                        }) { Text("Esci") }
+                    },
+                    dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text("Annulla") } },
+                )
             }
         }
 
@@ -81,7 +107,17 @@ fun SettingsScreen(
 
         // Senza account non c'è nulla da inviare: niente contatori o pulsanti che promettono una sync.
         if (session != null) Section("Sincronizzazione") {
-            Text("Modifiche da inviare: $pending")
+            // Stato in parole: "tutto a posto" o cosa manca, non contatori a zero.
+            Text(
+                when {
+                    syncState is SyncState.Running -> "Sincronizzazione in corso…"
+                    pending == 1 -> "1 modifica da inviare"
+                    pending > 0 -> "$pending modifiche da inviare"
+                    syncState is SyncState.Failed -> "Ultima sincronizzazione non riuscita"
+                    else -> "Tutto sincronizzato"
+                },
+                style = MaterialTheme.typography.bodyLarge,
+            )
             if (conflicts > 0) {
                 Text(
                     "Conflitti da risolvere: $conflicts (oggetti con l'icona di avviso nell'elenco)",
@@ -89,13 +125,10 @@ fun SettingsScreen(
                 )
             }
             Text(describe(syncState), style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = onSyncNow, enabled = syncState !is SyncState.Running) {
+            // Secondario: la sincronizzazione parte da sola; il pulsante serve a forzarla.
+            OutlinedButton(onClick = onSyncNow, enabled = syncState !is SyncState.Running) {
                 Text("Sincronizza ora")
             }
-        }
-
-        Section("Inventario") {
-            ExportSection(container.inventoryExporter)
         }
 
         // Scelta del motore solo se ce n'è più di uno disponibile in questo build.
@@ -129,11 +162,13 @@ private fun Section(title: String, content: @Composable () -> Unit) {
     }
 }
 
-private fun describe(state: SyncState): String {
-    return when (state) {
-        SyncState.Idle -> "Nessuna sincronizzazione in questa sessione"
-        SyncState.Running -> "Sincronizzazione in corso…"
-        is SyncState.Done -> "Ultima sync ${it.objectfinder.app.ui.objects.PlaceFormat.dateTime(state.atMillis)}: ${state.pushed} inviati, ${state.pulled} ricevuti"
-        is SyncState.Failed -> "Sync fallita ${it.objectfinder.app.ui.objects.PlaceFormat.dateTime(state.atMillis)}: ${state.message}"
-    }
+private fun describe(state: SyncState): String = when (state) {
+    SyncState.Idle -> "Si sincronizza da sola quando sei online."
+    SyncState.Running -> "Invio e ricezione delle modifiche…"
+    is SyncState.Done -> "Ultima volta: ${PlaceFormat.dateTime(state.atMillis)}" +
+        listOfNotNull(
+            state.pushed.takeIf { it > 0 }?.let { "$it inviate" },
+            state.pulled.takeIf { it > 0 }?.let { "$it ricevute" },
+        ).joinToString(", ").let { if (it.isEmpty()) "" else " · $it" }
+    is SyncState.Failed -> "${PlaceFormat.dateTime(state.atMillis)}: ${state.message}"
 }
