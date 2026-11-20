@@ -71,6 +71,13 @@ jobs:
           echo "$out"
           grep -q "completato: 0 migration applicate" <<<"$out"
 
+      - name: SQL tests
+        run: |
+          for f in backend/tests/*_test.sql; do
+            echo "== $f"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -t -f "$f"
+          done
+
   deploy:
     name: Apply to Supabase
     needs: validate

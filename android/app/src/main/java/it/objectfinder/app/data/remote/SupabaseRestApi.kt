@@ -110,6 +110,7 @@ data class InviteDto(
     val role: String,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("accepted_at") val acceptedAt: String? = null,
+    @SerialName("expires_at") val expiresAt: String? = null,
 )
 
 @Serializable
@@ -417,7 +418,7 @@ class SupabaseRestApi(
     suspend fun listPendingInvites(projectId: String): List<InviteDto> = authorized { token ->
         http.client.get("$rest/project_invites") {
             auth(token)
-            parameter("select", "id,project_id,email,role,created_at,accepted_at")
+            parameter("select", "id,project_id,email,role,created_at,accepted_at,expires_at")
             parameter("project_id", "eq.$projectId")
             parameter("accepted_at", "is.null")
             parameter("order", "created_at.desc")

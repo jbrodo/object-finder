@@ -16,7 +16,15 @@ import java.util.UUID
 
 data class ProjectMember(val userId: String, val email: String, val role: ProjectRole, val isMe: Boolean)
 
-data class PendingInvite(val id: String, val email: String, val role: ProjectRole)
+data class PendingInvite(
+    val id: String,
+    val email: String,
+    val role: ProjectRole,
+    /** Scadenza (migration 013); null con un server non ancora aggiornato. */
+    val expiresAt: Long? = null,
+) {
+    fun isExpired(now: Long = System.currentTimeMillis()): Boolean = expiresAt != null && expiresAt <= now
+}
 
 enum class InviteResult { ADDED, INVITED }
 
@@ -109,10 +117,18 @@ class ProjectRepository(
 
     suspend fun listPendingInvites(): List<PendingInvite> =
         api.listPendingInvites(requireActiveCloudProject()).map {
-            PendingInvite(it.id, it.email, ProjectRole.fromWire(it.role) ?: ProjectRole.VIEWER)
+            PendingInvite(
+                it.id, it.email, ProjectRole.fromWire(it.role) ?: ProjectRole.VIEWER,
+                SyncMerge.parseEpochMillis(it.expiresAt),
+            )
         }
 
     suspend fun revokeInvite(id: String) = api.revokeInvite(id)
+
+    /** Ripetere l'invito ne rinnova la validità (30 giorni) senza cambiare il ruolo. */
+    suspend fun renewInvite(invite: PendingInvite) {
+        api.inviteMember(requireActiveCloudProject(), invite.email, invite.role.wire)
+    }
 
     suspend fun removeMember(userId: String) {
         api.removeMember(requireActiveCloudProject(), userId)

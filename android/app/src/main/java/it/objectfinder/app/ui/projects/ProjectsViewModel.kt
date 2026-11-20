@@ -111,17 +111,30 @@ class MembersViewModel(
         load()
     }
 
-    fun shareInvite(invite: PendingInvite) = _state.update { it.copy(justInvited = invite, inviteEmail = null) }
+    /** Condividere un invito scaduto lo rinnova prima (altrimenti il link non servirebbe). */
+    fun shareInvite(invite: PendingInvite) {
+        if (!invite.isExpired()) {
+            _state.update { it.copy(justInvited = invite, inviteEmail = null) }
+            return
+        }
+        run {
+            repository.renewInvite(invite)
+            load()
+            _state.update { it.copy(justInvited = invite.copy(expiresAt = null), inviteEmail = null) }
+        }
+    }
 
     fun consumeInvite() = _state.update { it.copy(justInvited = null, inviteEmail = null) }
 
     /** Reinvio dell'email per un invito in attesa (il server limita i reinvii ravvicinati). */
     fun emailInvite(invite: PendingInvite) = run {
+        if (invite.isExpired()) repository.renewInvite(invite)
         val text = when (val mail = repository.sendInviteEmail(invite.email)) {
-            InviteEmail.Sent -> "Email di invito inviata a ${invite.email}"
+            InviteEmail.Sent -> "Email di invito inviata a ${invite.email}: vale 30 giorni"
             InviteEmail.NotConfigured -> "Invio email non attivo sul server: usa Condividi invito"
             is InviteEmail.NotSent -> "Email non inviata: ${mail.reason}"
         }
+        load()
         _state.update { it.copy(op = it.op.copy(message = text)) }
     }
 

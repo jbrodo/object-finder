@@ -58,4 +58,12 @@ class ProjectRoleTest {
         )
         assertEquals("qualcosa di nuovo", localizeServerMessage("qualcosa di nuovo"))
     }
+
+    @Test
+    fun `invite expiry`() {
+        val now = 1_000_000L
+        assertTrue(PendingInvite("i", "a@b.it", ProjectRole.EDITOR, expiresAt = now - 1).isExpired(now))
+        assertTrue(!PendingInvite("i", "a@b.it", ProjectRole.EDITOR, expiresAt = now + 1).isExpired(now))
+        assertTrue(!PendingInvite("i", "a@b.it", ProjectRole.EDITOR, expiresAt = null).isExpired(now)) // server vecchio
+    }
 }

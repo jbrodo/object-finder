@@ -200,7 +200,18 @@ fun MembersScreen(
                     }
                     items(state.invites, key = { "invite-${it.id}" }) { invite ->
                         ListItem(
-                            supportingContent = { Text("${invite.role.label} · in attesa di registrazione") },
+                            supportingContent = {
+                                val expires = invite.expiresAt
+                                Text(
+                                    when {
+                                        invite.isExpired() -> "${invite.role.label} · scaduto: reinvialo per rinnovarlo"
+                                        expires != null -> "${invite.role.label} · in attesa · scade il ${inviteDate(expires)}"
+                                        else -> "${invite.role.label} · in attesa di registrazione"
+                                    },
+                                    color = if (invite.isExpired()) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
                             trailingContent = {
                                 Row {
                                     IconButton(onClick = { viewModel.emailInvite(invite) }, enabled = !state.op.busy) {
@@ -416,10 +427,14 @@ private fun ConfirmDialog(title: String, text: String, confirm: String, onDismis
     )
 }
 
+internal fun inviteDate(millis: Long): String =
+    java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale.ITALIAN)
+        .format(java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault()))
+
 internal fun inviteMessage(projectName: String, invite: PendingInvite): String =
     "Ti ho invitato nel progetto «$projectName» su Object Finder come ${invite.role.label.lowercase()}.\n" +
         "Installa l'app e registrati con questa email: ${invite.email}\n" +
-        "Dopo aver confermato l'indirizzo email, il progetto comparirà al primo accesso."
+        "Dopo aver confermato l'indirizzo email, il progetto comparirà al primo accesso. L'invito vale 30 giorni."
 
 private fun shareInviteText(context: Context, text: String) {
     val send = Intent(Intent.ACTION_SEND).apply {

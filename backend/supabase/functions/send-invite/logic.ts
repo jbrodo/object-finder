@@ -83,7 +83,7 @@ export function buildEmail(args: {
     `2. Registrati con questo indirizzo: ${args.inviteeEmail}`,
     "3. Conferma l'indirizzo dall'email che ricevi alla registrazione.",
     "",
-    "Al primo accesso il progetto comparirà da solo.",
+    "Al primo accesso il progetto comparirà da solo. L'invito vale 30 giorni.",
     "",
     "Se non conosci chi ti ha invitato, ignora questa email.",
   ].join("\n");
@@ -96,7 +96,7 @@ export function buildEmail(args: {
 <li>Registrati con questo indirizzo: <strong>${e(args.inviteeEmail)}</strong></li>
 <li>Conferma l'indirizzo dall'email che ricevi alla registrazione.</li>
 </ol>
-<p>Al primo accesso il progetto comparirà da solo.</p>
+<p>Al primo accesso il progetto comparirà da solo. L'invito vale 30 giorni.</p>
 <p style="color:#605d66;font-size:13px">Se non conosci chi ti ha invitato, ignora questa email.</p>
 </body></html>`;
   return { subject, text, html };

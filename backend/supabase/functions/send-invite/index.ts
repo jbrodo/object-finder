@@ -121,7 +121,12 @@ Deno.serve(async (req) => {
     await rest(`project_invites?id=${eq(invite.id)}`, {
       method: "PATCH",
       headers: { "content-type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({ last_emailed_at: new Date().toISOString(), email_count: invite.email_count + 1 }),
+      // Reinviare l'email rinnova anche la validità dell'invito (30 giorni, migration 013).
+      body: JSON.stringify({
+        last_emailed_at: new Date().toISOString(),
+        email_count: invite.email_count + 1,
+        expires_at: new Date(Date.now() + 30 * 24 * 3600_000).toISOString(),
+      }),
     });
     return json(200, { sent: true });
   } catch (error) {
