@@ -86,7 +86,14 @@ android {
     }
 
     // APK scaricato fuori dallo Store: librerie native compresse (download molto più piccolo).
-    packaging { jniLibs { useLegacyPackaging = true } }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            // ONNX Runtime (piante offline) solo a 64 bit: +14 MB invece di +24 MB; sui rari telefoni
+            // armeabi-v7a il riconoscimento piante resta online (PlantEngine.isSupported).
+            excludes += listOf("lib/armeabi-v7a/libonnxruntime.so", "lib/armeabi-v7a/libonnxruntime4j_jni.so")
+        }
+    }
 
     // Ponte JNI verso il motore Cactus (Mirage): src/main/cpp. NDK r28 = stessa libc++ della release.
     ndkVersion = "28.2.13676358"
@@ -141,6 +148,36 @@ val downloadEmbedderModel = tasks.register<DownloadEmbedderModel>("downloadEmbed
     outputDir.set(layout.buildDirectory.dir("generated/embedderModel"))
 }
 
+// Etichette del modello offline delle piante (PlantNet/mobilenetv4-conv-s-plantclef2024, Apache-2.0):
+// labels.json (1 MB) della stessa revisione del modello, SHA-256 fissato, ridotto a un TSV
+// "specie<TAB>genere<TAB>famiglia" nell'APK. Il modello (50 MB) invece si scarica su richiesta.
+abstract class DownloadPlantLabels : DefaultTask() {
+    @get:Input abstract val url: Property<String>
+    @get:Input abstract val sha256: Property<String>
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun download() {
+        val target = outputDir.file("plant_labels.tsv").get().asFile
+        val bytes = URI(url.get()).toURL().openStream().use { it.readBytes() }
+        val sha = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        check(sha == sha256.get()) { "Checksum delle etichette non valido: ${url.get()}" }
+        @Suppress("UNCHECKED_CAST")
+        val rows = groovy.json.JsonSlurper().parseText(bytes.toString(Charsets.UTF_8)) as List<Map<String, Any?>>
+        check(rows.size == 7806) { "Attese 7806 etichette, trovate ${rows.size}" }
+        target.parentFile.mkdirs()
+        target.writeText(rows.joinToString("\n") { r ->
+            listOf("species", "genus", "family").joinToString("\t") { (r[it] ?: "").toString().replace('\t', ' ').replace('\n', ' ') }
+        })
+    }
+}
+
+val downloadPlantLabels = tasks.register<DownloadPlantLabels>("downloadPlantLabels") {
+    url.set("https://huggingface.co/PlantNet/mobilenetv4-conv-s-plantclef2024/resolve/119d3f3bf1ea7029e7248288b9ad5314fa02a0bc/labels.json")
+    sha256.set("1226fcbab5441062429cb7e332b89e657b4f15757f0d28a6db6787584c024c41")
+    outputDir.set(layout.buildDirectory.dir("generated/plantLabels"))
+}
+
 // Motore Cactus (Mirage) per Android: librerie statiche ARM della release 4.1.4, stessa revisione
 // usata dal pacchetto ufficiale cactus-compute; versione e SHA-256 fissati.
 abstract class DownloadCactusEngine : DefaultTask() {
@@ -177,6 +214,7 @@ tasks.matching { it.name.startsWith("configureCMake") || it.name.startsWith("bui
 androidComponents {
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(downloadEmbedderModel, DownloadEmbedderModel::outputDir)
+        variant.sources.assets?.addGeneratedSourceDirectory(downloadPlantLabels, DownloadPlantLabels::outputDir)
     }
 }
 
@@ -228,6 +266,8 @@ dependencies {
 
     // Riconoscimento visivo on-device (impronte delle foto, confronto per somiglianza).
     implementation("com.google.mediapipe:tasks-vision:1.2.2")
+    // Riconoscimento delle piante offline (modello ONNX scaricato su richiesta).
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.31.1")
     implementation("androidx.exifinterface:exifinterface:1.4.2")
 
     // Etichette QR: generazione (ZXing core), scansione (Google code scanner, senza permesso

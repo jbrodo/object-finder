@@ -120,6 +120,7 @@ fun ObjectEditorScreen(
     val codes by viewModel.identifiers.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val mirageState by viewModel.mirageState.collectAsStateWithLifecycle()
+    val plantState by viewModel.plantState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val permission = rememberLocationPermissionRequester()
     val editingExisting = state.editing && !state.isNew
@@ -420,6 +421,12 @@ fun ObjectEditorScreen(
                     onUseName = viewModel::useSuggestedName,
                     onAddToNotes = viewModel::addTextToNotes,
                     onLinkAsCode = { viewModel.addCode(IdentifierType.SERIAL, it) },
+                )
+                PlantCard(
+                    state = plantState,
+                    onIdentify = viewModel::identifyPlant,
+                    onDownload = viewModel::downloadPlantModel,
+                    onUse = viewModel::usePlant,
                 )
                 OutlinedTextField(
                     value = state.name,

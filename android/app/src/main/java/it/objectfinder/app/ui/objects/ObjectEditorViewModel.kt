@@ -1,5 +1,10 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.recognition.PlantIdentification
+import it.objectfinder.app.recognition.PlantGuess
+import it.objectfinder.app.recognition.PlantOutcome
+import it.objectfinder.app.recognition.PlantEngine
+import it.objectfinder.app.recognition.PlantIdentifier
 import it.objectfinder.app.data.PlaceTree
 import it.objectfinder.app.data.PlaceRepository
 import it.objectfinder.app.recognition.MirageParse
@@ -103,6 +108,18 @@ data class EditorState(
 }
 
 /** Stato della scheda "Suggerimenti dalla foto". */
+sealed interface PlantUi {
+    data object Hidden : PlantUi
+    /** C'è una foto: si può chiedere "È una pianta?". */
+    data object Idle : PlantUi
+    data class NeedsModel(val note: String?) : PlantUi
+    data class Downloading(val progress: Float) : PlantUi
+    data object Identifying : PlantUi
+    data class Ready(val result: PlantIdentification, val note: String?) : PlantUi
+    data object NotAPlant : PlantUi
+    data class Failed(val message: String) : PlantUi
+}
+
 sealed interface MirageUi {
     data object Hidden : MirageUi
     /** Oggetto esistente: si analizza solo su richiesta. */
@@ -118,6 +135,9 @@ data class ConflictUi(val deletedOnServer: Boolean, val differences: List<SyncMe
 
 /** Gestisce creazione e modifica: `objectId == null` → nuovo oggetto. */
 private const val MAX_ANALYZED_PHOTOS = 4
+
+/** Categoria proposta per le piante riconosciute. */
+const val PLANT_CATEGORY = "Piante"
 
 private const val NO_FIX_MESSAGE = "Posizione non disponibile: verifica che il GPS sia attivo, o indicala sulla mappa."
 
@@ -138,6 +158,9 @@ class ObjectEditorViewModel(
     private val mirage: MirageEngine? = null,
     /** Luoghi strutturati del progetto; null nei test. */
     private val places: PlaceRepository? = null,
+    /** Riconoscimento piante (Pl@ntNet online o modello sul telefono); null nei test. */
+    private val plants: PlantIdentifier? = null,
+    private val plantModel: PlantEngine? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(EditorState(isNew = objectId == null, loaded = objectId == null))
     val state: StateFlow<EditorState> = _state.asStateFlow()
@@ -189,6 +212,8 @@ class ObjectEditorViewModel(
 
     // ---- Suggerimenti dalla foto (Mirage) ----
 
+    private val _plant = MutableStateFlow<PlantUi>(PlantUi.Hidden)
+    val plantState: StateFlow<PlantUi> = _plant.asStateFlow()
     private val _mirage = MutableStateFlow<MirageUi>(MirageUi.Hidden)
     val mirageState: StateFlow<MirageUi> = _mirage.asStateFlow()
 
@@ -201,6 +226,12 @@ class ObjectEditorViewModel(
      * per chi entra solo a correggere un dato).
      */
     private fun onPhotosChanged(list: List<PhotoEntity>) {
+        // Piante: mai automatico (consuma la quota online), solo il pulsante quando c'è una foto.
+        if (plants != null) {
+            val hasPhoto = list.any { it.localPath != null }
+            if (!hasPhoto) _plant.value = PlantUi.Hidden
+            else if (_plant.value == PlantUi.Hidden) _plant.value = PlantUi.Idle
+        }
         val engine = mirage?.takeIf { it.isSupported } ?: return
         val local = localPhotos(list)
         if (local.isEmpty() || local.map { it.id } == analyzedPhotos) return
@@ -254,6 +285,42 @@ class ObjectEditorViewModel(
     fun retryMirage() = analyzePhotos()
 
     fun useSuggestedName(name: String) = setName(name)
+
+    // ---- Piante ----
+
+
+    /** Sull'ultima foto presente sul telefono. */
+    fun identifyPlant() {
+        val identifier = plants ?: return
+        val photo = photos.value.lastOrNull { it.localPath != null }?.localPath?.let { java.io.File(it) }
+        if (photo == null || !photo.exists()) { _plant.value = PlantUi.Failed("Aggiungi una foto della pianta"); return }
+        _plant.value = PlantUi.Identifying
+        viewModelScope.launch {
+            _plant.value = when (val outcome = identifier.identify(photo)) {
+                is PlantOutcome.Found -> PlantUi.Ready(outcome.identification, outcome.note)
+                PlantOutcome.NotAPlant -> PlantUi.NotAPlant
+                is PlantOutcome.NeedsModel -> PlantUi.NeedsModel(outcome.note)
+                is PlantOutcome.Failed -> PlantUi.Failed(outcome.message)
+            }
+        }
+    }
+
+    fun downloadPlantModel() {
+        val model = plantModel ?: return
+        _plant.value = PlantUi.Downloading(0f)
+        viewModelScope.launch {
+            runCatching { model.downloadModel { p -> _plant.value = PlantUi.Downloading(p) } }
+                .onSuccess { identifyPlant() }
+                .onFailure { e -> _plant.value = PlantUi.Failed("Download non riuscito: ${e.message ?: "errore"}. Riprova in Wi-Fi.") }
+        }
+    }
+
+    /** Usa il candidato: nome, categoria "Piante" e specie/famiglia nelle note. */
+    fun usePlant(guess: PlantGuess) {
+        setName(guess.displayName)
+        setCategory(PLANT_CATEGORY)
+        if (!_state.value.notes.contains(guess.noteLine)) addTextToNotes(guess.noteLine)
+    }
 
     // ---- Prestiti ----
 

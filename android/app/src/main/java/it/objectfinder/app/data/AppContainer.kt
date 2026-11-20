@@ -1,5 +1,8 @@
 package it.objectfinder.app.data
 
+import it.objectfinder.app.recognition.PlantGuess
+import it.objectfinder.app.recognition.PlantIdentifier
+import it.objectfinder.app.recognition.PlantEngine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
 import it.objectfinder.app.data.local.LOCAL_PROJECT_ID
@@ -76,6 +79,15 @@ class AppContainer(context: Context) {
             else EmbeddingAccess(project.id, project.canEditObjects)
         },
     )
+
+    /** Piante: Pl@ntNet online (Edge Function) se configurato, altrimenti modello sul telefono. */
+    val plantEngine = PlantEngine(appContext)
+    val plantIdentifier = PlantIdentifier(plantEngine) { photo ->
+        if (authRepository.session.value == null) throw it.objectfinder.app.data.remote.SupabaseException.NotAuthenticated()
+        restApi.identifyPlant(plantEngine.jpegForUpload(photo)).results.map { r ->
+            PlantGuess(r.scientificName, r.genus, r.family, r.score, r.commonNames)
+        }
+    }
 
     /** Suggerimenti dalla foto (Cactus Mirage), solo su ARM e dopo il download del modello. */
     val mirageEngine = MirageEngine(appContext)

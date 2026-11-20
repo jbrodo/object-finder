@@ -6,6 +6,8 @@ name: Edge functions
 #   SUPABASE_URL           già usato per l'APK: da qui si ricava il project ref
 #   RESEND_API_KEY         chiave del servizio email (resend.com)
 #   INVITE_FROM            mittente verificato, es. "Object Finder <inviti@tuodominio.it>"
+#   PLANTNET_API_KEY       facoltativo: chiave my.plantnet.org per il riconoscimento piante online
+#                          (senza, `identify-plant` risponde not_configured e l'app usa il modello offline)
 on:
   push:
     branches: [main]
@@ -35,10 +37,11 @@ jobs:
           deno-version: v2.1.4
 
       - name: Unit tests and type check
-        working-directory: backend/supabase/functions/send-invite
+        working-directory: backend/supabase/functions
         run: |
-          deno test
-          deno check index.ts
+          for fn in send-invite identify-plant; do
+            (cd "$fn" && deno test && deno check index.ts)
+          done
 
   deploy:
     name: Deploy to Supabase
@@ -54,6 +57,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       INVITE_FROM: ${{ secrets.INVITE_FROM }}
+      PLANTNET_API_KEY: ${{ secrets.PLANTNET_API_KEY }}
       SUPABASE_CLI: supabase@2.122.1
     steps:
       - name: Check out source
@@ -79,11 +83,18 @@ jobs:
         if: steps.secrets.outputs.deploy == 'true'
         working-directory: backend
         run: |
-          if [ -z "$RESEND_API_KEY" ] || [ -z "$INVITE_FROM" ]; then
+          : > "$RUNNER_TEMP/functions.env"
+          if [ -n "$RESEND_API_KEY" ] && [ -n "$INVITE_FROM" ]; then
+            printf 'RESEND_API_KEY=%s\nINVITE_FROM=%s\n' "$RESEND_API_KEY" "$INVITE_FROM" >> "$RUNNER_TEMP/functions.env"
+          else
             echo "::warning::RESEND_API_KEY o INVITE_FROM assenti: la funzione risponderà 'invio non configurato' e l'app proporrà la condivisione manuale."
-            exit 0
           fi
-          printf 'RESEND_API_KEY=%s\nINVITE_FROM=%s\n' "$RESEND_API_KEY" "$INVITE_FROM" > "$RUNNER_TEMP/functions.env"
+          if [ -n "$PLANTNET_API_KEY" ]; then
+            printf 'PLANTNET_API_KEY=%s\n' "$PLANTNET_API_KEY" >> "$RUNNER_TEMP/functions.env"
+          else
+            echo "::warning::PLANTNET_API_KEY assente: riconoscimento piante solo sul telefono (modello offline)."
+          fi
+          if [ ! -s "$RUNNER_TEMP/functions.env" ]; then rm -f "$RUNNER_TEMP/functions.env"; exit 0; fi
           npx --yes "$SUPABASE_CLI" secrets set --env-file "$RUNNER_TEMP/functions.env" --project-ref "${{ steps.secrets.outputs.ref }}"
           rm -f "$RUNNER_TEMP/functions.env"
 
@@ -92,3 +103,8 @@ jobs:
         working-directory: backend
         # JWT verificato dentro la funzione (/auth/v1/user): compatibile anche con le nuove chiavi API.
         run: npx --yes "$SUPABASE_CLI" functions deploy send-invite --project-ref "${{ steps.secrets.outputs.ref }}" --no-verify-jwt --use-api
+
+      - name: Deploy identify-plant
+        if: steps.secrets.outputs.deploy == 'true'
+        working-directory: backend
+        run: npx --yes "$SUPABASE_CLI" functions deploy identify-plant --project-ref "${{ steps.secrets.outputs.ref }}" --no-verify-jwt --use-api

@@ -41,6 +41,9 @@
 - [x] Selezione multipla nella lista e foglio A4 di etichette QR (3 × 7)
 - [x] Riconoscimento visivo on-device (MediaPipe Image Embedder, MobileNetV3 large): impronte locali delle foto, classifica per somiglianza + vicinanza, "Registra come nuovo"
 - [x] Impronte condivise sul server (migration 016): un telefono nuovo o un altro membro le scarica invece di riscaricare le foto
+- [x] Riconoscimento piante: Pl@ntNet online tramite Edge Function `identify-plant` (quota, migration 017) + modello PlantCLEF offline (ONNX, 50 MB su richiesta)
+- [ ] Attivare Pl@ntNet online: chiave my.plantnet.org nel secret `PLANTNET_API_KEY` (+ `SUPABASE_ACCESS_TOKEN` per pubblicare le funzioni)
+- [ ] Piante: provare su telefono reale (velocità a 512 px, qualità su foto di casa/orto/rose); nomi comuni italiani anche offline (es. GBIF, licenza da verificare)
 - [ ] Taratura delle soglie di somiglianza sulle foto reali (negli APK debug si vede la percentuale)
 - [x] Suggerimenti dalla foto con Cactus Mirage (nome, testo letto → note o numero di serie), JNI su ARM
 - [ ] Verificare Mirage su telefono ARM reale (velocità, qualità dei nomi in italiano); emulatore x86 non supportato

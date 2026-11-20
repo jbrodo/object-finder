@@ -5,3 +5,7 @@ project_id = "object-finder"
 [functions.send-invite]
 # Il token del chiamante è verificato dentro la funzione (GET /auth/v1/user).
 verify_jwt = false
+
+[functions.identify-plant]
+# Token del chiamante verificato dentro la funzione; la chiave Pl@ntNet è un secret della funzione.
+verify_jwt = false

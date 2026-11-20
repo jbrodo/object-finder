@@ -212,6 +212,27 @@ l'app propone la condivisione manuale dell'invito. Limiti anti-spam: un reinvio 
 invito, 50 email al giorno per progetto (migration 011); il destinatario è sempre quello salvato
 nell'invito, mai un indirizzo scelto dal client.
 
+## Riconoscimento piante
+Nell'editor, quando c'è una foto, la scheda **"È una pianta?"** propone fino a 5 specie con la
+percentuale; un tocco compila nome, categoria "Piante" e specie/famiglia nelle note. Mai automatico.
+
+- **Online (Pl@ntNet)**: flora mondiale, comprese piante d'appartamento e da orto, nomi comuni in
+  italiano. L'app manda la foto (lato corto 1280 px) alla Edge Function
+  `backend/supabase/functions/identify-plant`, che tiene la chiave e la inoltra a Pl@ntNet; la foto
+  non viene salvata. Quota (migration 017): 20 al giorno per utente e 450 in totale, sotto le 500
+  gratuite di Pl@ntNet (modificabili con i secret della funzione `PLANT_USER_DAILY` e `PLANT_GLOBAL_DAILY`).
+- **Sul telefono (offline)**: modello pubblico `PlantNet/mobilenetv4-conv-s-plantclef2024`
+  (Apache-2.0, 7.806 specie della flora europea sud-occidentale, ONNX Runtime), scaricato una volta
+  su richiesta (50 MB, revisione e SHA-256 fissati); etichette nell'APK. Copre orto e giardino solo in
+  parte e quasi nessuna pianta d'appartamento; le rose da giardino vengono riconosciute come genere
+  *Rosa*. Solo telefoni a 64 bit (sui 32 bit le piante si riconoscono solo online).
+
+L'app usa Pl@ntNet quando c'è un account e la funzione è configurata, altrimenti (o senza rete, o a
+quota finita, con un avviso) il modello sul telefono. **Per attivare l'online**: creare una chiave su
+[my.plantnet.org](https://my.plantnet.org), aggiungerla come secret del repository
+`PLANTNET_API_KEY` (oltre a `SUPABASE_ACCESS_TOKEN`) e avviare Actions → Edge functions → Run
+workflow. Non serve una nuova release dell'app.
+
 ## Note di sicurezza
 - Non inserire mai la `service_role` key nell'app: solo anon/publishable key con RLS.
 - I token di sessione sono cifrati con AES-256-GCM (chiave nell'Android Keystore, non estraibile) in

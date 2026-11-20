@@ -172,6 +172,18 @@ data class ObjectReadDto(
 )
 
 @Serializable
+data class PlantIdResultDto(
+    @SerialName("scientific_name") val scientificName: String,
+    val genus: String = "",
+    val family: String = "",
+    @SerialName("common_names") val commonNames: List<String> = emptyList(),
+    val score: Float = 0f,
+)
+
+@Serializable
+data class PlantIdResponseDto(val results: List<PlantIdResultDto> = emptyList(), val remaining: Int? = null)
+
+@Serializable
 data class EmbeddingRowDto(
     @SerialName("photo_id") val photoId: String,
     val model: String,
@@ -492,6 +504,15 @@ class SupabaseRestApi(
             }
         }
     }
+
+    /** Edge Function `identify-plant`: foto JPEG → specie da Pl@ntNet (chiave solo sul server). */
+    suspend fun identifyPlant(jpeg: ByteArray): PlantIdResponseDto = authorized { token ->
+        http.client.post("${http.baseUrl}/functions/v1/identify-plant") {
+            auth(token)
+            contentType(ContentType.Image.JPEG)
+            setBody(jpeg)
+        }
+    }.body()
 
     suspend fun acceptMyInvites(): Int = rpc("accept_my_invites", NoArgs()).body<Int>()
 

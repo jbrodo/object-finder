@@ -308,6 +308,8 @@ fun ObjectFinderApp(
                     initialPhoto = initialPhoto,
                     mirage = container.mirageEngine,
                     places = container.placeRepository,
+                    plants = container.plantIdentifier,
+                    plantModel = container.plantEngine,
                 )
             }
             val active by container.settings.activeProject.collectAsStateWithLifecycle()
