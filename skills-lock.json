@@ -85,6 +85,20 @@
       "skillPath": "skills/design-system/SKILL.md",
       "computedHash": "2913be4d68c05d341ee7e07cc4ea7539004c6885a8e19dd2e2f23c40636868bd"
     },
+    "edge-to-edge": {
+      "source": "android/skills",
+      "commit": "c72942584fff970dac86ced78b367fce0c441e52",
+      "sourceType": "github",
+      "skillPath": "system/edge-to-edge/SKILL.md",
+      "computedHash": "954c391ab845f97ce160c04c3944d6c6da3c7ad0385970353b314ee2a3aabea2"
+    },
+    "engage-sdk-integration": {
+      "source": "android/skills",
+      "commit": "c72942584fff970dac86ced78b367fce0c441e52",
+      "sourceType": "github",
+      "skillPath": "play/engage-sdk-integration/SKILL.md",
+      "computedHash": "dacadf87c68d11fade457e6e0be73985698dc80ceb383252b9bce18e21dd6ce6"
+    },
     "flutter-dart-code-review": {
       "source": "affaan-m/ECC",
       "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
@@ -112,6 +126,13 @@
       "sourceType": "github",
       "skillPath": "skills/java-coding-standards/SKILL.md",
       "computedHash": "11df0ff4be3c05e6edf33ab47709c525fb884090b424f5c76da4610f15b0f83a"
+    },
+    "jetpack-compose-performance": {
+      "source": "android/skills",
+      "commit": "c72942584fff970dac86ced78b367fce0c441e52",
+      "sourceType": "github",
+      "skillPath": "jetpack-compose/jetpack-compose-performance/SKILL.md",
+      "computedHash": "a66ab42a03f6b559bfd1c8325e242ff65d276c173a7ef8e889837c311d179d49"
     },
     "kotlin-coroutines-flows": {
       "source": "affaan-m/ECC",
