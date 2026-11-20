@@ -57,6 +57,13 @@
       "skillPath": "skills/backend-patterns/SKILL.md",
       "computedHash": "e39330205cf49940fb809109a690b87afbbca5d2e86269267abb8416d2093c15"
     },
+    "camerax": {
+      "source": "android/skills",
+      "commit": "c72942584fff970dac86ced78b367fce0c441e52",
+      "sourceType": "github",
+      "skillPath": "camera/camerax/SKILL.md",
+      "computedHash": "287fb330c1c5997da46df71ea6a0a6813be8a7a860eb5498ce483b4bf151a71f"
+    },
     "coding-standards": {
       "source": "affaan-m/ECC",
       "commit": "3f14a103a8694e51c1df9a806217a6d0b5f7a6f7",
