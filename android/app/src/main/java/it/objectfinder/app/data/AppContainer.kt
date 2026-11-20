@@ -1,5 +1,12 @@
 package it.objectfinder.app.data
 
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterIsInstance
+import it.objectfinder.app.data.local.LOCAL_PROJECT_ID
+import it.objectfinder.app.data.remote.EmbeddingRowDto
+import it.objectfinder.app.recognition.EmbeddingAccess
+import it.objectfinder.app.recognition.SharedEmbeddings
+import java.util.Base64
 import android.content.Context
 import it.objectfinder.app.export.InventoryExporter
 import kotlinx.coroutines.CoroutineScope
@@ -56,6 +63,18 @@ class AppContainer(context: Context) {
     val recognitionRepository = RecognitionRepository(
         ImageEmbedderEngine(appContext), database.photoEmbeddingDao(), database.objectDao(), settings,
         withTemporaryCopy = { photo, use -> photoRepository.withTemporaryCopy(photo, use) },
+        shared = object : SharedEmbeddings {
+            override suspend fun fetch(photoIds: List<String>, model: String) =
+                restApi.listEmbeddings(photoIds, model).associate { it.photoId to Base64.getDecoder().decode(it.vector) }
+
+            override suspend fun push(model: String, rows: Map<String, ByteArray>) =
+                restApi.insertEmbeddings(rows.map { (id, v) -> EmbeddingRowDto(id, model, Base64.getEncoder().encodeToString(v)) })
+        },
+        access = {
+            val project = settings.activeProject.value
+            if (authRepository.session.value == null || project == null || project.id == LOCAL_PROJECT_ID) null
+            else EmbeddingAccess(project.id, project.canEditObjects)
+        },
     )
 
     /** Suggerimenti dalla foto (Cactus Mirage), solo su ARM e dopo il download del modello. */
@@ -64,5 +83,13 @@ class AppContainer(context: Context) {
     /** Calcolo in background delle impronte mancanti (foto nuove, scaricate, cambio modello). */
     fun indexPhotosInBackground() {
         appScope.launch { runCatching { recognitionRepository.indexMissing() } }
+    }
+
+    init {
+        // Dopo ogni sincronizzazione: foto nuove dal server (impronte da scaricare) o appena
+        // caricate (impronte da inviare).
+        appScope.launch {
+            settings.syncState.filterIsInstance<SyncState.Done>().distinctUntilChanged().collect { indexPhotosInBackground() }
+        }
     }
 }

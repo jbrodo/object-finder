@@ -172,6 +172,14 @@ data class ObjectReadDto(
 )
 
 @Serializable
+data class EmbeddingRowDto(
+    @SerialName("photo_id") val photoId: String,
+    val model: String,
+    /** float32 little-endian in base64. */
+    val vector: String,
+)
+
+@Serializable
 data class PlaceRowDto(
     val id: String,
     @SerialName("project_id") val projectId: String,
@@ -414,6 +422,30 @@ class SupabaseRestApi(
             http.client.delete("$rest/places") {
                 auth(token)
                 parameter("id", "eq.$id")
+            }
+        }
+    }
+
+    // ---- Impronte del riconoscimento (tabella photo_embeddings, migration 016) ----
+
+    suspend fun listEmbeddings(photoIds: List<String>, model: String): List<EmbeddingRowDto> = authorized { token ->
+        http.client.get("$rest/photo_embeddings") {
+            auth(token)
+            parameter("select", "photo_id,model,vector")
+            parameter("model", "eq.$model")
+            parameter("photo_id", "in.(${photoIds.joinToString(",")})")
+        }
+    }.body()
+
+    /** Inserisce le impronte; quelle già presenti (stessa foto e modello) restano com'erano. */
+    suspend fun insertEmbeddings(rows: List<EmbeddingRowDto>) {
+        authorized { token ->
+            http.client.post("$rest/photo_embeddings") {
+                auth(token)
+                parameter("on_conflict", "photo_id,model")
+                header("Prefer", "resolution=ignore-duplicates,return=minimal")
+                contentType(ContentType.Application.Json)
+                setBody(rows)
             }
         }
     }

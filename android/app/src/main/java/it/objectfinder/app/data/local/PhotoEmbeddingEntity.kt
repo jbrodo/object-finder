@@ -9,7 +9,8 @@ import androidx.room.Query
 
 /**
  * Impronta numerica (embedding) di una foto, per riconoscere gli oggetti inquadrandoli.
- * Calcolata e usata solo sul telefono: non viene sincronizzata (si ricalcola dalle foto).
+ * Calcolata sul telefono e condivisa sul server (migration 016): un telefono nuovo la scarica
+ * invece di scaricare tutte le foto per ricalcolarla.
  */
 @Entity(tableName = "photo_embeddings")
 data class PhotoEmbeddingEntity(
@@ -20,6 +21,8 @@ data class PhotoEmbeddingEntity(
     /** Modello che l'ha prodotta: cambiando modello le impronte vecchie si ricalcolano. */
     val model: String,
     val createdAt: Long = System.currentTimeMillis(),
+    /** Già sul server (scaricata da lì o inviata). */
+    val uploaded: Boolean = false,
 ) {
     override fun equals(other: Any?) = other is PhotoEmbeddingEntity && other.photoId == photoId && other.model == model
     override fun hashCode() = photoId.hashCode()
@@ -51,6 +54,18 @@ interface PhotoEmbeddingDao {
             "ORDER BY (p.localPath IS NULL), p.createdAt"
     )
     suspend fun photosWithoutEmbedding(model: String): List<PhotoEntity>
+
+    /** Impronte da inviare: foto già sul server, oggetti del progetto indicato. */
+    @Query(
+        "SELECT e.* FROM photo_embeddings e " +
+            "JOIN object_photos p ON p.id = e.photoId AND p.syncStatus = 'synced' " +
+            "JOIN objects o ON o.id = e.objectId " +
+            "WHERE e.model = :model AND e.uploaded = 0 AND o.projectId = :projectId"
+    )
+    suspend fun notUploaded(projectId: String, model: String): List<PhotoEmbeddingEntity>
+
+    @Query("UPDATE photo_embeddings SET uploaded = 1 WHERE model = :model AND photoId IN (:photoIds)")
+    suspend fun markUploaded(photoIds: List<String>, model: String)
 
     /** Impronte di foto non più esistenti o di un modello precedente. */
     @Query(
