@@ -1,5 +1,10 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filterNotNull
@@ -155,7 +160,11 @@ fun InAppCamera(
         )
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            // Schermo intero edge-to-edge: si disegna sotto le barre, i comandi usano gli inset.
+            decorFitsSystemWindows = false,
+        )) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             surfaceRequest?.let { request ->
                 CameraXViewfinder(
@@ -177,6 +186,12 @@ fun InAppCamera(
                 )
             }
             GuideFrame(Modifier.fillMaxSize())
+            // Protezione della barra di stato: ora e icone leggibili anche su un'anteprima chiara.
+            Box(
+                Modifier.fillMaxWidth()
+                    .windowInsetsTopHeight(WindowInsets.statusBars.add(WindowInsets(top = 24.dp)))
+                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent))),
+            )
 
             val chrome = IconButtonDefaults.iconButtonColors(
                 containerColor = Color.Black.copy(alpha = 0.45f),

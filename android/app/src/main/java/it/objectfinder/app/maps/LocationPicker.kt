@@ -85,7 +85,11 @@ fun LocationPickerDialog(
     var locating by remember { mutableStateOf(false) }
     val zoom = if (start == null) 6f else 19f
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            // Schermo intero edge-to-edge: si disegna sotto le barre, i comandi usano gli inset.
+            decorFitsSystemWindows = false,
+        )) {
         Box(Modifier.fillMaxSize()) {
             when (MapEngine.resolve(engine)) {
                 MapEngine.GOOGLE_MAPS -> GooglePicker(initial, zoom, recenter, onCenter = { center = it })

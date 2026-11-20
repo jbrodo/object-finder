@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui.projects
 
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import it.objectfinder.app.data.InviteEmail
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.foundation.clickable
@@ -94,7 +97,8 @@ fun ProjectsScreen(viewModel: ProjectsViewModel, onBack: () -> Unit) {
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        // Inset in basso come contentPadding: l'elenco scorre sotto la barra di navigazione.
+        Column(Modifier.fillMaxSize().padding(padding.withoutBottom()).consumeWindowInsets(padding)) {
             if (state.op.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             Text(
                 "Ogni progetto ha il suo archivio di oggetti e i suoi membri. " +
@@ -103,7 +107,7 @@ fun ProjectsScreen(viewModel: ProjectsViewModel, onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),
             )
-            LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
+            LazyColumn(contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
                 items(state.projects, key = { it.id }) { project ->
                     ProjectRow(project, active = project.id == state.activeId, onClick = { viewModel.select(project) })
                     HorizontalDivider()
@@ -179,7 +183,8 @@ fun MembersScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        // Inset in basso come contentPadding: l'elenco scorre sotto la barra di navigazione.
+        Column(Modifier.fillMaxSize().padding(padding.withoutBottom()).consumeWindowInsets(padding)) {
             if (state.op.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (!canManage) {
                 Text(
@@ -189,7 +194,7 @@ fun MembersScreen(
                     modifier = Modifier.padding(16.dp),
                 )
             }
-            LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
+            LazyColumn(contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
                 if (state.invites.isNotEmpty()) {
                     item(key = "invites-header") {
                         Text(
@@ -448,4 +453,15 @@ private fun shareInviteText(context: Context, text: String) {
 @Composable
 private fun BackButton(onBack: () -> Unit) {
     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro") }
+}
+
+/** Gli inset di [Scaffold] tranne quello in basso (da passare come contentPadding agli elenchi). */
+@Composable
+private fun PaddingValues.withoutBottom(): PaddingValues {
+    val direction = androidx.compose.ui.platform.LocalLayoutDirection.current
+    return PaddingValues(
+        start = calculateStartPadding(direction),
+        top = calculateTopPadding(),
+        end = calculateEndPadding(direction),
+    )
 }

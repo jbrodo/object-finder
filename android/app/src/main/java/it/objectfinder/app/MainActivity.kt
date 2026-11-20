@@ -20,6 +20,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // C'è una NavigationBar in basso: niente velo semitrasparente del sistema sopra i suoi colori.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         if (savedInstanceState == null) pendingLink.value = intent.viewData()
         val container = (application as ObjectFinderApplication).container
         setContent {

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -216,7 +217,11 @@ private fun PhotoViewer(photo: PhotoEntity, canDelete: Boolean, onDismiss: () ->
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Annulla") } },
         )
     }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            // Schermo intero edge-to-edge: si disegna sotto le barre, i comandi usano gli inset.
+            decorFitsSystemWindows = false,
+        )) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             photo.localPath?.let { path ->
                 AsyncImage(
@@ -230,11 +235,11 @@ private fun PhotoViewer(photo: PhotoEntity, canDelete: Boolean, onDismiss: () ->
                 containerColor = Color.Black.copy(alpha = 0.5f),
                 contentColor = Color.White,
             )
-            IconButton(onClick = onDismiss, colors = buttonColors, modifier = Modifier.align(Alignment.TopStart).padding(16.dp)) {
+            IconButton(onClick = onDismiss, colors = buttonColors, modifier = Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(16.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Chiudi")
             }
             if (canDelete) {
-                IconButton(onClick = { confirmDelete = true }, colors = buttonColors, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
+                IconButton(onClick = { confirmDelete = true }, colors = buttonColors, modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(16.dp)) {
                     Icon(Icons.Default.Delete, contentDescription = "Elimina foto")
                 }
             }
