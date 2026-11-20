@@ -27,4 +27,8 @@ data class MapMarker(
     val snippet: String,
     val latitude: Double,
     val longitude: Double,
+    /** Incertezza del GPS (null se punto indicato a mano o sconosciuta). */
+    val accuracyMeters: Float? = null,
+    val approximate: Boolean = false,
+    val manual: Boolean = false,
 )

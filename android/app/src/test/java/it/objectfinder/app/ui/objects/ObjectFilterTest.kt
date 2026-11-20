@@ -57,4 +57,16 @@ class ObjectFilterTest {
         val inGarage = obj("Trapano", ObjectStatus.ACTIVE).copy(place = "Garage, scaffale alto")
         assertEquals(listOf("Trapano"), filterObjects(listOf(inGarage), "garage", ObjectFilter.ACTIVE).map { it.name })
     }
+
+    @Test
+    fun `list says when a position is approximate or set by hand`() {
+        val base = obj("x", ObjectStatus.ACTIVE).copy(latitude = 45.0, longitude = 9.0)
+        val approx = base.copy(accuracyMeters = 40f)
+        val manual = base.copy(accuracyMeters = null, locationSource = "manual")
+        assertEquals("Punto GPS approssimato · ±40 m", locationLine(approx, null))
+        assertEquals("a 85 m da te · approssimata ±40 m", locationLine(approx, 85.0))
+        assertEquals("Punto indicato sulla mappa", locationLine(manual, null))
+        assertEquals("a 85 m da te · indicata sulla mappa", locationLine(manual, 85.0))
+        assertEquals("Punto GPS salvato · ±8 m", locationLine(base.copy(accuracyMeters = 8f), null))
+    }
 }

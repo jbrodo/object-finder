@@ -4,6 +4,7 @@ import it.objectfinder.app.data.local.ConflictKind
 import it.objectfinder.app.data.local.DEFAULT_CATEGORY
 import it.objectfinder.app.data.local.PLACE_MAX
 import it.objectfinder.app.data.local.LOCAL_PROJECT_ID
+import it.objectfinder.app.data.local.LocationSource
 import it.objectfinder.app.data.local.ObjectConflictDao
 import it.objectfinder.app.data.local.ObjectConflictEntity
 import it.objectfinder.app.data.local.ObjectDao
@@ -34,6 +35,7 @@ data class ObjectDraft(
     val longitude: Double?,
     val accuracyMeters: Float?,
     val place: String = "",
+    val locationSource: LocationSource = LocationSource.GPS,
 )
 
 class ObjectRepository(
@@ -88,7 +90,8 @@ class ObjectRepository(
             status = draft.status.wire,
             latitude = draft.latitude,
             longitude = draft.longitude,
-            accuracyMeters = draft.accuracyMeters,
+            accuracyMeters = draft.accuracyMeters.takeIf { draft.locationSource == LocationSource.GPS },
+            locationSource = draft.locationSource.wire,
             createdAt = now(),
             updatedAt = now(),
         )
@@ -100,7 +103,10 @@ class ObjectRepository(
     private suspend fun recordPosition(item: ObjectEntity) {
         val lat = item.latitude ?: return
         val lon = item.longitude ?: return
-        history.record(item.id, lat, lon, item.accuracyMeters)
+        history.record(
+            item.id, lat, lon, item.accuracyMeters,
+            source = if (item.isManualLocation) LocationSource.MANUAL.wire else "phone",
+        )
     }
 
     suspend fun update(id: String, draft: ObjectDraft) {
@@ -114,7 +120,8 @@ class ObjectRepository(
                 status = draft.status.wire,
                 latitude = draft.latitude,
                 longitude = draft.longitude,
-                accuracyMeters = draft.accuracyMeters,
+                accuracyMeters = draft.accuracyMeters.takeIf { draft.locationSource == LocationSource.GPS },
+                locationSource = draft.locationSource.wire,
                 syncStatus = statusAfterLocalEdit(existing),
                 updatedAt = now(),
             )

@@ -17,6 +17,10 @@ import it.objectfinder.app.data.Geo
 data class MarkerGroup(val latitude: Double, val longitude: Double, val items: List<MapMarker>) {
     val key: String get() = items.first().id
     val label: String get() = if (items.size == 1) items[0].title else "${items.size} oggetti"
+    /** Tutti i punti del gruppo sono approssimati: il segnaposto lo mostra (stile vuoto). */
+    val approximate: Boolean get() = items.all { it.approximate }
+    /** Raggio del cerchio di incertezza: la peggiore tra le posizioni GPS del gruppo. */
+    val uncertaintyMeters: Float? get() = items.mapNotNull { it.accuracyMeters }.maxOrNull()
 }
 
 /** Raggruppamento greedy: ogni segnaposto entra nel primo gruppo entro [radiusMeters] dal suo capostipite. */
@@ -36,9 +40,17 @@ fun groupMarkers(markers: List<MapMarker>, radiusMeters: Double = 15.0): List<Ma
  * Etichetta-segnaposto con il nome (o il conteggio) disegnata come bitmap, uguale per Google Maps
  * e OpenStreetMap. Il punto esatto è la punta in basso al centro (ancora 0.5, 1.0).
  */
-fun labelPinBitmap(text: String, background: Int, foreground: Int, density: Float): Bitmap {
+fun labelPinBitmap(
+    text: String,
+    background: Int,
+    foreground: Int,
+    density: Float,
+    /** Posizione approssimata: etichetta vuota (fondo chiaro, bordo e testo colorati). */
+    outlined: Boolean = false,
+    surface: Int = android.graphics.Color.WHITE,
+): Bitmap {
     val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = foreground
+        color = if (outlined) background else foreground
         textSize = 13f * density
         typeface = Typeface.DEFAULT_BOLD
     }
@@ -54,16 +66,28 @@ fun labelPinBitmap(text: String, background: Int, foreground: Int, density: Floa
     val height = (boxHeight + pointer).toInt()
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = background }
+    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = if (outlined) surface else background }
     val radius = boxHeight / 2
-    canvas.drawRoundRect(RectF(0f, 0f, width.toFloat(), boxHeight), radius, radius, fill)
+    val box = RectF(0f, 0f, width.toFloat(), boxHeight)
+    canvas.drawRoundRect(box, radius, radius, fill)
+    if (outlined) {
+        val stroke = 2f * density
+        val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = background
+            style = Paint.Style.STROKE
+            strokeWidth = stroke
+            pathEffect = android.graphics.DashPathEffect(floatArrayOf(4f * density, 3f * density), 0f)
+        }
+        val inset = stroke / 2
+        canvas.drawRoundRect(RectF(inset, inset, width - inset, boxHeight - inset), radius - inset, radius - inset, border)
+    }
     val tip = Path().apply {
         moveTo(width / 2f - pointer, boxHeight - 1)
         lineTo(width / 2f + pointer, boxHeight - 1)
         lineTo(width / 2f, height.toFloat())
         close()
     }
-    canvas.drawPath(tip, fill)
+    canvas.drawPath(tip, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = background })
     canvas.drawText(label, (width - textWidth) / 2f, padV - metrics.ascent, textPaint)
     return bitmap
 }

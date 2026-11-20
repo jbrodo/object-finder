@@ -30,6 +30,7 @@ object SyncMerge {
             latitude = remote.latitude,
             longitude = remote.longitude,
             accuracyMeters = remote.accuracyMeters,
+            locationSource = remote.locationSource,
             status = remote.status,
             syncStatus = SyncStatus.SYNCED.wire,
             createdAt = local?.createdAt ?: parseEpochMillis(remote.createdAt) ?: System.currentTimeMillis(),
@@ -68,14 +69,16 @@ object SyncMerge {
             local.status == server.status &&
             local.latitude == server.latitude &&
             local.longitude == server.longitude &&
-            local.accuracyMeters == server.accuracyMeters
+            local.accuracyMeters == server.accuracyMeters &&
+            local.locationSource == server.locationSource
 
     data class FieldDiff(val label: String, val mine: String, val theirs: String)
 
     /** Campi diversi tra la versione locale e quella del server, per la schermata di scelta. */
     fun diff(local: ObjectEntity, server: ObjectReadDto): List<FieldDiff> {
-        fun pos(lat: Double?, lon: Double?) =
-            if (lat == null || lon == null) "nessuna" else String.format(java.util.Locale.ROOT, "%.5f, %.5f", lat, lon)
+        fun pos(lat: Double?, lon: Double?, source: String) =
+            if (lat == null || lon == null) "nessuna"
+            else String.format(java.util.Locale.ROOT, "%.5f, %.5f", lat, lon) + if (source == "manual") " (a mano)" else ""
         return listOfNotNull(
             FieldDiff("Nome", local.name, server.name).takeIf { it.mine != it.theirs },
             FieldDiff("Categoria", local.category, server.category).takeIf { it.mine != it.theirs },
@@ -88,8 +91,8 @@ object SyncMerge {
             FieldDiff("Note", local.notes.ifBlank { "—" }, server.notes.ifBlank { "—" }).takeIf { it.mine != it.theirs },
             FieldDiff(
                 "Posizione",
-                pos(local.latitude, local.longitude),
-                pos(server.latitude, server.longitude),
+                pos(local.latitude, local.longitude, local.locationSource),
+                pos(server.latitude, server.longitude, server.locationSource),
             ).takeIf { it.mine != it.theirs },
         )
     }
@@ -146,6 +149,7 @@ object SyncMerge {
         latitude = entity.latitude,
         longitude = entity.longitude,
         accuracyMeters = entity.accuracyMeters,
+        locationSource = entity.locationSource,
     )
 
     fun parseEpochMillis(iso: String?): Long? =

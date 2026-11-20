@@ -1,5 +1,9 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.maps.PickerStart
+import it.objectfinder.app.maps.MapEngine
+import it.objectfinder.app.maps.LocationPickerDialog
+import androidx.compose.material.icons.filled.EditLocationAlt
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -92,9 +96,11 @@ fun ObjectEditorScreen(
     readOnly: Boolean = false,
     objectId: String? = null,
     canDelete: Boolean = false,
+    mapEngine: MapEngine = MapEngine.OPEN_STREET_MAP,
 ) {
     var showLabel by remember { mutableStateOf(false) }
     var showNfc by remember { mutableStateOf(false) }
+    var showPicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -256,6 +262,18 @@ fun ObjectEditorScreen(
                 dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Continua a modificare") } },
             )
         }
+        if (showPicker) {
+            LocationPickerDialog(
+                start = pickerStart(state),
+                engine = mapEngine,
+                onConfirm = { lat, lon ->
+                    showPicker = false
+                    // In consultazione si salva subito; nel modulo si salva con il resto.
+                    if (state.editing) viewModel.setManualLocation(lat, lon) else viewModel.saveManualLocation(lat, lon)
+                },
+                onDismiss = { showPicker = false },
+            )
+        }
         if (showNfc && objectId != null) {
             NfcWriteDialog(objectId = objectId, title = state.name, onDismiss = { showNfc = false })
         }
@@ -304,6 +322,8 @@ fun ObjectEditorScreen(
                     history = history,
                     readOnly = readOnly,
                     onMoveHere = { permission.withPermission(viewModel::moveHere) },
+                    onPickOnMap = { showPicker = true },
+                    onUseBestNow = viewModel::useBestFixNow,
                     onDescribe = viewModel::startEditing,
                 )
                 PhotoSection(
@@ -354,6 +374,8 @@ fun ObjectEditorScreen(
                 PositionEditor(
                     state = state,
                     onCapture = { permission.withPermission(viewModel::captureLocation) },
+                    onPickOnMap = { showPicker = true },
+                    onUseBestNow = viewModel::useBestFixNow,
                     onClear = viewModel::clearLocation,
                 )
                 if (state.isNew) {
@@ -404,6 +426,8 @@ private fun WherePanel(
     history: List<LocationHistoryEntity>,
     readOnly: Boolean,
     onMoveHere: () -> Unit,
+    onPickOnMap: () -> Unit,
+    onUseBestNow: () -> Unit,
     onDescribe: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -431,10 +455,13 @@ private fun WherePanel(
                     since?.let { "aggiornata ${PlaceFormat.age(it, System.currentTimeMillis())}" },
                 ).joinToString(" · ")
                 if (facts.isNotEmpty()) Text(facts, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    PlaceFormat.coordinates(state.latitude!!, state.longitude!!, state.accuracyMeters),
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                Text(precisionLine(state), style = MaterialTheme.typography.bodySmall)
+                if (state.isApproximate && !readOnly) {
+                    Text(
+                        "Il GPS era impreciso (±${state.accuracyMeters!!.toInt()} m): se sai dov'è, correggi il punto sulla mappa.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
                 Button(
                     onClick = { navigateTo(context, state.latitude!!, state.longitude!!) },
                     modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
@@ -455,11 +482,16 @@ private fun WherePanel(
                     else Icon(Icons.Default.MyLocation, contentDescription = null, Modifier.size(18.dp))
                     Text(
                         when {
-                            state.locating -> "  Rilevo la posizione…"
+                            state.locating -> "  " + locatingLabel(state)
                             state.hasLocation -> "  L'ho spostato qui"
                             else -> "  Registra la posizione qui"
                         }
                     )
+                }
+                LocatingControls(state, onUseBestNow)
+                TextButton(onClick = onPickOnMap, enabled = !state.locating) {
+                    Icon(Icons.Default.EditLocationAlt, contentDescription = null, Modifier.size(18.dp))
+                    Text(if (state.hasLocation) "  Correggi il punto sulla mappa" else "  Indica il punto sulla mappa")
                 }
             }
         }
@@ -487,32 +519,81 @@ private fun PlaceField(value: String, onChange: (String) -> Unit) {
 
 /** Punto GPS nel modulo: stato dell'acquisizione sempre visibile. */
 @Composable
-private fun PositionEditor(state: EditorState, onCapture: () -> Unit, onClear: () -> Unit) {
+private fun PositionEditor(
+    state: EditorState,
+    onCapture: () -> Unit,
+    onPickOnMap: () -> Unit,
+    onUseBestNow: () -> Unit,
+    onClear: () -> Unit,
+) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Punto GPS", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
             Text(
                 when {
-                    state.locating -> "Rilevo la posizione…"
-                    state.hasLocation -> PlaceFormat.coordinates(state.latitude!!, state.longitude!!, state.accuracyMeters)
+                    state.locating -> locatingLabel(state)
+                    state.hasLocation -> precisionLine(state)
                     else -> "Nessuna posizione salvata"
                 },
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedButton(onClick = onCapture, enabled = !state.locating) {
+            if (state.isApproximate) {
+                Text(
+                    "Impreciso: al chiuso il GPS sbaglia. Se sai dov'è, indicalo sulla mappa.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            LocatingControls(state, onUseBestNow)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onCapture, enabled = !state.locating, modifier = Modifier.weight(1f)) {
                     if (state.locating) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     else Icon(Icons.Default.MyLocation, contentDescription = null, Modifier.size(18.dp))
-                    Text(if (state.hasLocation) "  Aggiorna" else "  Usa posizione attuale")
+                    Text(if (state.hasLocation) "  GPS" else "  Usa GPS")
                 }
-                Spacer(Modifier.weight(1f))
-                // Lontano da "Aggiorna": toglie un dato, non deve partire per sbaglio.
-                if (state.hasLocation && !state.locating) {
-                    TextButton(onClick = onClear) { Text("Rimuovi", color = MaterialTheme.colorScheme.error) }
+                OutlinedButton(onClick = onPickOnMap, enabled = !state.locating, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.EditLocationAlt, contentDescription = null, Modifier.size(18.dp))
+                    Text("  Sulla mappa")
                 }
+            }
+            // Separato dai pulsanti di acquisizione: toglie un dato, non deve partire per sbaglio.
+            if (state.hasLocation && !state.locating) {
+                TextButton(onClick = onClear) { Text("Rimuovi posizione", color = MaterialTheme.colorScheme.error) }
             }
         }
     }
+}
+
+/** "±5 m", "approssimata ±40 m" o "indicata a mano", con le coordinate. */
+private fun precisionLine(state: EditorState): String {
+    val coords = PlaceFormat.coordinates(state.latitude!!, state.longitude!!, null)
+    return when {
+        state.isManualLocation -> "Indicata a mano sulla mappa · $coords"
+        state.accuracyMeters == null -> coords
+        state.isApproximate -> "Approssimata ±${state.accuracyMeters.toInt()} m · $coords"
+        else -> "Precisione ±${state.accuracyMeters.toInt()} m · $coords"
+    }
+}
+
+private fun locatingLabel(state: EditorState): String =
+    state.liveAccuracy?.let { "Cerco un segnale migliore… ±${it.toInt()} m" } ?: "Rilevo la posizione…"
+
+/** Durante il rilevamento: si può accettare subito il fix migliore trovato finora. */
+@Composable
+private fun LocatingControls(state: EditorState, onUseBestNow: () -> Unit) {
+    if (state.locating && state.liveAccuracy != null) {
+        TextButton(onClick = onUseBestNow) { Text("Usa comunque (±${state.liveAccuracy.toInt()} m)") }
+    }
+}
+
+/** Il selettore parte dal punto dell'oggetto (con la sua incertezza) o dalla posizione del telefono. */
+private fun pickerStart(state: EditorState): PickerStart? = when {
+    state.hasLocation -> PickerStart(
+        state.latitude!!, state.longitude!!,
+        state.accuracyMeters.takeIf { !state.isManualLocation },
+    )
+    state.origin != null -> PickerStart(state.origin.latitude, state.origin.longitude)
+    else -> null
 }
 
 @Composable

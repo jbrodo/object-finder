@@ -87,7 +87,12 @@ fun List<ObjectEntity>.toMarkers(): List<MapMarker> = mapNotNull { item ->
     val lon = item.longitude ?: return@mapNotNull null
     // Sottotitolo utile per riconoscerlo: il "dove" scritto, altrimenti la categoria se non è quella predefinita.
     val subtitle = item.place.ifBlank { item.category.takeUnless(::isDefaultCategory).orEmpty() }
-    MapMarker(item.id, item.name, subtitle, lat, lon)
+    MapMarker(
+        item.id, item.name, subtitle, lat, lon,
+        accuracyMeters = item.accuracyMeters.takeIf { !item.isManualLocation },
+        approximate = item.isApproximate,
+        manual = item.isManualLocation,
+    )
 }
 
 @Composable
@@ -105,7 +110,11 @@ fun ObjectMapScreen(
     var selectedKey by remember { mutableStateOf<String?>(null) }
     val selected = groups.firstOrNull { it.key == selectedKey }
     BackHandler(enabled = selected != null) { selectedKey = null }
-    val pinColors = PinColors(MaterialTheme.colorScheme.primary.toArgb(), MaterialTheme.colorScheme.onPrimary.toArgb())
+    val pinColors = PinColors(
+        MaterialTheme.colorScheme.primary.toArgb(),
+        MaterialTheme.colorScheme.onPrimary.toArgb(),
+        MaterialTheme.colorScheme.surface.toArgb(),
+    )
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -163,9 +172,9 @@ fun ObjectMapScreen(
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
             when (engine) {
                 MapEngine.GOOGLE_MAPS ->
-                    GoogleObjectsMap(groups, focus, hasPermission, pinColors, { selectedKey = it.key }, Modifier.fillMaxSize())
+                    GoogleObjectsMap(groups, focus, hasPermission, pinColors, selected, { selectedKey = it.key }, Modifier.fillMaxSize())
                 MapEngine.OPEN_STREET_MAP ->
-                    OsmObjectsMap(groups, focus, hasPermission, pinColors, { selectedKey = it.key }, Modifier.fillMaxSize())
+                    OsmObjectsMap(groups, focus, hasPermission, pinColors, selected, { selectedKey = it.key }, Modifier.fillMaxSize())
             }
             SmallFloatingActionButton(
                 onClick = {
@@ -212,6 +221,7 @@ private fun GoogleObjectsMap(
     focus: MapFocus?,
     showMyLocation: Boolean,
     colors: PinColors,
+    selected: MarkerGroup?,
     onSelect: (MarkerGroup) -> Unit,
     modifier: Modifier,
 ) {
@@ -246,8 +256,13 @@ private fun GoogleObjectsMap(
     ) {
         groups.forEach { group ->
             key(group.key) {
-                val icon = remember(group.label, colors) {
-                    BitmapDescriptorFactory.fromBitmap(labelPinBitmap(group.label, colors.background, colors.foreground, density))
+                val icon = remember(group.label, group.approximate, colors) {
+                    BitmapDescriptorFactory.fromBitmap(
+                        labelPinBitmap(
+                            group.label, colors.background, colors.foreground, density,
+                            outlined = group.approximate, surface = colors.surface,
+                        )
+                    )
                 }
                 Marker(
                     state = rememberUpdatedMarkerState(position = LatLng(group.latitude, group.longitude)),
@@ -258,6 +273,16 @@ private fun GoogleObjectsMap(
                 )
             }
         }
+        // Area in cui il GPS colloca il punto toccato.
+        selected?.uncertaintyMeters?.let { radius ->
+            com.google.maps.android.compose.Circle(
+                center = LatLng(selected.latitude, selected.longitude),
+                radius = radius.toDouble(),
+                fillColor = androidx.compose.ui.graphics.Color(colors.background).copy(alpha = 0.12f),
+                strokeColor = androidx.compose.ui.graphics.Color(colors.background).copy(alpha = 0.6f),
+                strokeWidth = 3f,
+            )
+        }
     }
 }
 
@@ -267,6 +292,7 @@ private fun OsmObjectsMap(
     focus: MapFocus?,
     showMyLocation: Boolean,
     colors: PinColors,
+    selected: MarkerGroup?,
     onSelect: (MarkerGroup) -> Unit,
     modifier: Modifier,
 ) {
@@ -323,6 +349,18 @@ private fun OsmObjectsMap(
         update = { map ->
             map.overlays.clear()
             if (showMyLocation) map.overlays.add(myLocationOverlay)
+            // Area in cui il GPS colloca il punto toccato (sotto i segnaposti).
+            selected?.uncertaintyMeters?.let { radius ->
+                map.overlays.add(org.osmdroid.views.overlay.Polygon(map).apply {
+                    points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(
+                        GeoPoint(selected.latitude, selected.longitude), radius.toDouble(),
+                    )
+                    fillPaint.color = androidx.core.graphics.ColorUtils.setAlphaComponent(colors.background, 31)
+                    outlinePaint.color = androidx.core.graphics.ColorUtils.setAlphaComponent(colors.background, 153)
+                    outlinePaint.strokeWidth = 3f
+                    setOnClickListener { _, _, _ -> false }
+                })
+            }
             val density = map.resources.displayMetrics.density
             groups.forEach { group ->
                 val marker = org.osmdroid.views.overlay.Marker(map).apply {
@@ -330,7 +368,10 @@ private fun OsmObjectsMap(
                     title = group.label
                     icon = android.graphics.drawable.BitmapDrawable(
                         map.resources,
-                        labelPinBitmap(group.label, colors.background, colors.foreground, density),
+                        labelPinBitmap(
+                            group.label, colors.background, colors.foreground, density,
+                            outlined = group.approximate, surface = colors.surface,
+                        ),
                     )
                     setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
                     setOnMarkerClickListener { _, _ -> onSelect(group); true }
@@ -342,7 +383,7 @@ private fun OsmObjectsMap(
     )
 }
 
-private fun createOsmMapView(context: Context): MapView {
+internal fun createOsmMapView(context: Context): MapView {
     Configuration.getInstance().apply {
         load(context, context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
         // User-Agent identificativo richiesto dalla tile usage policy di OSM.
@@ -362,7 +403,17 @@ sealed interface MapFocus {
     data class Fit(val markers: List<MapMarker>) : MapFocus
 }
 
-data class PinColors(val background: Int, val foreground: Int)
+data class PinColors(val background: Int, val foreground: Int, val surface: Int)
+
+/** Riga del riquadro: il "dove" scritto e quanto è affidabile il punto. */
+internal fun markerDetail(item: MapMarker): String = listOfNotNull(
+    item.snippet.ifBlank { null },
+    when {
+        item.manual -> "indicata a mano"
+        item.approximate -> "approssimata ±${item.accuracyMeters!!.toInt()} m"
+        else -> null
+    },
+).joinToString(" · ")
 
 /** Riquadro dal basso per il segnaposto toccato: chi c'è in quel punto, aprirlo o andarci. */
 @Composable
@@ -410,8 +461,9 @@ private fun SelectedGroupPanel(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (item.snippet.isNotBlank()) Text(
-                                item.snippet,
+                            val detail = markerDetail(item)
+                            if (detail.isNotBlank()) Text(
+                                detail,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,

@@ -91,6 +91,8 @@ internal fun parseSupabaseError(body: String): String? {
 }
 
 private val KNOWN_MESSAGES = listOf(
+    // PostgREST (PGRST204): l'app è più nuova dello schema; le modifiche restano in coda, nulla va perso.
+    "in the schema cache" to "Il server non è ancora aggiornato per questa versione dell'app: le modifiche restano qui e partiranno appena lo sarà",
     "invalid login credentials" to "Email o password non corretti",
     "email not confirmed" to "Email non ancora confermata: controlla la tua casella",
     "user already registered" to "Esiste già un account con questa email",

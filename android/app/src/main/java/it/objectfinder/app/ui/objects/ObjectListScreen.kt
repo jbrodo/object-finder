@@ -273,10 +273,19 @@ private fun EmptyState(title: String, body: String) {
 }
 
 /** Distanza se nota, altrimenti solo il fatto che il punto GPS c'è: le coordinate qui non aiutano. */
-internal fun locationLine(item: ObjectEntity, distance: Double?): String = when {
-    !item.hasLocation -> "Posizione non registrata"
-    distance != null -> PlaceFormat.distanceFromYou(distance)
-    else -> "Punto GPS salvato" + (item.accuracyMeters?.let { " · ±${it.toInt()} m" } ?: "")
+internal fun locationLine(item: ObjectEntity, distance: Double?): String {
+    if (!item.hasLocation) return "Posizione non registrata"
+    val reliability = when {
+        item.isManualLocation -> "indicata sulla mappa"
+        item.isApproximate -> "approssimata ±${item.accuracyMeters!!.toInt()} m"
+        else -> null
+    }
+    return when {
+        distance != null -> PlaceFormat.distanceFromYou(distance) + (reliability?.let { " · $it" } ?: "")
+        item.isManualLocation -> "Punto indicato sulla mappa"
+        item.isApproximate -> "Punto GPS approssimato · ±${item.accuracyMeters!!.toInt()} m"
+        else -> "Punto GPS salvato" + (item.accuracyMeters?.let { " · ±${it.toInt()} m" } ?: "")
+    }
 }
 
 /** Categoria e stato solo se diversi dai valori predefiniti; null se non c'è nulla da dire. */

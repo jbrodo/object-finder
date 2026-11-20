@@ -144,4 +144,15 @@ class SyncMergeTest {
         assertNull(SyncMerge.mergeRemote(server, known))
         assertNotNull(SyncMerge.mergeRemote(server.copy(version = 4, updatedAt = "2026-11-19T11:00:00+00:00"), known))
     }
+
+    @Test
+    fun `manual location source syncs and shows in conflicts`() {
+        val server = remote().copy(locationSource = "manual", accuracyMeters = null)
+        val merged = SyncMerge.mergeRemote(server, null)!!
+        assertTrue(merged.isManualLocation)
+        assertEquals("manual", SyncMerge.toWriteDto(merged).locationSource)
+        val gps = merged.copy(locationSource = "gps")
+        assertTrue(!SyncMerge.sameContent(gps, server))
+        assertEquals("45.00000, 9.00000 (a mano)", SyncMerge.diff(gps, server).single { it.label == "Posizione" }.theirs)
+    }
 }

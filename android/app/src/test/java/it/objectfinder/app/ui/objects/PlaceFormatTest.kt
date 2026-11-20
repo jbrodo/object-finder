@@ -48,4 +48,17 @@ class PlaceFormatTest {
         assertEquals("2 oggetti", groups[0].label)
         assertEquals("Trapano", groups[1].label)
     }
+
+    @Test
+    fun `group circle uses the worst gps accuracy and ignores manual points`() {
+        val group = groupMarkers(listOf(
+            MapMarker("a", "Scala", "", 45.0, 9.0, accuracyMeters = 12f),
+            MapMarker("b", "Bici", "", 45.0, 9.0, accuracyMeters = 40f, approximate = true),
+            MapMarker("c", "Trapano", "", 45.0, 9.0, manual = true),
+        )).single()
+        assertEquals(40f, group.uncertaintyMeters)
+        assertEquals(false, group.approximate) // non tutti approssimati: segnaposto pieno
+        assertEquals("approssimata ±40 m", it.objectfinder.app.maps.markerDetail(group.items[1]))
+        assertEquals("indicata a mano", it.objectfinder.app.maps.markerDetail(group.items[2]))
+    }
 }

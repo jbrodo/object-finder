@@ -32,6 +32,19 @@ enum class ObjectStatus(val wire: String, val label: String) {
     }
 }
 
+/** Valori allineati al vincolo objects_location_source_valid della migration 012. */
+enum class LocationSource(val wire: String) {
+    GPS("gps"),
+    MANUAL("manual");
+
+    companion object {
+        fun fromWire(value: String?): LocationSource = entries.firstOrNull { it.wire == value } ?: GPS
+    }
+}
+
+/** Oltre questa incertezza il punto GPS è "approssimato" (al chiuso è frequente). */
+const val APPROXIMATE_ACCURACY_METERS = 25f
+
 enum class SyncStatus(val wire: String) {
     PENDING("pending"),
     SYNCED("synced"),
@@ -51,6 +64,8 @@ data class ObjectEntity(
     val latitude: Double?,
     val longitude: Double?,
     val accuracyMeters: Float?,
+    /** Origine del punto: [LocationSource.GPS] (con incertezza) o [LocationSource.MANUAL] (scelto sulla mappa). */
+    val locationSource: String = LocationSource.GPS.wire,
     val status: String = ObjectStatus.ACTIVE.wire,
     val syncStatus: String = SyncStatus.PENDING.wire,
     val createdAt: Long = System.currentTimeMillis(),
@@ -64,6 +79,10 @@ data class ObjectEntity(
     /** Mai arrivato sul server: si può eliminare senza connessione. */
     val neverSynced: Boolean get() = remoteVersion == null && remoteUpdatedAt == null
     val hasLocation: Boolean get() = latitude != null && longitude != null
+    val isManualLocation: Boolean get() = LocationSource.fromWire(locationSource) == LocationSource.MANUAL
+    /** Punto GPS con incertezza alta: va mostrato come tale. */
+    val isApproximate: Boolean
+        get() = hasLocation && !isManualLocation && (accuracyMeters ?: 0f) > APPROXIMATE_ACCURACY_METERS
     val statusEnum: ObjectStatus get() = ObjectStatus.fromWire(status)
     val isPending: Boolean get() = syncStatus == SyncStatus.PENDING.wire
 }

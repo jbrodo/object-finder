@@ -141,6 +141,7 @@ data class ObjectWriteDto(
     val latitude: Double?,
     val longitude: Double?,
     @SerialName("accuracy_meters") val accuracyMeters: Float?,
+    @SerialName("location_source") val locationSource: String = "gps",
 )
 
 @Serializable
@@ -155,6 +156,7 @@ data class ObjectReadDto(
     val latitude: Double? = null,
     val longitude: Double? = null,
     @SerialName("accuracy_meters") val accuracyMeters: Float? = null,
+    @SerialName("location_source") val locationSource: String = "gps",
     val version: Int = 1,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String,
@@ -493,6 +495,6 @@ class SupabaseRestApi(
 
         const val PHOTO_BUCKET = "object-photos"
         private const val OBJECT_COLUMNS =
-            "id,project_id,name,category,notes,place,status,latitude,longitude,accuracy_meters,version,created_at,updated_at"
+            "id,project_id,name,category,notes,place,status,latitude,longitude,accuracy_meters,location_source,version,created_at,updated_at"
     }
 }

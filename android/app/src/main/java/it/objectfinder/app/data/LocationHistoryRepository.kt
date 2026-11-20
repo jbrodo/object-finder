@@ -60,8 +60,18 @@ class LocationHistoryRepository(
     fun observePendingCount(): Flow<Int> = dao.observePendingCount()
 
     /** Registra la posizione nello storico se è cambiata rispetto all'ultima nota. */
-    suspend fun record(objectId: String, latitude: Double, longitude: Double, accuracyMeters: Float?) {
-        if (!Geo.isNewPosition(dao.latestForObject(objectId), latitude, longitude, accuracyMeters)) return
+    suspend fun record(
+        objectId: String,
+        latitude: Double,
+        longitude: Double,
+        accuracyMeters: Float?,
+        source: String = "phone",
+    ) {
+        // Un punto scelto a mano è sempre una correzione voluta: niente soglia di rumore GPS.
+        val previous = dao.latestForObject(objectId)
+        val manual = source == "manual"
+        if (manual && previous != null && previous.latitude == latitude && previous.longitude == longitude) return
+        if (!manual && !Geo.isNewPosition(previous, latitude, longitude, accuracyMeters)) return
         dao.upsert(
             LocationHistoryEntity(
                 id = UUID.randomUUID().toString(),
@@ -70,6 +80,7 @@ class LocationHistoryRepository(
                 longitude = longitude,
                 accuracyMeters = accuracyMeters,
                 recordedAt = now(),
+                source = source,
             )
         )
     }

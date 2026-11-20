@@ -254,11 +254,13 @@ fun ObjectFinderApp(
                 )
             }
             val active by container.settings.activeProject.collectAsStateWithLifecycle()
+            val editorMapEngine by container.settings.mapEngine.collectAsStateWithLifecycle()
             ObjectEditorScreen(
                 viewModel = vm,
                 readOnly = active?.canEditObjects == false,
                 objectId = id,
                 canDelete = active?.canDeleteObjects ?: true,
+                mapEngine = editorMapEngine,
                 onClose = { nav.popBackStack() },
             )
         }

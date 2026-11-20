@@ -48,6 +48,10 @@ class ProjectRoleTest {
     fun `server messages are localized and unknown ones kept`() {
         assertEquals("Nessun account registrato con questa email", localizeServerMessage("no account found for this email"))
         assertEquals("Email o password non corretti", localizeServerMessage("Invalid login credentials"))
+        assertTrue(
+            localizeServerMessage("Could not find the 'location_source' column of 'objects' in the schema cache")
+                .startsWith("Il server non è ancora aggiornato")
+        )
         assertEquals(
             "Permessi insufficienti per questa operazione",
             localizeServerMessage("new row violates row-level security policy for table \"objects\""),

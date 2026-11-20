@@ -1,5 +1,11 @@
 package it.objectfinder.app.ui.objects
 
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.cancelAndJoin
+import it.objectfinder.app.location.FixPolicy
+import it.objectfinder.app.data.local.APPROXIMATE_ACCURACY_METERS
+import it.objectfinder.app.data.local.LocationSource
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import it.objectfinder.app.data.ObjectDraft
@@ -51,7 +57,10 @@ data class EditorState(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val accuracyMeters: Float? = null,
+    val locationSource: LocationSource = LocationSource.GPS,
     val locating: Boolean = false,
+    /** Incertezza del miglior fix raccolto finora durante il rilevamento. */
+    val liveAccuracy: Float? = null,
     val saving: Boolean = false,
     val message: String? = null,
     val nameTouched: Boolean = false,
@@ -67,7 +76,10 @@ data class EditorState(
     val hasLocation: Boolean get() = latitude != null && longitude != null
     val isArchived: Boolean get() = status == ObjectStatus.ARCHIVED
 
-    fun draft() = ObjectDraft(name, category, notes, status, latitude, longitude, accuracyMeters, place)
+    fun draft() = ObjectDraft(name, category, notes, status, latitude, longitude, accuracyMeters, place, locationSource)
+    val isManualLocation: Boolean get() = locationSource == LocationSource.MANUAL
+    val isApproximate: Boolean
+        get() = hasLocation && !isManualLocation && (accuracyMeters ?: 0f) > APPROXIMATE_ACCURACY_METERS
 
     /** Distanza dal telefono all'oggetto, se entrambe le posizioni sono note. */
     val distanceMeters: Double?
@@ -82,6 +94,8 @@ data class EditorState(
 data class ConflictUi(val deletedOnServer: Boolean, val differences: List<SyncMerge.FieldDiff>)
 
 /** Gestisce creazione e modifica: `objectId == null` → nuovo oggetto. */
+private const val NO_FIX_MESSAGE = "Posizione non disponibile: verifica che il GPS sia attivo, o indicala sulla mappa."
+
 class ObjectEditorViewModel(
     private val objectId: String?,
     private val repository: ObjectRepository,
@@ -222,36 +236,102 @@ class ObjectEditorViewModel(
     }
 
     /** "Spostato qui": nuova posizione dal GPS salvata subito, senza passare dalla modifica. */
+    /** "L'ho spostato qui": miglior posizione GPS dei prossimi secondi, salvata subito. */
     fun moveHere() {
         val id = objectId ?: return
-        if (_state.value.locating) return
-        _state.update { it.copy(locating = true) }
-        locateJob = viewModelScope.launch {
-            val location = runCatching { locationProvider.currentLocation() }.getOrNull()
+        acquire { location ->
             if (location == null) {
-                _state.update {
-                    it.copy(locating = false, message = "Posizione non disponibile: verifica che il GPS sia attivo e riprova.")
-                }
-                return@launch
+                _state.update { it.copy(message = NO_FIX_MESSAGE) }
+                return@acquire
             }
-            val current = repository.get(id) ?: run { _state.update { it.copy(locating = false) }; return@launch }
-            repository.update(
-                id,
-                ObjectDraft(
-                    current.name, current.category, current.notes, current.statusEnum,
-                    location.latitude, location.longitude, location.accuracyMeters, current.place,
-                ),
-            )
-            onLocalChange()
-            reload()
-            _state.update {
-                it.copy(
-                    locating = false,
-                    origin = location,
-                    message = "Posizione aggiornata (±${location.accuracyMeters.toInt()} m)",
-                )
-            }
+            persistLocation(id, location.latitude, location.longitude, location.accuracyMeters, LocationSource.GPS)
+            _state.update { it.copy(origin = location, message = fixMessage(location, saved = true)) }
         }
+    }
+
+    /** Punto scelto sulla mappa dalla scheda: salvato subito come posizione indicata a mano. */
+    fun saveManualLocation(latitude: Double, longitude: Double) {
+        val id = objectId ?: return
+        viewModelScope.launch {
+            persistLocation(id, latitude, longitude, null, LocationSource.MANUAL)
+            _state.update { it.copy(message = "Posizione corretta sulla mappa") }
+        }
+    }
+
+    /** Punto scelto sulla mappa nel modulo (nuovo oggetto o modifica): si salva con il resto. */
+    fun setManualLocation(latitude: Double, longitude: Double) {
+        locateJob?.cancel()
+        _state.update {
+            it.copy(
+                latitude = latitude, longitude = longitude, accuracyMeters = null,
+                locationSource = LocationSource.MANUAL, locating = false, liveAccuracy = null,
+            )
+        }
+    }
+
+    private suspend fun persistLocation(
+        id: String, latitude: Double, longitude: Double, accuracy: Float?, source: LocationSource,
+    ) {
+        val current = repository.get(id) ?: return
+        repository.update(
+            id,
+            ObjectDraft(
+                current.name, current.category, current.notes, current.statusEnum,
+                latitude, longitude, accuracy, current.place, source,
+            ),
+        )
+        onLocalChange()
+        reload()
+    }
+
+    // ---- Rilevamento GPS: il fix migliore entro pochi secondi ----
+
+    private var bestSoFar: DeviceLocation? = null
+    private var onFix: (suspend (DeviceLocation?) -> Unit)? = null
+
+    /**
+     * Raccoglie fix per al massimo [FixPolicy.MAX_WAIT_MILLIS], tiene il più preciso e si ferma appena
+     * è buono; l'incertezza attuale è in [EditorState.liveAccuracy]. Senza fix ripiega sull'ultima nota.
+     */
+    private fun acquire(onDone: suspend (DeviceLocation?) -> Unit) {
+        if (_state.value.locating) return
+        bestSoFar = null
+        onFix = onDone
+        _state.update { it.copy(locating = true, liveAccuracy = null) }
+        locateJob = viewModelScope.launch {
+            withTimeoutOrNull(FixPolicy.MAX_WAIT_MILLIS) {
+                locationProvider.fixes().first { fix ->
+                    val best = FixPolicy.better(bestSoFar, fix).also { bestSoFar = it }
+                    _state.update { it.copy(liveAccuracy = best.accuracyMeters) }
+                    FixPolicy.isGoodEnough(best)
+                }
+            }
+            finishAcquire(bestSoFar ?: runCatching { locationProvider.currentLocation() }.getOrNull())
+        }
+    }
+
+    /** "Usa comunque": si accetta subito il fix migliore raccolto finora. */
+    fun useBestFixNow() {
+        val best = bestSoFar ?: return
+        val running = locateJob
+        locateJob = viewModelScope.launch {
+            running?.cancelAndJoin()
+            finishAcquire(best)
+        }
+    }
+
+    private suspend fun finishAcquire(location: DeviceLocation?) {
+        val callback = onFix ?: return
+        onFix = null
+        _state.update { it.copy(locating = false, liveAccuracy = null) }
+        callback(location)
+    }
+
+    private fun fixMessage(location: DeviceLocation, saved: Boolean): String {
+        val accuracy = location.accuracyMeters.toInt()
+        return if (location.accuracyMeters > APPROXIMATE_ACCURACY_METERS)
+            "Posizione approssimata (±$accuracy m): puoi correggerla sulla mappa"
+        else if (saved) "Posizione aggiornata (±$accuracy m)" else "Posizione acquisita (±$accuracy m)"
     }
 
     private suspend fun reload() {
@@ -265,6 +345,7 @@ class ObjectEditorViewModel(
                 notes = item.notes,
                 place = item.place,
                 status = item.statusEnum,
+                locationSource = LocationSource.fromWire(item.locationSource),
                 latitude = item.latitude,
                 longitude = item.longitude,
                 accuracyMeters = item.accuracyMeters,
@@ -322,28 +403,22 @@ class ObjectEditorViewModel(
     fun setNotes(v: String) = _state.update { it.copy(notes = v) }
     fun setPlace(v: String) = _state.update { it.copy(place = v.take(PLACE_MAX)) }
     fun setStatus(v: ObjectStatus) = _state.update { it.copy(status = v) }
-    fun clearLocation() = _state.update { it.copy(latitude = null, longitude = null, accuracyMeters = null) }
+    fun clearLocation() = _state.update {
+        it.copy(latitude = null, longitude = null, accuracyMeters = null, locationSource = LocationSource.GPS)
+    }
     fun consumeMessage() = _state.update { it.copy(message = null) }
 
     /** Da invocare solo dopo che il permesso posizione è stato concesso. */
-    fun captureLocation() {
-        if (_state.value.locating) return
-        _state.update { it.copy(locating = true) }
-        locateJob = viewModelScope.launch {
-            val location = runCatching { locationProvider.currentLocation() }.getOrNull()
-            _state.update {
-                if (location == null) it.copy(
-                    locating = false,
-                    message = "Posizione non disponibile: verifica che il GPS sia attivo e riprova.",
-                )
-                else it.copy(
-                    locating = false,
-                    latitude = location.latitude,
-                    longitude = location.longitude,
-                    accuracyMeters = location.accuracyMeters,
-                    message = "Posizione acquisita (±${location.accuracyMeters.toInt()} m)",
-                )
-            }
+    fun captureLocation() = acquire { location ->
+        _state.update {
+            if (location == null) it.copy(message = NO_FIX_MESSAGE)
+            else it.copy(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                accuracyMeters = location.accuracyMeters,
+                locationSource = LocationSource.GPS,
+                message = fixMessage(location, saved = false),
+            )
         }
     }
 
