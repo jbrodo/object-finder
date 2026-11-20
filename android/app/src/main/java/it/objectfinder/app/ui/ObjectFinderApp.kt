@@ -246,6 +246,7 @@ fun ObjectFinderApp(
                     showSyncState = session != null,
                     onOpenObject = { nav.navigate(Routes.editor(it)) },
                     onCreateObject = { nav.navigate(Routes.editor()) },
+                    onChanged = requestSync,
                     modifier = modifier,
                 )
             }

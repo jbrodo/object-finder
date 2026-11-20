@@ -1,5 +1,26 @@
 package it.objectfinder.app.ui.objects
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import it.objectfinder.app.export.SheetLabel
+import it.objectfinder.app.export.LabelSheetLayout
+import it.objectfinder.app.export.LabelSheetActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.Unarchive
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.foundation.combinedClickable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -70,9 +91,19 @@ fun ObjectListScreen(
     canCreate: Boolean = true,
     /** Stato di sincronizzazione visibile solo con un account: offline non c'è nulla da inviare. */
     showSyncState: Boolean = true,
+    /** Dopo modifiche fatte dalla lista (archiviazione multipla): avvia la sincronizzazione. */
+    onChanged: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // Selezione multipla: Set per ricerche immediate; ogni scheda legge il proprio stato in proprio.
+    var selected by rememberSaveable(stateSaver = SelectionSaver) { mutableStateOf(emptySet<String>()) }
+    val selecting = selected.isNotEmpty()
+    BackHandler(enabled = selecting) { selected = emptySet() }
+    var sheet by remember { mutableStateOf<Pair<java.io.File, Int>?>(null) }
+    var preparing by remember { mutableStateOf(false) }
+
+    fun toggle(id: String) { selected = if (id in selected) selected - id else selected + id }
     val scope = rememberCoroutineScope()
     val permission = rememberLocationPermissionRequester()
     var locating by remember { mutableStateOf(false) }
@@ -98,6 +129,39 @@ fun ObjectListScreen(
     }
 
     Column(modifier.fillMaxSize()) {
+      if (selecting) {
+        val chosen = state.items.filter { it.id in selected }
+        val allArchived = chosen.isNotEmpty() && chosen.all { it.statusEnum == ObjectStatus.ARCHIVED }
+        SelectionBar(
+            count = selected.size,
+            allVisibleSelected = state.items.all { it.id in selected },
+            archiveLabel = if (allArchived) "Ripristina" else "Archivia",
+            canEdit = canCreate,
+            preparing = preparing,
+            onClear = { selected = emptySet() },
+            onSelectAll = { selected = state.items.map { it.id }.toSet() },
+            onLabels = {
+                val labels = chosen.map { SheetLabel(it.id, it.name, it.place) }
+                preparing = true
+                scope.launch {
+                    val file = withContext(Dispatchers.IO) { LabelSheetActions.create(context, labels) }
+                    preparing = false
+                    sheet = file to labels.size
+                }
+            },
+            onArchive = {
+                viewModel.setArchived(selected, archived = !allArchived) {
+                    Toast.makeText(
+                        context,
+                        if (allArchived) "${selected.size} oggetti ripristinati" else "${selected.size} oggetti archiviati",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    selected = emptySet()
+                    onChanged()
+                }
+            },
+        )
+      } else {
         OutlinedTextField(
             value = state.query,
             onValueChange = viewModel::setQuery,
@@ -127,6 +191,7 @@ fun ObjectListScreen(
                 label = { Text("Vicini") },
             )
         }
+      }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
@@ -149,12 +214,14 @@ fun ObjectListScreen(
                             cover = state.covers[item.id],
                             distance = state.distanceTo(item),
                             showSyncState = showSyncState,
-                            onClick = { onOpenObject(item.id) },
+                            isSelected = { item.id in selected },
+                            onClick = { if (selecting) toggle(item.id) else onOpenObject(item.id) },
+                            onLongClick = { toggle(item.id) },
                         )
                     }
                 }
             }
-            if (canCreate) ExtendedFloatingActionButton(
+            if (canCreate && !selecting) ExtendedFloatingActionButton(
                 onClick = onCreateObject,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Registra oggetto") },
@@ -162,6 +229,7 @@ fun ObjectListScreen(
             )
         }
     }
+    sheet?.let { (file, count) -> LabelSheetReady(file, count) { sheet = null } }
 }
 
 @Composable
@@ -170,9 +238,18 @@ private fun ObjectCard(
     cover: String?,
     distance: Double?,
     showSyncState: Boolean,
+    isSelected: () -> Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    val chosen = isSelected()
+    Card(
+        Modifier.fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = "Seleziona")
+            .semantics { selected = chosen },
+        colors = if (chosen) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        else CardDefaults.cardColors(),
+    ) {
       Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         // Riquadro sempre presente: righe allineate con o senza foto.
         Box(
@@ -189,6 +266,10 @@ private fun ObjectCard(
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (chosen) Box(
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary) }
         }
         Column(Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -293,3 +374,65 @@ internal fun metaLine(item: ObjectEntity): String? = listOfNotNull(
     item.category.takeUnless(::isDefaultCategory),
     item.statusEnum.label.takeIf { item.statusEnum != ObjectStatus.ACTIVE },
 ).joinToString(" · ").ifEmpty { null }
+
+private val SelectionSaver = listSaver<Set<String>, String>(save = { it.toList() }, restore = { it.toSet() })
+
+/** Barra della selezione multipla: al posto di ricerca e filtri finché c'è qualcosa selezionato. */
+@Composable
+private fun SelectionBar(
+    count: Int,
+    allVisibleSelected: Boolean,
+    archiveLabel: String,
+    canEdit: Boolean,
+    preparing: Boolean,
+    onClear: () -> Unit,
+    onSelectAll: () -> Unit,
+    onLabels: () -> Unit,
+    onArchive: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onClear) { Icon(Icons.Default.Close, contentDescription = "Annulla selezione") }
+            Text(
+                if (count == 1) "1 selezionato" else "$count selezionati",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            if (!allVisibleSelected) TextButton(onClick = onSelectAll) { Text("Seleziona tutti") }
+        }
+        Row(Modifier.padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onLabels, enabled = !preparing) {
+                if (preparing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Default.QrCode2, contentDescription = null, Modifier.size(18.dp))
+                Text("  Etichette QR")
+            }
+            if (canEdit) OutlinedButton(onClick = onArchive) {
+                Icon(
+                    if (archiveLabel == "Archivia") Icons.Default.Archive else Icons.Default.Unarchive,
+                    contentDescription = null, Modifier.size(18.dp),
+                )
+                Text("  $archiveLabel")
+            }
+        }
+    }
+}
+
+/** Foglio di etichette pronto: stampa o condivisione del PDF. */
+@Composable
+private fun LabelSheetReady(file: java.io.File, count: Int, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val pages = LabelSheetLayout.pageCount(count)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.QrCode2, contentDescription = null) },
+        title = { Text("Etichette pronte") },
+        text = {
+            Text(
+                "$count etichette su " + (if (pages == 1) "1 foglio A4" else "$pages fogli A4") +
+                    " (3 × 7, circa 70 × 42 mm). Vanno bene fogli adesivi o carta normale da ritagliare."
+            )
+        },
+        confirmButton = { TextButton(onClick = { LabelSheetActions.print(context, file, count); onDismiss() }) { Text("Stampa") } },
+        dismissButton = { TextButton(onClick = { LabelSheetActions.share(context, file); onDismiss() }) { Text("Condividi PDF") } },
+    )
+}

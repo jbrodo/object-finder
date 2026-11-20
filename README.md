@@ -131,6 +131,8 @@ disinstallata l'app.
   scansionati o inseriti a mano; scansionandoli si apre l'oggetto (scelta se più oggetti hanno lo
   stesso codice); la ricerca in elenco trova anche per codice
 - Archiviazione/ripristino (soft delete sincronizzato)
+- Selezione multipla nella lista (tocco lungo): archivia/ripristina più oggetti e stampa un foglio A4
+  di etichette QR (3 × 7, circa 70 × 42 mm, con nome e "Dove") da stampare o condividere in PDF
 - Permessi posizione con spiegazione, gestione del rifiuto permanente e scorciatoia alle impostazioni
 - Acquisizione GPS ad alta precisione con fallback sull'ultima posizione nota
 - Conflitti tra membri: concorrenza ottimistica sulla `version` del server; se un altro membro ha

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 enum class ObjectFilter(val label: String) { ACTIVE("Attuali"), ARCHIVED("Archiviati"), ALL("Tutti") }
 
@@ -37,7 +38,7 @@ data class ObjectListState(
 }
 
 class ObjectListViewModel(
-    repository: ObjectRepository,
+    private val repository: ObjectRepository,
     photos: PhotoRepository,
     identifiers: IdentifierRepository,
 ) : ViewModel() {
@@ -66,6 +67,14 @@ class ObjectListViewModel(
     fun setOrigin(location: DeviceLocation?) { origin.value = location }
 
     fun setQuery(value: String) { query.value = value }
+
+    /** Archivia o ripristina più oggetti insieme (selezione multipla). */
+    fun setArchived(ids: Collection<String>, archived: Boolean, onDone: () -> Unit) {
+        viewModelScope.launch {
+            ids.forEach { repository.setArchived(it, archived) }
+            onDone()
+        }
+    }
     fun setFilter(value: ObjectFilter) { filter.value = value }
 }
 

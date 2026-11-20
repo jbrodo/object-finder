@@ -38,6 +38,7 @@
 - [x] Collegare codici esistenti (barcode prodotto, seriale) tramite `object_identifiers` (migration 006)
 - [x] Etichette NFC: scrittura del link dell'oggetto (+ AAR) su tag NTAG, apertura della scheda avvicinando il telefono
 - [x] Private Storage upload (bucket `object-photos`, path `<project>/<object>/<file>`, migration 005)
+- [x] Selezione multipla nella lista e foglio A4 di etichette QR (3 × 7)
 - [x] Riconoscimento visivo on-device (MediaPipe Image Embedder, MobileNetV3 large): impronte locali delle foto, classifica per somiglianza + vicinanza, "Registra come nuovo"
 - [ ] Taratura delle soglie di somiglianza sulle foto reali (negli APK debug si vede la percentuale)
 - [x] Suggerimenti dalla foto con Cactus Mirage (nome, testo letto → note o numero di serie), JNI su ARM
@@ -65,6 +66,7 @@
 - [ ] Taratura delle soglie del riconoscimento sulle foto reali (percentuali dalle prove con la v1.7.1)
 - [ ] Impronte del riconoscimento salvate sul server (un telefono nuovo non riscarica tutte le foto)
 - [ ] Segnalazione crash (Firebase Crashlytics, stesso progetto di App Distribution)
+- [ ] Spostare oggetti in un altro progetto (anche in blocco): serve una migrazione che sposti le foto su Storage (`<project>/<object>/…`) e verifichi i permessi su entrambi i progetti
 - [ ] R8 in release con regole verificate (Ktor, serialization, Room, MediaPipe, JNI di Mirage) e Baseline Profiles per avvio e scorrimento (prerequisiti della skill jetpack-compose-performance)
 
 ## M4 — Tracking
