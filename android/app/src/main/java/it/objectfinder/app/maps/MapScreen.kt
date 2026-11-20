@@ -402,6 +402,11 @@ private fun OsmObjectsMap(
         }
     }
     val myLocationOverlay = remember(mapView) { MyLocationNewOverlay(GpsMyLocationProvider(context), mapView) }
+    // Segnaposti come bitmap: ricreati solo se cambiano etichetta, stile o colori (non a ogni zoom).
+    val pinCache = remember { HashMap<String, android.graphics.Bitmap>() }
+    fun pin(label: String, approximate: Boolean, density: Float) = pinCache.getOrPut("$label|$approximate|$colors") {
+        labelPinBitmap(label, colors.background, colors.foreground, density, outlined = approximate, surface = colors.surface)
+    }
 
     DisposableEffect(lifecycle, mapView, showMyLocation) {
         val observer = LifecycleEventObserver { _, event ->
@@ -479,13 +484,7 @@ private fun OsmObjectsMap(
                     map.overlays.add(org.osmdroid.views.overlay.Marker(map).apply {
                         position = GeoPoint(leg.latitude, leg.longitude)
                         title = leg.item.title
-                        icon = android.graphics.drawable.BitmapDrawable(
-                            map.resources,
-                            labelPinBitmap(
-                                leg.item.title, colors.background, colors.foreground, density,
-                                outlined = leg.item.approximate, surface = colors.surface,
-                            ),
-                        )
+                        icon = android.graphics.drawable.BitmapDrawable(map.resources, pin(leg.item.title, leg.item.approximate, density))
                         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
                         setOnMarkerClickListener { _, _ -> onLegTap(leg); true }
                     })
@@ -501,13 +500,7 @@ private fun OsmObjectsMap(
                 val marker = org.osmdroid.views.overlay.Marker(map).apply {
                     position = GeoPoint(group.latitude, group.longitude)
                     title = group.label
-                    icon = android.graphics.drawable.BitmapDrawable(
-                        map.resources,
-                        labelPinBitmap(
-                            group.label, colors.background, colors.foreground, density,
-                            outlined = group.approximate, surface = colors.surface,
-                        ),
-                    )
+                    icon = android.graphics.drawable.BitmapDrawable(map.resources, pin(group.label, group.approximate, density))
                     setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
                     setOnMarkerClickListener { _, _ -> onSelect(group); true }
                 }

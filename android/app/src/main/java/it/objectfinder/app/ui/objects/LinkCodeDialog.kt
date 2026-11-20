@@ -80,7 +80,7 @@ fun LinkCodeDialog(
                             modifier = Modifier.fillMaxWidth(),
                         )
                         LazyColumn(Modifier.heightIn(max = 280.dp)) {
-                            items(candidates, key = { it.id }) { item ->
+                            items(candidates, key = { it.id }, contentType = { "candidate" }) { item ->
                                 ListItem(
                                     headlineContent = { Text(item.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                     supportingContent = item.place.takeIf { it.isNotBlank() }?.let { place ->

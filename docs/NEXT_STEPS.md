@@ -65,6 +65,7 @@
 - [ ] Taratura delle soglie del riconoscimento sulle foto reali (percentuali dalle prove con la v1.7.1)
 - [ ] Impronte del riconoscimento salvate sul server (un telefono nuovo non riscarica tutte le foto)
 - [ ] Segnalazione crash (Firebase Crashlytics, stesso progetto di App Distribution)
+- [ ] R8 in release con regole verificate (Ktor, serialization, Room, MediaPipe, JNI di Mirage) e Baseline Profiles per avvio e scorrimento (prerequisiti della skill jetpack-compose-performance)
 
 ## M4 — Tracking
 - [ ] BLE scan/connect

@@ -108,7 +108,7 @@ fun ProjectsScreen(viewModel: ProjectsViewModel, onBack: () -> Unit) {
                 modifier = Modifier.padding(16.dp),
             )
             LazyColumn(contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
-                items(state.projects, key = { it.id }) { project ->
+                items(state.projects, key = { it.id }, contentType = { "project" }) { project ->
                     ProjectRow(project, active = project.id == state.activeId, onClick = { viewModel.select(project) })
                     HorizontalDivider()
                 }
@@ -196,14 +196,14 @@ fun MembersScreen(
             }
             LazyColumn(contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
                 if (state.invites.isNotEmpty()) {
-                    item(key = "invites-header") {
+                    item(key = "invites-header", contentType = "header") {
                         Text(
                             "Inviti in attesa",
                             style = MaterialTheme.typography.titleSmall,
                             modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
                         )
                     }
-                    items(state.invites, key = { "invite-${it.id}" }) { invite ->
+                    items(state.invites, key = { "invite-${it.id}" }, contentType = { "invite" }) { invite ->
                         ListItem(
                             supportingContent = {
                                 val expires = invite.expiresAt
@@ -233,7 +233,7 @@ fun MembersScreen(
                         ) { Text(invite.email) }
                         HorizontalDivider()
                     }
-                    item(key = "members-header") {
+                    item(key = "members-header", contentType = "header") {
                         Text(
                             "Membri",
                             style = MaterialTheme.typography.titleSmall,
@@ -241,7 +241,7 @@ fun MembersScreen(
                         )
                     }
                 }
-                items(state.members, key = { it.userId }) { member ->
+                items(state.members, key = { it.userId }, contentType = { "member" }) { member ->
                     MemberRow(
                         member = member,
                         canManage = canManage && member.role != ProjectRole.OWNER && !member.isMe,
@@ -252,7 +252,7 @@ fun MembersScreen(
                 }
                 // Da soli il progetto non si condivide: si spiega come farlo, anche con chi non ha un account.
                 if (canManage && state.members.size == 1 && state.invites.isEmpty() && !state.op.busy) {
-                    item(key = "alone-hint") {
+                    item(key = "alone-hint", contentType = "hint") {
                         Text(
                             "Sei l'unico membro. Aggiungi chi deve vedere e ritrovare questi oggetti: " +
                                 "se non ha ancora un account, l'invito vale quando si registra con quella email.",
@@ -432,9 +432,11 @@ private fun ConfirmDialog(title: String, text: String, confirm: String, onDismis
     )
 }
 
+/** Creato una volta: le righe degli inviti lo riusano (immutabile e thread-safe). */
+private val inviteDateFormat = java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale.ITALIAN)
+
 internal fun inviteDate(millis: Long): String =
-    java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale.ITALIAN)
-        .format(java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault()))
+    inviteDateFormat.format(java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault()))
 
 internal fun inviteMessage(projectName: String, invite: PendingInvite): String =
     "Ti ho invitato nel progetto «$projectName» su Object Finder come ${invite.role.label.lowercase()}.\n" +

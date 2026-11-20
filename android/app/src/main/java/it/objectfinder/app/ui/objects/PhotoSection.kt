@@ -116,7 +116,7 @@ fun PhotoSection(
                 )
             } else {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(photos, key = { it.id }) { photo ->
+                    items(photos, key = { it.id }, contentType = { "photo" }) { photo ->
                         PhotoThumbnail(photo, size = 96, onClick = { viewing = photo.id })
                     }
                 }

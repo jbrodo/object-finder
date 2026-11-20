@@ -143,7 +143,7 @@ fun ObjectListScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(state.items, key = { it.id }) { item ->
+                    items(state.items, key = { it.id }, contentType = { "object" }) { item ->
                         ObjectCard(
                             item,
                             cover = state.covers[item.id],
