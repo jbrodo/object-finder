@@ -66,4 +66,22 @@ class ProjectRoleTest {
         assertTrue(!PendingInvite("i", "a@b.it", ProjectRole.EDITOR, expiresAt = now + 1).isExpired(now))
         assertTrue(!PendingInvite("i", "a@b.it", ProjectRole.EDITOR, expiresAt = null).isExpired(now)) // server vecchio
     }
+
+    @Test
+    fun `password errors from supabase are in italian`() {
+        assertEquals(
+            "La nuova password deve essere diversa da quella attuale",
+            localizeServerMessage("New password should be different from the old password."),
+        )
+        assertEquals(
+            "Hai già chiesto un link da poco: attendi un minuto e riprova",
+            localizeServerMessage("For security purposes, you can only request this after 42 seconds."),
+        )
+    }
+
+    @Test
+    fun `email link flow defaults to sign up`() {
+        assertEquals(EmailLinkFlow.RECOVERY, EmailLinkFlow.fromWire("recovery"))
+        assertEquals(EmailLinkFlow.SIGN_UP, EmailLinkFlow.fromWire(null))
+    }
 }

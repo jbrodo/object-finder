@@ -8,6 +8,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/** Da dove arriva il link aperto: conferma della registrazione o ripristino della password. */
+enum class EmailLinkFlow(val wire: String) {
+    SIGN_UP("signup"),
+    RECOVERY("recovery");
+
+    companion object {
+        fun fromWire(value: String?) = entries.firstOrNull { it.wire == value } ?: SIGN_UP
+    }
+}
+
 sealed interface AuthOutcome {
     data object SignedIn : AuthOutcome
     data class ConfirmEmail(val email: String) : AuthOutcome
@@ -30,7 +40,7 @@ class AuthRepository(
 
     suspend fun signUp(email: String, password: String): AuthOutcome {
         // Il verifier resta sul telefono finché non si apre il link dell'email (anche giorni dopo).
-        val verifier = Pkce.newVerifier().also(settings::setPkceVerifier)
+        val verifier = Pkce.newVerifier().also { settings.setPkceVerifier(it, EmailLinkFlow.SIGN_UP.wire) }
         return when (val result = api.signUp(email.trim(), password, Pkce.challenge(verifier), Pkce.REDIRECT_URL)) {
             is SignUpResult.SignedIn -> {
                 store.save(Session.from(result.token, clock(), email.trim()))
@@ -45,12 +55,27 @@ class AuthRepository(
      * Se il verifier non c'è (registrazione da un altro telefono, dati cancellati) l'email è comunque
      * confermata: si accede con email e password.
      */
-    suspend fun completeEmailLink(code: String) {
-        val verifier = settings.pkceVerifier()
-            ?: throw IllegalStateException("Email confermata. Accedi con email e password.")
+    suspend fun completeEmailLink(code: String): EmailLinkFlow {
+        val flow = EmailLinkFlow.fromWire(settings.pkceFlow())
+        val verifier = settings.pkceVerifier() ?: throw IllegalStateException(
+            if (flow == EmailLinkFlow.RECOVERY) "Apri il link sullo stesso telefono da cui hai chiesto il ripristino, oppure richiedilo di nuovo."
+            else "Email confermata. Accedi con email e password."
+        )
         val token = api.exchangeCode(code, verifier)
-        settings.setPkceVerifier(null)
+        settings.setPkceVerifier(null, null)
         store.save(Session.from(token, clock()))
+        return flow
+    }
+
+    /** "Password dimenticata?": email con link che riporta nell'app per sceglierne una nuova. */
+    suspend fun requestPasswordReset(email: String) {
+        val verifier = Pkce.newVerifier().also { settings.setPkceVerifier(it, EmailLinkFlow.RECOVERY.wire) }
+        api.recover(email.trim(), Pkce.challenge(verifier), Pkce.REDIRECT_URL)
+    }
+
+    /** Nuova password per l'account collegato (dopo il link di ripristino o da Impostazioni). */
+    suspend fun changePassword(newPassword: String) {
+        api.updatePassword(validAccessToken(), newPassword)
     }
 
     /** Logout: il token viene revocato lato server best-effort; i dati locali restano sul dispositivo. */

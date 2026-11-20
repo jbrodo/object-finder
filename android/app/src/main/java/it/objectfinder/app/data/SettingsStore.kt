@@ -76,8 +76,14 @@ class SettingsStore(context: Context) {
 
     fun pkceVerifier(): String? = prefs.getString(KEY_PKCE, null)
 
-    fun setPkceVerifier(value: String?) {
-        prefs.edit().apply { if (value == null) remove(KEY_PKCE) else putString(KEY_PKCE, value) }.apply()
+    fun pkceFlow(): String? = prefs.getString(KEY_PKCE_FLOW, null)
+
+    /** Verifier PKCE e tipo di link atteso (registrazione o ripristino password). */
+    fun setPkceVerifier(value: String?, flow: String?) {
+        prefs.edit().apply {
+            if (value == null) remove(KEY_PKCE) else putString(KEY_PKCE, value)
+            if (flow == null) remove(KEY_PKCE_FLOW) else putString(KEY_PKCE_FLOW, flow)
+        }.apply()
     }
 
     fun setOnboardingDone() {
@@ -119,6 +125,7 @@ class SettingsStore(context: Context) {
         const val KEY_PROJECT_ROLE = "active_project_role"
         const val KEY_ONBOARDING = "onboarding_done"
         const val KEY_PKCE = "pkce_verifier"
+        const val KEY_PKCE_FLOW = "pkce_flow"
         const val KEY_CURSOR = "pull_cursor_"
     }
 }

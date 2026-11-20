@@ -25,6 +25,7 @@
 - [x] Email di invito lato server (Edge Function `send-invite` + Resend, limiti anti-spam, migration 011)
 - [x] Conflitti multi-utente: concorrenza ottimistica su `version`, scelta guidata dall'utente
 - [x] Cifratura token con Android Keystore (AES-256-GCM)
+- [x] Link di conferma email e "Password dimenticata?" con ritorno nell'app (PKCE), "Cambia password"
 - [x] Eliminazione definitiva propagata (migration 009, tombstone `deleted_objects`)
 - [x] Pull con cursore composto `(updated_at, id)` e finestra di ricontrollo di 2 minuti
 - [x] Logout: le copie locali già sincronizzate vengono tolte dal telefono (restano le modifiche non inviate)

@@ -31,6 +31,8 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
 ### Link dell'email di conferma (Supabase Auth)
 Alla registrazione l'app chiede a Supabase di far tornare il link di conferma nell'app
 (`objectfinder://auth/callback`, flusso PKCE): aprendolo dal telefono si entra già autenticati.
+Lo stesso ritorno serve a "Password dimenticata?": dal link si rientra nell'app e si sceglie subito la
+nuova password (da Impostazioni c'è anche "Cambia password").
 Supabase accetta solo indirizzi autorizzati, altrimenti usa il **Site URL** del progetto (di default
 `http://localhost:3000`, da cui il link a localhost). Una volta sola, nel pannello Supabase:
 

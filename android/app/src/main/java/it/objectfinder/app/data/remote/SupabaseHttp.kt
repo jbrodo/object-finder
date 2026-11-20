@@ -91,6 +91,9 @@ internal fun parseSupabaseError(body: String): String? {
 }
 
 private val KNOWN_MESSAGES = listOf(
+    "should be different from the old password" to "La nuova password deve essere diversa da quella attuale",
+    "requires reauthentication" to "Per sicurezza esci e rientra, poi cambia la password",
+    "for security purposes, you can only request this after" to "Hai già chiesto un link da poco: attendi un minuto e riprova",
     // PostgREST (PGRST204): l'app è più nuova dello schema; le modifiche restano in coda, nulla va perso.
     "in the schema cache" to "Il server non è ancora aggiornato per questa versione dell'app: le modifiche restano qui e partiranno appena lo sarà",
     "invalid login credentials" to "Email o password non corretti",

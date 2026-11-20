@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.settings
 
+import it.objectfinder.app.ui.auth.NewPasswordDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +44,8 @@ fun SettingsScreen(
 ) {
     val scope = rememberCoroutineScope()
     var confirmSignOut by remember { mutableStateOf(false) }
+    var changingPassword by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     val session by container.authRepository.session.collectAsStateWithLifecycle()
     val project by container.settings.activeProject.collectAsStateWithLifecycle()
     val syncState by container.settings.syncState.collectAsStateWithLifecycle()
@@ -68,7 +71,21 @@ fun SettingsScreen(
                 }
             } else {
                 Text(current.email.ifBlank { current.userId })
-                OutlinedButton(onClick = { confirmSignOut = true }) { Text("Esci") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { changingPassword = true }) { Text("Cambia password") }
+                    OutlinedButton(onClick = { confirmSignOut = true }) { Text("Esci") }
+                }
+                if (changingPassword) NewPasswordDialog(
+                    title = "Cambia password",
+                    message = null,
+                    email = current.email,
+                    onSave = container.authRepository::changePassword,
+                    onDone = { text ->
+                        changingPassword = false
+                        android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    onDismiss = { changingPassword = false },
+                )
                 if (confirmSignOut) AlertDialog(
                     onDismissRequest = { confirmSignOut = false },
                     title = { Text("Uscire dall'account?") },

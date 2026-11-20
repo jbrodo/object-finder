@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.auth
 
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -74,6 +75,7 @@ fun AuthScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf<String?>(null) }
     var passwordVisible by remember { mutableStateOf(false) }
+    var forgotOpen by remember { mutableStateOf(false) }
     val activity = LocalActivity.current
     val configured = container.config.isSupabaseConfigured
 
@@ -227,6 +229,12 @@ fun AuthScreen(
                     },
             )
 
+            if (configured && mode == AuthMode.SIGN_IN) {
+                TextButton(onClick = { forgotOpen = true }, modifier = Modifier.align(Alignment.End)) {
+                    Text("Password dimenticata?")
+                }
+            }
+
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             info?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
 
@@ -244,6 +252,14 @@ fun AuthScreen(
                 Text("Continua senza account")
             }
         }
+    }
+    if (forgotOpen) {
+        ForgotPasswordDialog(
+            initialEmail = email,
+            onSend = container.authRepository::requestPasswordReset,
+            onSent = { text -> forgotOpen = false; error = null; info = text },
+            onDismiss = { forgotOpen = false },
+        )
     }
 }
 

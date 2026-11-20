@@ -4,6 +4,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -34,6 +35,16 @@ private data class SignUpBody(
     @SerialName("code_challenge") val codeChallenge: String,
     @SerialName("code_challenge_method") val codeChallengeMethod: String = "s256",
 )
+
+@Serializable
+private data class RecoverBody(
+    val email: String,
+    @SerialName("code_challenge") val codeChallenge: String,
+    @SerialName("code_challenge_method") val codeChallengeMethod: String = "s256",
+)
+
+@Serializable
+private data class PasswordBody(val password: String)
 
 @Serializable
 private data class PkceBody(
@@ -80,6 +91,31 @@ class SupabaseAuthApi(private val http: SupabaseHttp) {
         } else {
             SignUpResult.ConfirmationRequired(email)
         }
+    }
+
+    /**
+     * Email per reimpostare la password, con ritorno nell'app (PKCE). Supabase risponde sempre
+     * 200, anche se l'indirizzo non ha un account: non rivela quali email sono registrate.
+     */
+    suspend fun recover(email: String, codeChallenge: String, redirectTo: String) {
+        http.requireConfigured()
+        http.client.post("${http.baseUrl}/auth/v1/recover") {
+            parameter("redirect_to", redirectTo)
+            header("apikey", http.anonKey)
+            contentType(ContentType.Application.Json)
+            setBody(RecoverBody(email, codeChallenge))
+        }.ensureSuccess()
+    }
+
+    /** Nuova password per l'utente della sessione. */
+    suspend fun updatePassword(accessToken: String, password: String) {
+        http.requireConfigured()
+        http.client.put("${http.baseUrl}/auth/v1/user") {
+            header("apikey", http.anonKey)
+            header("Authorization", "Bearer $accessToken")
+            contentType(ContentType.Application.Json)
+            setBody(PasswordBody(password))
+        }.ensureSuccess()
     }
 
     /** Scambia il codice del link di conferma (PKCE) con una sessione. */

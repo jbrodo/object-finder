@@ -1,5 +1,7 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.auth.NewPasswordDialog
+import it.objectfinder.app.data.EmailLinkFlow
 import it.objectfinder.app.data.Pkce
 import it.objectfinder.app.ui.objects.LinkCodeDialog
 import it.objectfinder.app.data.AddIdentifierResult
@@ -127,6 +129,8 @@ fun ObjectFinderApp(
 
     var choosing by remember { mutableStateOf<ScanOutcome.Choose?>(null) }
     var unlinked by remember { mutableStateOf<ScanOutcome.Unlinked?>(null) }
+    // Link di ripristino aperto: si è dentro, si sceglie subito la nuova password.
+    var choosingPassword by remember { mutableStateOf(false) }
 
     /** Gestisce un contenuto scansionato, un deep link o un tag NFC: apre l'oggetto o propone di collegarlo. */
     fun handleScanned(raw: String, type: IdentifierType = IdentifierType.BARCODE) {
@@ -182,20 +186,26 @@ fun ObjectFinderApp(
         scope.launch { when (val callback = Pkce.parseCallback(link)) {
             null -> handleScanned(link)
             // Link dell'email di conferma: account confermato e accesso fatto, senza password.
-            is Pkce.Callback.Code -> runCatching { container.authRepository.completeEmailLink(callback.code) }
-                .onSuccess {
+            is Pkce.Callback.Code -> {
+              val expectedFlow = EmailLinkFlow.fromWire(container.settings.pkceFlow())
+              runCatching { container.authRepository.completeEmailLink(callback.code) }
+                .onSuccess { flow ->
                     container.settings.setOnboardingDone()
                     requestSync()
                     if (nav.currentDestination?.route == Routes.AUTH) nav.leaveAuth()
-                    snackbar.showSnackbar("Email confermata: benvenuto in Object Finder")
+                    if (flow == EmailLinkFlow.RECOVERY) choosingPassword = true
+                    else snackbar.showSnackbar("Email confermata: benvenuto in Object Finder")
                 }
                 .onFailure { e ->
                     snackbar.showSnackbar(
                         (e as? IllegalStateException)?.message
-                            ?: "Il link è scaduto o già usato. L'email risulta confermata: accedi con email e password.",
+                            ?: if (expectedFlow == EmailLinkFlow.RECOVERY)
+                                "Il link è scaduto o già usato: chiedine uno nuovo da «Password dimenticata?»."
+                            else "Il link è scaduto o già usato. L'email risulta confermata: accedi con email e password.",
                         duration = SnackbarDuration.Long,
                     )
                 }
+            }
             is Pkce.Callback.Error -> snackbar.showSnackbar(
                 "Link di conferma non valido o scaduto (${callback.description}). Accedi e, se serve, registrati di nuovo.",
                 duration = SnackbarDuration.Long,
@@ -339,6 +349,17 @@ fun ObjectFinderApp(
                 }
             },
             onDismiss = { unlinked = null },
+        )
+    }
+
+    if (choosingPassword) {
+        NewPasswordDialog(
+            title = "Scegli una nuova password",
+            message = "Sei dentro con il link dell'email. Imposta ora la nuova password per i prossimi accessi.",
+            email = session?.email.orEmpty(),
+            onSave = container.authRepository::changePassword,
+            onDone = { text -> choosingPassword = false; scope.launch { snackbar.showSnackbar(text) } },
+            onDismiss = { choosingPassword = false },
         )
     }
 
