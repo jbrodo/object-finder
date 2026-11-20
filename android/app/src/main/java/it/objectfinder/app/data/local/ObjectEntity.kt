@@ -11,14 +11,20 @@ const val LOCAL_PROJECT_ID = "default-project"
 /** Categoria predefinita. Gli oggetti creati prima della 1.1 hanno il valore legacy "general". */
 const val DEFAULT_CATEGORY = "Generale"
 
+/** Lunghezza massima del campo "Dove" (vincolo objects_place_length della migration 010). */
+const val PLACE_MAX = 200
+
 /** Etichetta mostrata per una categoria (il valore legacy inglese viene localizzato). */
-fun categoryLabel(raw: String): String = if (raw.isBlank() || raw.equals("general", ignoreCase = true)) DEFAULT_CATEGORY else raw
+fun categoryLabel(raw: String): String = if (isDefaultCategory(raw)) DEFAULT_CATEGORY else raw
+
+fun isDefaultCategory(raw: String): Boolean =
+    raw.isBlank() || raw.equals("general", ignoreCase = true) || raw == DEFAULT_CATEGORY
 
 /** Valori allineati all'enum `public.object_status` della migration 001. */
 enum class ObjectStatus(val wire: String, val label: String) {
-    ACTIVE("active", "Attivo"),
-    INACTIVE("inactive", "Inattivo"),
-    MAINTENANCE("maintenance", "Manutenzione"),
+    ACTIVE("active", "In uso"),
+    INACTIVE("inactive", "Non in uso"),
+    MAINTENANCE("maintenance", "In manutenzione"),
     ARCHIVED("archived", "Archiviato");
 
     companion object {
@@ -40,6 +46,8 @@ data class ObjectEntity(
     val name: String,
     val category: String,
     val notes: String = "",
+    /** "Dove": descrizione libera del punto (es. "garage, scaffale alto"). */
+    val place: String = "",
     val latitude: Double?,
     val longitude: Double?,
     val accuracyMeters: Float?,

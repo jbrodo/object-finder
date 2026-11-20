@@ -49,7 +49,7 @@ class ScanResolver(
         if (matches.isEmpty()) {
             return ScanOutcome.Message(
                 "Il codice ${code.take(40)} non è collegato a nessun oggetto. " +
-                    "Aprine uno e usa «Collega codice»."
+                    "Aprine uno e usa «Scansiona» in Codici collegati."
             )
         }
         val current = currentProjectId()

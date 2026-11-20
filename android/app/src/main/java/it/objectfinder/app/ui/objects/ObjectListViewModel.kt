@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
-enum class ObjectFilter(val label: String) { ACTIVE("In uso"), ARCHIVED("Archiviati"), ALL("Tutti") }
+enum class ObjectFilter(val label: String) { ACTIVE("Attuali"), ARCHIVED("Archiviati"), ALL("Tutti") }
 
 data class ObjectListState(
     val items: List<ObjectEntity> = emptyList(),
@@ -87,6 +87,7 @@ internal fun filterObjects(
             item.name.contains(q, ignoreCase = true) ||
             item.category.contains(q, ignoreCase = true) ||
             item.notes.contains(q, ignoreCase = true) ||
+            item.place.contains(q, ignoreCase = true) ||
             codes[item.id].orEmpty().any { it.contains(q, ignoreCase = true) })
     }
 }

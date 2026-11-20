@@ -25,8 +25,6 @@ import it.objectfinder.app.data.AppContainer
 import it.objectfinder.app.data.SyncState
 import it.objectfinder.app.maps.MapEngine
 import kotlinx.coroutines.launch
-import java.text.DateFormat
-import java.util.Date
 
 @Composable
 fun SettingsScreen(
@@ -132,11 +130,10 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 private fun describe(state: SyncState): String {
-    val fmt = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
     return when (state) {
         SyncState.Idle -> "Nessuna sincronizzazione in questa sessione"
         SyncState.Running -> "Sincronizzazione in corso…"
-        is SyncState.Done -> "Ultima sync ${fmt.format(Date(state.atMillis))}: ${state.pushed} inviati, ${state.pulled} ricevuti"
-        is SyncState.Failed -> "Sync fallita ${fmt.format(Date(state.atMillis))}: ${state.message}"
+        is SyncState.Done -> "Ultima sync ${it.objectfinder.app.ui.objects.PlaceFormat.dateTime(state.atMillis)}: ${state.pushed} inviati, ${state.pulled} ricevuti"
+        is SyncState.Failed -> "Sync fallita ${it.objectfinder.app.ui.objects.PlaceFormat.dateTime(state.atMillis)}: ${state.message}"
     }
 }

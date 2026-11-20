@@ -24,6 +24,7 @@ object SyncMerge {
             name = remote.name,
             category = remote.category,
             notes = remote.notes,
+            place = remote.place,
             latitude = remote.latitude,
             longitude = remote.longitude,
             accuracyMeters = remote.accuracyMeters,
@@ -61,6 +62,7 @@ object SyncMerge {
         local.name == server.name &&
             local.category == server.category &&
             local.notes == server.notes &&
+            local.place == server.place &&
             local.status == server.status &&
             local.latitude == server.latitude &&
             local.longitude == server.longitude &&
@@ -80,6 +82,7 @@ object SyncMerge {
                 ObjectStatus.fromWire(local.status).label,
                 ObjectStatus.fromWire(server.status).label,
             ).takeIf { it.mine != it.theirs },
+            FieldDiff("Dove", local.place.ifBlank { "—" }, server.place.ifBlank { "—" }).takeIf { it.mine != it.theirs },
             FieldDiff("Note", local.notes.ifBlank { "—" }, server.notes.ifBlank { "—" }).takeIf { it.mine != it.theirs },
             FieldDiff(
                 "Posizione",
@@ -100,6 +103,7 @@ object SyncMerge {
         name = entity.name,
         category = entity.category,
         notes = entity.notes,
+        place = entity.place,
         status = entity.status,
         latitude = entity.latitude,
         longitude = entity.longitude,

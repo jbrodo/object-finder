@@ -8,6 +8,7 @@ import it.objectfinder.app.data.ObjectRepository
 import it.objectfinder.app.data.SyncMerge
 import it.objectfinder.app.data.local.ConflictKind
 import it.objectfinder.app.data.local.DEFAULT_CATEGORY
+import it.objectfinder.app.data.local.PLACE_MAX
 import it.objectfinder.app.data.local.categoryLabel
 import it.objectfinder.app.data.remote.ObjectReadDto
 import it.objectfinder.app.data.remote.SupabaseException
@@ -30,6 +31,8 @@ import kotlinx.coroutines.flow.stateIn
 import java.util.UUID
 import it.objectfinder.app.data.local.ObjectStatus
 import it.objectfinder.app.location.LocationProvider
+import it.objectfinder.app.location.DeviceLocation
+import it.objectfinder.app.data.Geo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,6 +46,7 @@ data class EditorState(
     val name: String = "",
     val category: String = DEFAULT_CATEGORY,
     val notes: String = "",
+    val place: String = "",
     val status: ObjectStatus = ObjectStatus.ACTIVE,
     val latitude: Double? = null,
     val longitude: Double? = null,
@@ -53,11 +57,26 @@ data class EditorState(
     val nameTouched: Boolean = false,
     /** true quando il salvataggio è completato e la schermata può chiudersi. */
     val finished: Boolean = false,
+    /** Oggetto esistente: si apre in consultazione, la modifica è un'azione esplicita. */
+    val editing: Boolean = isNew,
+    /** Posizione del telefono, per mostrare la distanza dall'oggetto (null se non disponibile). */
+    val origin: DeviceLocation? = null,
 ) {
     // Si può salvare anche durante l'acquisizione GPS: il salvataggio ne attende la fine.
     val canSave: Boolean get() = loaded && name.isNotBlank() && !saving
     val hasLocation: Boolean get() = latitude != null && longitude != null
     val isArchived: Boolean get() = status == ObjectStatus.ARCHIVED
+
+    fun draft() = ObjectDraft(name, category, notes, status, latitude, longitude, accuracyMeters, place)
+
+    /** Distanza dal telefono all'oggetto, se entrambe le posizioni sono note. */
+    val distanceMeters: Double?
+        get() {
+            val from = origin ?: return null
+            val lat = latitude ?: return null
+            val lon = longitude ?: return null
+            return Geo.distanceMeters(from.latitude, from.longitude, lat, lon)
+        }
 }
 
 data class ConflictUi(val deletedOnServer: Boolean, val differences: List<SyncMerge.FieldDiff>)
@@ -82,6 +101,8 @@ class ObjectEditorViewModel(
     private val effectiveId: String = objectId ?: UUID.randomUUID().toString()
     private var saved = false
     private var locateJob: Job? = null
+    /** Valori all'apertura della modifica: per sapere se ci sono cambiamenti da non perdere. */
+    private var baseline: ObjectDraft? = null
 
     val photos: StateFlow<List<PhotoEntity>> = photoRepository.observeForObject(effectiveId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -168,6 +189,68 @@ class ObjectEditorViewModel(
     init {
         if (objectId != null) viewModelScope.launch { runCatching { refreshHistory(objectId) } }
         if (objectId != null) viewModelScope.launch { reload() }
+        if (objectId != null) viewModelScope.launch { locateUser() }
+    }
+
+    /** Posizione del telefono per la distanza: subito l'ultima nota, poi un fix fresco. Mai richiesta di permesso qui. */
+    private suspend fun locateUser() {
+        if (!locationProvider.hasPermission()) return
+        runCatching { locationProvider.lastKnownLocation() }.getOrNull()?.let { loc -> _state.update { it.copy(origin = loc) } }
+        runCatching { locationProvider.currentLocation() }.getOrNull()?.let { loc -> _state.update { it.copy(origin = loc) } }
+    }
+
+    /** Da chiamare dopo che il permesso è stato concesso altrove (es. "Spostato qui"). */
+    fun refreshOrigin() { viewModelScope.launch { locateUser() } }
+
+    fun startEditing() {
+        baseline = _state.value.draft()
+        _state.update { it.copy(editing = true, nameTouched = false) }
+    }
+
+    /** Ci sono modifiche non salvate nel modulo (solo per un oggetto esistente in modifica). */
+    val hasUnsavedChanges: Boolean
+        get() = _state.value.editing && !_state.value.isNew && baseline != null && baseline != _state.value.draft()
+
+    /** Esce dalla modifica scartando i cambiamenti: si torna ai valori salvati. */
+    fun cancelEditing() {
+        locateJob?.cancel()
+        viewModelScope.launch {
+            reload()
+            _state.update { it.copy(editing = false, locating = false) }
+        }
+    }
+
+    /** "Spostato qui": nuova posizione dal GPS salvata subito, senza passare dalla modifica. */
+    fun moveHere() {
+        val id = objectId ?: return
+        if (_state.value.locating) return
+        _state.update { it.copy(locating = true) }
+        locateJob = viewModelScope.launch {
+            val location = runCatching { locationProvider.currentLocation() }.getOrNull()
+            if (location == null) {
+                _state.update {
+                    it.copy(locating = false, message = "Posizione non disponibile: verifica che il GPS sia attivo e riprova.")
+                }
+                return@launch
+            }
+            val current = repository.get(id) ?: run { _state.update { it.copy(locating = false) }; return@launch }
+            repository.update(
+                id,
+                ObjectDraft(
+                    current.name, current.category, current.notes, current.statusEnum,
+                    location.latitude, location.longitude, location.accuracyMeters, current.place,
+                ),
+            )
+            onLocalChange()
+            reload()
+            _state.update {
+                it.copy(
+                    locating = false,
+                    origin = location,
+                    message = "Posizione aggiornata (±${location.accuracyMeters.toInt()} m)",
+                )
+            }
+        }
     }
 
     private suspend fun reload() {
@@ -179,6 +262,7 @@ class ObjectEditorViewModel(
                 name = item.name,
                 category = categoryLabel(item.category),
                 notes = item.notes,
+                place = item.place,
                 status = item.statusEnum,
                 latitude = item.latitude,
                 longitude = item.longitude,
@@ -192,7 +276,7 @@ class ObjectEditorViewModel(
         viewModelScope.launch {
             // Prima si salvano le eventuali modifiche in corso nel form, poi si sceglie la propria versione.
             val s = _state.value
-            repository.update(id, ObjectDraft(s.name, s.category, s.notes, s.status, s.latitude, s.longitude, s.accuracyMeters))
+            repository.update(id, s.draft())
             repository.keepMine(id)
             onLocalChange()
             _state.update { it.copy(message = "Tenuta la tua versione: verrà inviata al server") }
@@ -235,6 +319,7 @@ class ObjectEditorViewModel(
     fun setName(v: String) = _state.update { it.copy(name = v, nameTouched = true) }
     fun setCategory(v: String) = _state.update { it.copy(category = v) }
     fun setNotes(v: String) = _state.update { it.copy(notes = v) }
+    fun setPlace(v: String) = _state.update { it.copy(place = v.take(PLACE_MAX)) }
     fun setStatus(v: ObjectStatus) = _state.update { it.copy(status = v) }
     fun clearLocation() = _state.update { it.copy(latitude = null, longitude = null, accuracyMeters = null) }
     fun consumeMessage() = _state.update { it.copy(message = null) }
@@ -266,12 +351,19 @@ class ObjectEditorViewModel(
         _state.update { it.copy(saving = true) }
         viewModelScope.launch {
             locateJob?.join()
-            val s = _state.value
-            val draft = ObjectDraft(s.name, s.category, s.notes, s.status, s.latitude, s.longitude, s.accuracyMeters)
-            if (objectId == null) repository.create(draft, effectiveId) else repository.update(objectId, draft)
+            val draft = _state.value.draft()
             saved = true
-            onLocalChange()
-            _state.update { it.copy(saving = false, finished = true) }
+            if (objectId == null) {
+                repository.create(draft, effectiveId)
+                onLocalChange()
+                _state.update { it.copy(saving = false, finished = true) }
+            } else {
+                // Oggetto esistente: si torna alla scheda, dove si vede subito il risultato.
+                repository.update(objectId, draft)
+                onLocalChange()
+                reload()
+                _state.update { it.copy(saving = false, editing = false, message = "Modifiche salvate") }
+            }
         }
     }
 

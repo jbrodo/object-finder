@@ -131,6 +131,7 @@ data class ObjectWriteDto(
     val name: String,
     val category: String,
     val notes: String,
+    val place: String,
     val status: String,
     val latitude: Double?,
     val longitude: Double?,
@@ -144,6 +145,7 @@ data class ObjectReadDto(
     val name: String,
     val category: String = "general",
     val notes: String = "",
+    val place: String = "",
     val status: String = "active",
     val latitude: Double? = null,
     val longitude: Double? = null,
@@ -464,6 +466,6 @@ class SupabaseRestApi(
     companion object {
         const val PHOTO_BUCKET = "object-photos"
         private const val OBJECT_COLUMNS =
-            "id,project_id,name,category,notes,status,latitude,longitude,accuracy_meters,version,created_at,updated_at"
+            "id,project_id,name,category,notes,place,status,latitude,longitude,accuracy_meters,version,created_at,updated_at"
     }
 }

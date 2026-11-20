@@ -32,8 +32,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import it.objectfinder.app.data.Geo
 import it.objectfinder.app.data.local.LocationHistoryEntity
-import java.text.DateFormat
-import java.util.Date
 import java.util.Locale
 
 /** Dove è stato l'oggetto e quando; ogni voce si apre nell'app mappe. */
@@ -43,7 +41,7 @@ fun LocationHistorySection(history: List<LocationHistoryEntity>) {
     val context = LocalContext.current
     var expanded by rememberSaveable { mutableStateOf(false) }
     val shown = if (expanded) history else history.take(3)
-    val fmt = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
+    
 
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -68,12 +66,11 @@ fun LocationHistorySection(history: List<LocationHistoryEntity>) {
                     )
                     Column(Modifier.padding(start = 8.dp)) {
                         Text(
-                            fmt.format(Date(item.recordedAt)) + if (index == 0) " · attuale" else "",
+                            PlaceFormat.dateTime(item.recordedAt) + if (index == 0) " · attuale" else "",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            String.format(Locale.ROOT, "%.5f, %.5f", item.latitude, item.longitude) +
-                                (item.accuracyMeters?.let { " · ±${it.toInt()} m" } ?: "") +
+                            PlaceFormat.coordinates(item.latitude, item.longitude, item.accuracyMeters) +
                                 (moved?.let { " · spostato di ${Geo.formatDistance(it)}" } ?: ""),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

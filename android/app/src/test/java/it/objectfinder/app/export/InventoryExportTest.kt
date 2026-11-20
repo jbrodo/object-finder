@@ -49,7 +49,7 @@ class InventoryExportTest {
 
     @Test
     fun `values are labelled and dates formatted`() {
-        assertTrue(csv.contains("\"Manutenzione\""))
+        assertTrue(csv.contains("\"In manutenzione\""))
         assertTrue(csv.contains("\"1970-01-01 00:00\";\"1970-01-02 00:00\""))
         assertTrue(csv.contains("\"5\";\"\"Barcode") || csv.contains("\"5\";\""))
     }

@@ -100,11 +100,11 @@ fun CodesSection(
                         },
                     ) {
                         Icon(Icons.Default.QrCodeScanner, contentDescription = null, Modifier.size(18.dp))
-                        Text("  Collega codice")
+                        Text("  Scansiona")
                     }
                     OutlinedButton(onClick = { manualEntry = true }) {
                         Icon(Icons.Default.Keyboard, contentDescription = null, Modifier.size(18.dp))
-                        Text("  Inserisci")
+                        Text("  Scrivi")
                     }
                 }
             }
@@ -142,7 +142,7 @@ private fun ManualCodeDialog(onDismiss: () -> Unit, onConfirm: (IdentifierType, 
     LaunchedEffect(Unit) { focus.requestFocus() }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Inserisci codice") },
+        title = { Text("Scrivi codice") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

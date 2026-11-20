@@ -96,4 +96,15 @@ class SyncMergeTest {
         assertEquals("Email not confirmed", parseSupabaseError("""{"code":400,"msg":"Email not confirmed"}"""))
         assertNull(parseSupabaseError("<html>bad gateway</html>"))
     }
+
+    @Test
+    fun `place travels both ways and counts as a real difference`() {
+        val server = remote().copy(place = "Garage, scaffale alto")
+        val merged = SyncMerge.mergeRemote(server, null)!!
+        assertEquals("Garage, scaffale alto", merged.place)
+        assertEquals("Garage, scaffale alto", SyncMerge.toWriteDto(merged).place)
+        val moved = merged.copy(place = "Cantina")
+        assertTrue(!SyncMerge.sameContent(moved, server))
+        assertEquals(listOf("Dove"), SyncMerge.diff(moved, server).map { it.label })
+    }
 }

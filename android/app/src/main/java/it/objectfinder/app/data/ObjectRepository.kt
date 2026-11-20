@@ -2,6 +2,7 @@ package it.objectfinder.app.data
 
 import it.objectfinder.app.data.local.ConflictKind
 import it.objectfinder.app.data.local.DEFAULT_CATEGORY
+import it.objectfinder.app.data.local.PLACE_MAX
 import it.objectfinder.app.data.local.LOCAL_PROJECT_ID
 import it.objectfinder.app.data.local.ObjectConflictDao
 import it.objectfinder.app.data.local.ObjectConflictEntity
@@ -32,6 +33,7 @@ data class ObjectDraft(
     val latitude: Double?,
     val longitude: Double?,
     val accuracyMeters: Float?,
+    val place: String = "",
 )
 
 class ObjectRepository(
@@ -82,6 +84,7 @@ class ObjectRepository(
             name = draft.name.trim(),
             category = draft.category.trim().ifBlank { DEFAULT_CATEGORY },
             notes = draft.notes.trim(),
+            place = draft.place.trim().take(PLACE_MAX),
             status = draft.status.wire,
             latitude = draft.latitude,
             longitude = draft.longitude,
@@ -107,6 +110,7 @@ class ObjectRepository(
                 name = draft.name.trim(),
                 category = draft.category.trim().ifBlank { DEFAULT_CATEGORY },
                 notes = draft.notes.trim(),
+                place = draft.place.trim().take(PLACE_MAX),
                 status = draft.status.wire,
                 latitude = draft.latitude,
                 longitude = draft.longitude,

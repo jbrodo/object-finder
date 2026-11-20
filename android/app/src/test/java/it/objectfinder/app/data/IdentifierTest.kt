@@ -79,7 +79,7 @@ class IdentifierTest {
     @Test
     fun `unlinked code explains how to link it`() = runTest {
         val outcome = resolver(emptyList()).resolve("8001234567890")
-        assertTrue(outcome is ScanOutcome.Message && "Collega codice" in outcome.text)
+        assertTrue(outcome is ScanOutcome.Message && "«Scansiona» in Codici collegati" in outcome.text)
     }
 
     @Test

@@ -119,10 +119,10 @@ object InventoryPdf {
             textLeft, y, Paints.body,
         )
         y += 13
-        val position = if (o.latitude != null && o.longitude != null)
-            String.format(Locale.ROOT, "Posizione %.6f, %.6f", o.latitude, o.longitude) +
-                (o.accuracyMeters?.let { " · ±${it.toInt()} m" } ?: "")
-        else "Posizione non registrata"
+        val gps = if (o.latitude != null && o.longitude != null)
+            "GPS " + it.objectfinder.app.ui.objects.PlaceFormat.coordinates(o.latitude, o.longitude, o.accuracyMeters)
+        else "GPS non registrato"
+        val position = if (o.place.isNotBlank()) "Dove: ${o.place} · $gps" else gps
         canvas.drawText(ellipsize(position, Paints.body, textWidth), textLeft, y, Paints.body)
         if (row.codes.isNotEmpty()) {
             y += 13

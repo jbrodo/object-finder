@@ -54,7 +54,28 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberUpdatedMarkerState
 import it.objectfinder.app.data.local.ObjectEntity
-import it.objectfinder.app.data.local.categoryLabel
+import it.objectfinder.app.data.local.isDefaultCategory
+import it.objectfinder.app.ui.objects.PlaceFormat
+import it.objectfinder.app.ui.objects.navigateTo
+import it.objectfinder.app.data.Geo
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -64,7 +85,9 @@ import org.osmdroid.views.MapView
 fun List<ObjectEntity>.toMarkers(): List<MapMarker> = mapNotNull { item ->
     val lat = item.latitude ?: return@mapNotNull null
     val lon = item.longitude ?: return@mapNotNull null
-    MapMarker(item.id, item.name, "${categoryLabel(item.category)} · ${item.statusEnum.label}", lat, lon)
+    // Sottotitolo utile per riconoscerlo: il "dove" scritto, altrimenti la categoria se non è quella predefinita.
+    val subtitle = item.place.ifBlank { item.category.takeUnless(::isDefaultCategory).orEmpty() }
+    MapMarker(item.id, item.name, subtitle, lat, lon)
 }
 
 @Composable
@@ -77,7 +100,12 @@ fun ObjectMapScreen(
 ) {
     val engine = MapEngine.resolve(preferredEngine)
     val markers = remember(objects) { objects.toMarkers() }
+    val groups = remember(markers) { groupMarkers(markers) }
     val withoutLocation = objects.size - markers.size
+    var selectedKey by remember { mutableStateOf<String?>(null) }
+    val selected = groups.firstOrNull { it.key == selectedKey }
+    BackHandler(enabled = selected != null) { selectedKey = null }
+    val pinColors = PinColors(MaterialTheme.colorScheme.primary.toArgb(), MaterialTheme.colorScheme.onPrimary.toArgb())
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -135,9 +163,9 @@ fun ObjectMapScreen(
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
             when (engine) {
                 MapEngine.GOOGLE_MAPS ->
-                    GoogleObjectsMap(markers, focus, hasPermission, onOpenObject, Modifier.fillMaxSize())
+                    GoogleObjectsMap(groups, focus, hasPermission, pinColors, { selectedKey = it.key }, Modifier.fillMaxSize())
                 MapEngine.OPEN_STREET_MAP ->
-                    OsmObjectsMap(markers, focus, hasPermission, onOpenObject, Modifier.fillMaxSize())
+                    OsmObjectsMap(groups, focus, hasPermission, pinColors, { selectedKey = it.key }, Modifier.fillMaxSize())
             }
             SmallFloatingActionButton(
                 onClick = {
@@ -151,7 +179,15 @@ fun ObjectMapScreen(
                 if (locating) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 else Icon(Icons.Default.MyLocation, contentDescription = "La mia posizione")
             }
-            if (markers.isEmpty() || withoutLocation > 0) {
+            if (selected != null) {
+                SelectedGroupPanel(
+                    group = selected,
+                    myLocation = myLocation,
+                    onOpen = onOpenObject,
+                    onDismiss = { selectedKey = null },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                )
+            } else if (markers.isEmpty() || withoutLocation > 0) {
                 Surface(
                     tonalElevation = 3.dp,
                     shape = MaterialTheme.shapes.medium,
@@ -159,6 +195,7 @@ fun ObjectMapScreen(
                 ) {
                     Text(
                         if (markers.isEmpty()) "Nessun oggetto con posizione GPS"
+                        else if (withoutLocation == 1) "1 oggetto senza posizione non è mostrato"
                         else "$withoutLocation oggetti senza posizione non sono mostrati",
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                         style = MaterialTheme.typography.bodyMedium,
@@ -171,12 +208,14 @@ fun ObjectMapScreen(
 
 @Composable
 private fun GoogleObjectsMap(
-    markers: List<MapMarker>,
+    groups: List<MarkerGroup>,
     focus: MapFocus?,
     showMyLocation: Boolean,
-    onOpen: (String) -> Unit,
+    colors: PinColors,
+    onSelect: (MarkerGroup) -> Unit,
     modifier: Modifier,
 ) {
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
     val camera = rememberCameraPositionState()
     LaunchedEffect(focus) {
         when (focus) {
@@ -205,13 +244,17 @@ private fun GoogleObjectsMap(
             myLocationButtonEnabled = false, // c'è il nostro pulsante, uguale per entrambi i motori
         ),
     ) {
-        markers.forEach { marker ->
-            key(marker.id) {
+        groups.forEach { group ->
+            key(group.key) {
+                val icon = remember(group.label, colors) {
+                    BitmapDescriptorFactory.fromBitmap(labelPinBitmap(group.label, colors.background, colors.foreground, density))
+                }
                 Marker(
-                    state = rememberUpdatedMarkerState(position = LatLng(marker.latitude, marker.longitude)),
-                    title = marker.title,
-                    snippet = "${marker.snippet} · tocca per aprire",
-                    onInfoWindowClick = { onOpen(marker.id) },
+                    state = rememberUpdatedMarkerState(position = LatLng(group.latitude, group.longitude)),
+                    title = group.label,
+                    icon = icon,
+                    anchor = Offset(0.5f, 1f),
+                    onClick = { onSelect(group); true },
                 )
             }
         }
@@ -220,10 +263,11 @@ private fun GoogleObjectsMap(
 
 @Composable
 private fun OsmObjectsMap(
-    markers: List<MapMarker>,
+    groups: List<MarkerGroup>,
     focus: MapFocus?,
     showMyLocation: Boolean,
-    onOpen: (String) -> Unit,
+    colors: PinColors,
+    onSelect: (MarkerGroup) -> Unit,
     modifier: Modifier,
 ) {
     val context = LocalContext.current
@@ -279,15 +323,17 @@ private fun OsmObjectsMap(
         update = { map ->
             map.overlays.clear()
             if (showMyLocation) map.overlays.add(myLocationOverlay)
-            markers.forEach { item ->
+            val density = map.resources.displayMetrics.density
+            groups.forEach { group ->
                 val marker = org.osmdroid.views.overlay.Marker(map).apply {
-                    position = GeoPoint(item.latitude, item.longitude)
-                    title = item.title
-                    snippet = item.snippet
-                    setOnMarkerClickListener { m, _ ->
-                        if (m.isInfoWindowShown) onOpen(item.id) else m.showInfoWindow()
-                        true
-                    }
+                    position = GeoPoint(group.latitude, group.longitude)
+                    title = group.label
+                    icon = android.graphics.drawable.BitmapDrawable(
+                        map.resources,
+                        labelPinBitmap(group.label, colors.background, colors.foreground, density),
+                    )
+                    setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
+                    setOnMarkerClickListener { _, _ -> onSelect(group); true }
                 }
                 map.overlays.add(marker)
             }
@@ -314,4 +360,75 @@ private fun createOsmMapView(context: Context): MapView {
 sealed interface MapFocus {
     data class Point(val latitude: Double, val longitude: Double, val zoom: Float = 16f) : MapFocus
     data class Fit(val markers: List<MapMarker>) : MapFocus
+}
+
+data class PinColors(val background: Int, val foreground: Int)
+
+/** Riquadro dal basso per il segnaposto toccato: chi c'è in quel punto, aprirlo o andarci. */
+@Composable
+private fun SelectedGroupPanel(
+    group: MarkerGroup,
+    myLocation: DeviceLocation?,
+    onOpen: (String) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier,
+) {
+    val context = LocalContext.current
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 3.dp,
+        shadowElevation = 6.dp,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(top = 12.dp)) {
+                    Text(
+                        if (group.items.size == 1) "In questo punto" else "${group.items.size} oggetti in questo punto",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    myLocation?.let {
+                        Text(
+                            PlaceFormat.distanceFromYou(
+                                Geo.distanceMeters(it.latitude, it.longitude, group.latitude, group.longitude)
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "Chiudi") }
+            }
+            Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()).padding(end = 12.dp)) {
+                group.items.forEachIndexed { index, item ->
+                    if (index > 0) HorizontalDivider()
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onOpen(item.id) }.padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (item.snippet.isNotBlank()) Text(
+                                item.snippet,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Apri ${item.title}")
+                    }
+                }
+            }
+            Button(
+                onClick = { navigateTo(context, group.latitude, group.longitude) },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp),
+            ) {
+                Icon(Icons.Default.Directions, contentDescription = null, Modifier.size(18.dp))
+                Text("  Portami lì")
+            }
+        }
+    }
 }

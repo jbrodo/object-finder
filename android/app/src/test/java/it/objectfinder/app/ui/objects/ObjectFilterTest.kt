@@ -36,9 +36,25 @@ class ObjectFilterTest {
     }
 
     @Test
-    fun `location formatting is locale independent`() {
+    fun `list location line prefers distance and never shows raw coordinates`() {
         val item = obj("x", ObjectStatus.ACTIVE).copy(latitude = 45.4642035, longitude = 9.189982, accuracyMeters = 7.8f)
-        assertEquals("45.464204, 9.189982 · ±7 m", formatLocation(item))
-        assertEquals("Posizione non acquisita", formatLocation(obj("y", ObjectStatus.ACTIVE)))
+        assertEquals("Punto GPS salvato · ±7 m", locationLine(item, null))
+        assertEquals("a 85 m da te", locationLine(item, 85.4))
+        assertEquals("qui vicino", locationLine(item, 4.0))
+        assertEquals("Posizione non registrata", locationLine(obj("y", ObjectStatus.ACTIVE), null))
+    }
+
+    @Test
+    fun `meta line hides default category and status`() {
+        assertEquals(null, metaLine(obj("a", ObjectStatus.ACTIVE)))
+        assertEquals(null, metaLine(obj("a", ObjectStatus.ACTIVE, category = "Generale")))
+        assertEquals("Attrezzi", metaLine(obj("a", ObjectStatus.ACTIVE, category = "Attrezzi")))
+        assertEquals("Attrezzi · In manutenzione", metaLine(obj("a", ObjectStatus.MAINTENANCE, category = "Attrezzi")))
+    }
+
+    @Test
+    fun `query matches the place description`() {
+        val inGarage = obj("Trapano", ObjectStatus.ACTIVE).copy(place = "Garage, scaffale alto")
+        assertEquals(listOf("Trapano"), filterObjects(listOf(inGarage), "garage", ObjectFilter.ACTIVE).map { it.name })
     }
 }

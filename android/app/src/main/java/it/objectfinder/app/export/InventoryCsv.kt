@@ -28,7 +28,7 @@ object InventoryCsv {
     private const val BOM = "\uFEFF"
 
     val header = listOf(
-        "Nome", "Categoria", "Stato", "Note", "Latitudine", "Longitudine", "Precisione (m)",
+        "Nome", "Categoria", "Stato", "Dove", "Note", "Latitudine", "Longitudine", "Precisione (m)",
         "Codici collegati", "Foto", "Creato", "Aggiornato", "Id",
     )
 
@@ -43,6 +43,7 @@ object InventoryCsv {
                 field(o.name),
                 field(categoryLabel(o.category)),
                 field(o.statusEnum.label),
+                field(o.place),
                 field(o.notes),
                 number(o.latitude?.let { String.format(Locale.ROOT, "%.6f", it) }),
                 number(o.longitude?.let { String.format(Locale.ROOT, "%.6f", it) }),

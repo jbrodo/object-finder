@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -57,9 +58,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.objectfinder.app.data.local.ObjectEntity
-import it.objectfinder.app.data.local.categoryLabel
+import it.objectfinder.app.data.local.isDefaultCategory
 import it.objectfinder.app.data.local.ObjectStatus
-import java.util.Locale
 
 @Composable
 fun ObjectListScreen(
@@ -101,7 +101,7 @@ fun ObjectListScreen(
         OutlinedTextField(
             value = state.query,
             onValueChange = viewModel::setQuery,
-            placeholder = { Text("Cerca nome, note o codice") },
+            placeholder = { Text("Cerca nome, luogo, note o codice") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -173,13 +173,21 @@ private fun ObjectCard(
     onClick: () -> Unit,
 ) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-      Row(Modifier.padding(start = if (cover != null) 12.dp else 0.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (cover != null) {
-            AsyncImage(
+      Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Riquadro sempre presente: righe allineate con o senza foto.
+        Box(
+            Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (cover != null) AsyncImage(
                 model = File(cover),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
+                modifier = Modifier.fillMaxSize(),
+            ) else Text(
+                item.name.trim().take(1).uppercase(),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Column(Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -206,27 +214,36 @@ private fun ObjectCard(
                     modifier = Modifier.size(18.dp),
                 )
             }
-            Text(
-                "${categoryLabel(item.category)} · ${item.statusEnum.label}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (item.statusEnum == ObjectStatus.ARCHIVED) MaterialTheme.colorScheme.outline
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // Il "dove" è la risposta che si cerca: prima riga sotto il nome.
+            if (item.place.isNotBlank()) {
+                Text(
+                    item.place,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     if (item.hasLocation) Icons.Default.LocationOn else Icons.Default.LocationOff,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (distance != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    distance?.let {
-                        // Sotto i 10 m la differenza è dentro l'incertezza del GPS.
-                        if (it < 10) "a meno di 10 m da te" else "a ${Geo.formatDistance(it)} da te"
-                    } ?: formatLocation(item),
+                    locationLine(item, distance),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (distance != null) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Unspecified,
+                    color = if (distance != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // Solo ciò che distingue l'oggetto: categoria e stato predefiniti sono rumore.
+            metaLine(item)?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (item.statusEnum == ObjectStatus.ARCHIVED) MaterialTheme.colorScheme.outline
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (item.notes.isNotBlank()) {
@@ -255,10 +272,15 @@ private fun EmptyState(title: String, body: String) {
     }
 }
 
-internal fun formatLocation(item: ObjectEntity): String {
-    val lat = item.latitude
-    val lon = item.longitude
-    if (lat == null || lon == null) return "Posizione non acquisita"
-    val accuracy = item.accuracyMeters?.let { " · ±${it.toInt()} m" } ?: ""
-    return String.format(Locale.ROOT, "%.6f, %.6f", lat, lon) + accuracy
+/** Distanza se nota, altrimenti solo il fatto che il punto GPS c'è: le coordinate qui non aiutano. */
+internal fun locationLine(item: ObjectEntity, distance: Double?): String = when {
+    !item.hasLocation -> "Posizione non registrata"
+    distance != null -> PlaceFormat.distanceFromYou(distance)
+    else -> "Punto GPS salvato" + (item.accuracyMeters?.let { " · ±${it.toInt()} m" } ?: "")
 }
+
+/** Categoria e stato solo se diversi dai valori predefiniti; null se non c'è nulla da dire. */
+internal fun metaLine(item: ObjectEntity): String? = listOfNotNull(
+    item.category.takeUnless(::isDefaultCategory),
+    item.statusEnum.label.takeIf { item.statusEnum != ObjectStatus.ACTIVE },
+).joinToString(" · ").ifEmpty { null }
