@@ -121,6 +121,33 @@ jobs:
               --target "$GITHUB_SHA" --title "Object Finder $TAG" --generate-notes
           fi
 
+      # Distribuzione ai tester: Firebase App Distribution invia una notifica (app "App Tester")
+      # a ogni release. Facoltativa: senza i secret il passo viene saltato.
+      - name: Distribute to testers (Firebase App Distribution)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TESTER_GROUPS: ${{ vars.FIREBASE_TESTER_GROUPS || 'testers' }}
+        run: |
+          if [ -z "$FIREBASE_APP_ID" ] || [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::notice::FIREBASE_APP_ID o FIREBASE_SERVICE_ACCOUNT assenti: distribuzione ai tester saltata (vedi README)."
+            exit 0
+          fi
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
+          # Note di rilascio: quelle generate da GitHub per questo tag (limite Firebase 16 KB).
+          gh release view "$TAG" --json body -q .body | head -c 15000 > "$RUNNER_TEMP/notes.txt" || echo "Object Finder $TAG" > "$RUNNER_TEMP/notes.txt"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json" npx --yes firebase-tools@15.35.0 \
+            appdistribution:distribute "object-finder-$TAG.apk" \
+            --app "$FIREBASE_APP_ID" \
+            --groups "$FIREBASE_TESTER_GROUPS" \
+            --release-notes-file "$RUNNER_TEMP/notes.txt"
+
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-sa.json"
+
       - name: Remove keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/release.jks"

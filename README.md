@@ -143,6 +143,27 @@ disinstallata l'app.
 - Posizione corretta a mano: mirino fisso sulla mappa ("Correggi il punto sulla mappa"), salvata
   come posizione indicata a mano; rilevamento GPS che tiene il fix migliore dei primi secondi
 
+## Distribuzione ai tester (Firebase App Distribution)
+Il repository è privato: chi non ha accesso a GitHub non può scaricare l'APK dalle release. A ogni
+tag `vX.Y.Z` il workflow **Release APK** carica l'APK firmato anche su Firebase App Distribution, che
+avvisa i tester (app "Firebase App Tester") e permette l'aggiornamento con un tocco. Configurazione,
+una volta sola:
+
+1. console.firebase.google.com → crea un progetto → aggiungi un'app Android con package
+   `it.objectfinder.app` (il file `google-services.json` non serve).
+2. App Distribution → Tester e gruppi → crea il gruppo `testers` e aggiungi le email.
+3. Google Cloud console del progetto → IAM → Account di servizio → nuovo account con ruolo
+   **Firebase App Distribution Admin** → Chiavi → crea chiave JSON.
+4. Secret del repository:
+
+| Secret | Valore |
+|---|---|
+| `FIREBASE_APP_ID` | Impostazioni progetto → App Android → ID app (`1:1234…:android:abcd…`) |
+| `FIREBASE_SERVICE_ACCOUNT` | contenuto del file JSON della chiave |
+
+Gruppo diverso da `testers`: variabile del repository `FIREBASE_TESTER_GROUPS`. Senza i secret il
+passo viene saltato e la release su GitHub resta invariata.
+
 ## Email di invito
 La Edge Function `backend/supabase/functions/send-invite` manda l'email a chi viene invitato senza
 account. La pubblica il workflow **Edge functions** a ogni modifica della funzione su `main`

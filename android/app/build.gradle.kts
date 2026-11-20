@@ -37,7 +37,7 @@ android {
     defaultConfig {
         applicationId = "it.objectfinder.app"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = appVersionCode
         versionName = appVersionName
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = mapsApiKey
