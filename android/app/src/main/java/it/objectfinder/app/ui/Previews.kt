@@ -1,5 +1,10 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.objects.LocationHistorySection
+import it.objectfinder.app.ui.objects.CodesSection
+import it.objectfinder.app.ui.projects.InviteRow
+import it.objectfinder.app.data.PendingInvite
+import it.objectfinder.app.data.ProjectRole
 import it.objectfinder.app.ui.objects.WhereEditor
 import it.objectfinder.app.ui.objects.SearchAndFilters
 import it.objectfinder.app.ui.objects.PlantUi
@@ -195,6 +200,8 @@ internal fun ObjectPageLayoutPreview() = SampleTheme {
                 loanedTo = "Marco", loanedAt = null, due = SampleWhere.loanDue,
                 readOnly = false, onReturned = {}, onEdit = {},
             )
+            CodesSection(codes = emptyList(), readOnly = false, onAdd = { _, _ -> }, onDelete = {}, onError = {}, collapsible = true)
+            LocationHistorySection(SampleHistory)
         }
     }
 }
@@ -299,6 +306,26 @@ internal fun RegistrationFormPreview() = SampleTheme {
         WhereEditor(
             placePath = "Casa › Garage", onPickPlace = {}, onPlaceChange = {}, state = SampleDraft.copy(placeId = "garage", place = "scaffale in alto a sinistra"),
             onCapture = {}, onPickOnMap = {}, onUseBestNow = {}, onClear = {},
+        )
+    }
+}
+
+// --- Membri ------------------------------------------------------------------------------
+
+@Preview(name = "Inviti in attesa", widthDp = 360)
+@Preview(name = "Inviti in attesa · scuro", widthDp = 360, uiMode = UI_MODE_NIGHT_YES)
+@Composable
+internal fun InviteRowsPreview() = SampleTheme {
+    // 360dp: il telefono più stretto comune; l'email resta intera.
+    val role = ProjectRole.assignable.first()
+    Column {
+        InviteRow(
+            PendingInvite("i1", "giulia.ferraresi@example.com", role),
+            busy = false, onResend = {}, onShare = {}, onRevoke = {},
+        )
+        InviteRow(
+            PendingInvite("i2", "marco@example.com", role, expiresAt = System.currentTimeMillis() - 86_400_000L),
+            busy = false, onResend = {}, onShare = {}, onRevoke = {},
         )
     }
 }

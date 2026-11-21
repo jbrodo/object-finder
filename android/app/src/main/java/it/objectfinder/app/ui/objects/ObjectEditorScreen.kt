@@ -197,14 +197,17 @@ fun ObjectEditorScreen(
                             if (!readOnly) IconButton(onClick = viewModel::startEditing) {
                                 Icon(Icons.Default.Edit, contentDescription = "Modifica")
                             }
-                            if (objectId != null) IconButton(onClick = { showLabel = true }) {
-                                Icon(Icons.Default.QrCode2, contentDescription = "Etichetta QR")
-                            }
                             Box {
                                 IconButton(onClick = { menuOpen = true }) {
                                     Icon(Icons.Default.MoreVert, contentDescription = "Altre azioni")
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    // Le due etichette nello stesso posto, una accanto all'altra.
+                                    if (objectId != null) DropdownMenuItem(
+                                        text = { Text("Etichetta QR da stampare") },
+                                        leadingIcon = { Icon(Icons.Default.QrCode2, contentDescription = null) },
+                                        onClick = { menuOpen = false; showLabel = true },
+                                    )
                                     // Scrivere un tag non cambia l'oggetto: possibile anche in sola lettura.
                                     if (objectId != null) DropdownMenuItem(
                                         text = { Text("Scrivi etichetta NFC") },
@@ -405,12 +408,6 @@ fun ObjectEditorScreen(
                             },
                             onEdit = { viewModel.loadBorrowers(); lending = true },
                         )
-                    } else if (!readOnly) {
-                        TextButton(onClick = { viewModel.loadBorrowers(); lending = true }) {
-                            Icon(Icons.Default.Handshake, contentDescription = null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                            Text("Presta a qualcuno")
-                        }
                     }
                     PhotoSection(
                         photos = photos,
@@ -426,12 +423,20 @@ fun ObjectEditorScreen(
                             Text(state.notes, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
+                    if (state.loanedTo.isBlank() && !readOnly) {
+                        TextButton(onClick = { viewModel.loadBorrowers(); lending = true }) {
+                            Icon(Icons.Default.Handshake, contentDescription = null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                            Text("Presta a qualcuno")
+                        }
+                    }
                     CodesSection(
                         codes = codes,
                         readOnly = readOnly,
                         onAdd = viewModel::addCode,
                         onDelete = viewModel::deleteCode,
                         onError = viewModel::showMessage,
+                        collapsible = true,
                     )
                     LocationHistorySection(history)
                 } else {

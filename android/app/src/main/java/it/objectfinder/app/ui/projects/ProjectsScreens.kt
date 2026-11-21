@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.projects
 
+import androidx.compose.material.icons.filled.PersonRemove
 import it.objectfinder.app.ui.common.readableWidth
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -165,9 +166,20 @@ fun MembersScreen(
                 title = { Text("Membri · ${project?.name ?: ""}") },
                 navigationIcon = { BackButton(onBack) },
                 actions = {
-                    if (project?.role != null && project.role != ProjectRole.OWNER) {
-                        IconButton(onClick = { confirmLeave = true }) {
-                            Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Esci dal progetto")
+                    // Azione pesante e rara: voce scritta in un menu, non un'icona da interpretare.
+                    if (project?.role != null && project.role != ProjectRole.OWNER) Box {
+                        var barMenu by remember { mutableStateOf(false) }
+                        IconButton(onClick = { barMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Altre azioni")
+                        }
+                        DropdownMenu(expanded = barMenu, onDismissRequest = { barMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Esci dal progetto", color = MaterialTheme.colorScheme.error) },
+                                leadingIcon = {
+                                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                },
+                                onClick = { barMenu = false; confirmLeave = true },
+                            )
                         }
                     }
                 },
@@ -205,33 +217,13 @@ fun MembersScreen(
                         )
                     }
                     items(state.invites, key = { "invite-${it.id}" }, contentType = { "invite" }) { invite ->
-                        ListItem(
-                            supportingContent = {
-                                val expires = invite.expiresAt
-                                Text(
-                                    when {
-                                        invite.isExpired() -> "${invite.role.label} · scaduto: reinvialo per rinnovarlo"
-                                        expires != null -> "${invite.role.label} · in attesa · scade il ${inviteDate(expires)}"
-                                        else -> "${invite.role.label} · in attesa di registrazione"
-                                    },
-                                    color = if (invite.isExpired()) MaterialTheme.colorScheme.error
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            },
-                            trailingContent = {
-                                Row {
-                                    IconButton(onClick = { viewModel.emailInvite(invite) }, enabled = !state.op.busy) {
-                                        Icon(Icons.Default.Email, contentDescription = "Invia di nuovo l'email")
-                                    }
-                                    IconButton(onClick = { viewModel.shareInvite(invite) }) {
-                                        Icon(Icons.Default.Share, contentDescription = "Condividi invito")
-                                    }
-                                    IconButton(onClick = { confirmRevoke = invite }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Revoca invito")
-                                    }
-                                }
-                            },
-                        ) { Text(invite.email) }
+                        InviteRow(
+                            invite = invite,
+                            busy = state.op.busy,
+                            onResend = { viewModel.emailInvite(invite) },
+                            onShare = { viewModel.shareInvite(invite) },
+                            onRevoke = { confirmRevoke = invite },
+                        )
                         HorizontalDivider()
                     }
                     item(key = "members-header", contentType = "header") {
@@ -339,6 +331,60 @@ fun MembersScreen(
     }
 }
 
+/**
+ * Invito in attesa: email per intero (niente icone che la troncano) e un menu con voci scritte.
+ * "Revoca" è in rosso e chiede conferma; lo stesso schema delle righe dei membri.
+ */
+@Composable
+internal fun InviteRow(
+    invite: PendingInvite,
+    busy: Boolean,
+    onResend: () -> Unit,
+    onShare: () -> Unit,
+    onRevoke: () -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    ListItem(
+        supportingContent = {
+            val expires = invite.expiresAt
+            Text(
+                when {
+                    invite.isExpired() -> "${invite.role.label} · scaduto: invialo di nuovo per rinnovarlo"
+                    expires != null -> "${invite.role.label} · in attesa · scade il ${inviteDate(expires)}"
+                    else -> "${invite.role.label} · in attesa di registrazione"
+                },
+                color = if (invite.isExpired()) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        trailingContent = {
+            Box {
+                IconButton(onClick = { menu = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Azioni per l'invito a ${invite.email}")
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Invia di nuovo l'email") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        enabled = !busy,
+                        onClick = { menu = false; onResend() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Condividi invito") },
+                        leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                        onClick = { menu = false; onShare() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Revoca invito", color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = { Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                        onClick = { menu = false; onRevoke() },
+                    )
+                }
+            }
+        },
+    ) { Text(invite.email) }
+}
+
 @Composable
 private fun MemberRow(
     member: ProjectMember,
@@ -351,7 +397,7 @@ private fun MemberRow(
         supportingContent = { Text(member.role.label) },
         trailingContent = {
             if (canManage) Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Azioni") }
+                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Azioni per ${member.email}") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     ProjectRole.assignable.filter { it != member.role }.forEach { role ->
                         DropdownMenuItem(
@@ -359,7 +405,11 @@ private fun MemberRow(
                             onClick = { menu = false; onRoleChange(role) },
                         )
                     }
-                    DropdownMenuItem(text = { Text("Rimuovi dal progetto") }, onClick = { menu = false; onRemove() })
+                    DropdownMenuItem(
+                        text = { Text("Rimuovi dal progetto", color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = { Icon(Icons.Default.PersonRemove, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                        onClick = { menu = false; onRemove() },
+                    )
                 }
             }
         },

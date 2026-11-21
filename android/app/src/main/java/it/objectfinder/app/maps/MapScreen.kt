@@ -1,5 +1,8 @@
 package it.objectfinder.app.maps
 
+import it.objectfinder.app.ui.common.rememberIsOnline
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SegmentedButton
@@ -39,7 +42,6 @@ import it.objectfinder.app.ui.common.rememberLocationPermissionRequester
 import kotlinx.coroutines.launch
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -241,6 +243,21 @@ fun ObjectMapScreen(
                 MapEngine.OPEN_STREET_MAP -> OsmObjectsMap(
                     groups.filter { it.key != expanded?.key }, expanded, legs, focus, hasPermission, pinColors, selected,
                     ::onGroupTap, ::onLegTap, { if (it != zoom) { zoom = it; if (!locating) userMovedMap = true } }, Modifier.fillMaxSize(),
+                )
+            }
+            // Senza rete le tessere possono non arrivare: lo si dice, e si ricorda che Elenco funziona.
+            val online by rememberIsOnline()
+            if (!online) Surface(
+                color = MaterialTheme.colorScheme.inverseSurface,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 64.dp, start = 16.dp, end = 16.dp)
+                    .widthIn(max = 480.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            ) {
+                Text(
+                    "Senza connessione la mappa può restare vuota: segnaposto ed Elenco funzionano lo stesso",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                 )
             }
             if (markers.isNotEmpty()) FilledTonalButton(

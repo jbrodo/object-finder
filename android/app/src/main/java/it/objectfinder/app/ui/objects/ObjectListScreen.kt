@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
@@ -49,7 +50,6 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.foundation.combinedClickable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -78,7 +78,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import it.objectfinder.app.data.Geo
 import it.objectfinder.app.location.LocationProvider
 import it.objectfinder.app.ui.common.rememberLocationPermissionRequester
 import kotlinx.coroutines.launch
@@ -360,10 +359,13 @@ private fun ObjectCard(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
-            ) else if (!chosen) Text(
-                item.name.trim().take(1).uppercase(),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            ) else if (!chosen) Icon(
+                // Senza foto: un segnaposto neutro, non l'iniziale che ogni app mostra. Non la scatola:
+                // accanto a un oggetto si leggerebbe come "archiviato".
+                Icons.Outlined.Category,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(28.dp),
             )
             if (chosen) Box(
                 Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
@@ -399,7 +401,9 @@ private fun ObjectCard(
             if (where.isNotBlank()) {
                 Text(
                     where,
-                    style = MaterialTheme.typography.bodyMedium,
+                    // È la risposta che si cerca: stessa taglia del nome (che si distingue per peso),
+                    // più grande dei fatti sotto.
+                    style = MaterialTheme.typography.bodyLarge,
                     // Due righe: è la risposta che si cerca, non va troncata al primo dettaglio.
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,

@@ -57,6 +57,14 @@ class PreviewScreenshotTest {
         }
     }
 
+    @Config(qualifiers = "w411dp-h1600dp-port-xxhdpi")
+    @Test fun objectPageLargeText() = shot("object_page_font200") {
+        val density = LocalDensity.current
+        CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+            ObjectPageLayoutPreview()
+        }
+    }
+
     @Test fun loanPanels() = shot("loan_panels") { LoanPanelPreview() }
 
     @Config(qualifiers = "+night")
@@ -67,6 +75,9 @@ class PreviewScreenshotTest {
     @Test fun emptyState() = shot("empty_state") { EmptyStatePreview() }
 
     @Test fun noResults() = shot("no_results") { NoResultsPreview() }
+
+    @Config(qualifiers = "w360dp-h640dp-port-xxhdpi")
+    @Test fun inviteRows() = shot("invite_rows") { InviteRowsPreview() }
 
     @Config(qualifiers = "w411dp-h1180dp-port-xxhdpi")
     @Test fun registrationForm() = shot("registration_form") { RegistrationFormPreview() }

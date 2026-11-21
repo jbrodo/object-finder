@@ -1,5 +1,7 @@
 package it.objectfinder.app.ui.auth
 
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import it.objectfinder.app.data.userMessage
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.width
@@ -184,12 +186,19 @@ fun AuthScreen(
                 }
             }
 
+            // Un errore che riguarda un campo va sotto quel campo; gli altri restano sopra il pulsante.
+            val emailError = error?.takeIf { it in EMAIL_ERRORS }
+            val passwordError = error?.takeIf { it in PASSWORD_ERRORS }
+            val generalError = error?.takeIf { emailError == null && passwordError == null }
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { email = it; if (emailError != null) error = null },
                 label = { Text("Email") },
                 singleLine = true,
-                isError = email.isNotBlank() && !emailValid,
+                isError = (email.isNotBlank() && !emailValid) || emailError != null,
+                supportingText = emailError?.let { message ->
+                    { Text(message, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -199,7 +208,9 @@ fun AuthScreen(
                 state = passwordState,
                 label = { Text("Password") },
                 supportingText = {
-                    if (mode == AuthMode.SIGN_UP) {
+                    if (passwordError != null) {
+                        Text(passwordError, Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                    } else if (mode == AuthMode.SIGN_UP) {
                         val strength = passwordStrength(password)
                         Text(
                             if (password.isEmpty()) "Almeno $MIN_SIGNUP_PASSWORD caratteri: puoi usare la password suggerita dal gestore password"
@@ -214,7 +225,7 @@ fun AuthScreen(
                         )
                     }
                 },
-                isError = password.isNotEmpty() && !passwordValid,
+                isError = (password.isNotEmpty() && !passwordValid) || passwordError != null,
                 textObfuscationMode = if (passwordVisible) TextObfuscationMode.Visible else TextObfuscationMode.RevealLastTyped,
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -240,8 +251,13 @@ fun AuthScreen(
                 }
             }
 
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            info?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            // Annunciati da TalkBack: dopo "Accedi" l'esito arriva anche a chi non vede lo schermo.
+            generalError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            }
+            info?.let {
+                Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            }
 
             Button(onClick = ::submit, enabled = canSubmit, modifier = Modifier.fillMaxWidth()) {
                 if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -270,3 +286,11 @@ fun AuthScreen(
 }
 
 private val EMAIL_REGEX = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+
+/** Messaggi del server (già tradotti in SupabaseHttp) che riguardano un campo preciso. */
+internal val EMAIL_ERRORS = setOf(
+    "Esiste già un account con questa email",
+    "Email non ancora confermata: controlla la tua casella",
+    "Nessun account registrato con questa email",
+)
+internal val PASSWORD_ERRORS = setOf("La password è troppo corta")

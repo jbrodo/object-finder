@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-21T20:53:44.746653+00:00",
+  "generatedAt": "2026-11-21T22:20:40.807991+00:00",
   "title": "Design System: ObjectFinder",
   "extensions": {
     "colorMeta": {
@@ -270,6 +270,11 @@
         "name": "The Dot-Join Rule",
         "body": "Related facts on one line are joined with ` · ` (place path · detail, distance · age), never with commas or pipes.",
         "section": "typography"
+      },
+      {
+        "name": "The Window-Class Rule",
+        "body": "Layout decisions read the window size class, never orientation or \"is tablet\". Every new screen is checked at phone (411px), foldable (673px) and tablet (1280px) widths through the screenshot previews.",
+        "section": "layout"
       }
     ],
     "dos": [
@@ -278,6 +283,9 @@
       "**Do** use the Answer Panel (16px radius, 16px padding, Label eyebrow + Title Large answer) for any new status-bearing summary.",
       "**Do** keep tinted containers for their meanings: primary = location, tertiary = loan, error = needs a decision.",
       "**Do** state uncertainty plainly (\"±40 m\", \"aggiornata 3 giorni fa\") and offer the correcting action right below it.",
+      "**Do** add every new screen or panel to `Previews.kt` and record it (`./gradlew :app:recordRoborazziDebug`), in light and dark, at phone and tablet widths.",
+      "**Do** give the \"where\" line in list cards two lines before ellipsizing; it is the answer the user is looking for.",
+      "**Do** put rare or destructive row actions (invites, members, leaving a project) in a ⋮ menu as written items with a leading icon; the destructive item is in `error` color and still confirms. The ⋮ button's description names its subject (\"Azioni per l'invito a …\").",
       "**Do** keep inline icons at 18px and list thumbnails at 64px with a 12px radius so rows align with or without photos."
     ],
     "donts": [
@@ -285,6 +293,9 @@
       "**Don't** introduce custom fonts or a branded typeface; the system type scale is the voice.",
       "**Don't** add decorative imagery: no illustrations, stock photos, or mascots. Only the user's own photos appear.",
       "**Don't** use primary, tertiary or error containers for decoration or emphasis unrelated to their meaning.",
+      "**Don't** use Toasts or pad strings with spaces for layout.",
+      "**Don't** show exception text to users; map errors through `userMessage()` to an Italian sentence with the remedy.",
+      "**Don't** render a single choice among several as independent toggle chips.",
       "**Don't** add a custom shadow vocabulary; Material elevation defaults cover everything except the map panel."
     ]
   }

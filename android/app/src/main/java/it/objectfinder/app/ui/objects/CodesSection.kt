@@ -1,5 +1,7 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material.icons.filled.QrCode2
+import it.objectfinder.app.ui.common.CollapsibleCard
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
@@ -13,9 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
@@ -61,6 +60,8 @@ fun CodesSection(
     onAdd: (IdentifierType, String) -> Unit,
     onDelete: (String) -> Unit,
     onError: (String) -> Unit,
+    /** In consultazione: chiusa, con il numero di codici. Nel modulo resta aperta. */
+    collapsible: Boolean = false,
 ) {
     val activity = LocalActivity.current as? ComponentActivity
     var manualEntry by rememberSaveable { mutableStateOf(false) }
@@ -69,68 +70,70 @@ fun CodesSection(
     val hasNfc = remember(context) { NfcTags.availability(context) != NfcTags.Availability.MISSING }
     var confirmDelete by remember { mutableStateOf<IdentifierEntity?>(null) }
 
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Codici collegati", style = MaterialTheme.typography.titleSmall)
-            if (codes.isEmpty()) {
-                Text(
-                    if (readOnly) "Nessun codice collegato"
-                    else "Collega il barcode del prodotto, il numero di serie o un tag NFC: scansionandoli ritroverai l'oggetto.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    codes.forEach { code ->
-                        InputChip(
-                            selected = false,
-                            onClick = { if (!readOnly) confirmDelete = code },
-                            // Valori lunghi (URL, UID): una riga con i puntini, non tagliata a metà.
-                            label = {
-                                Text(
-                                    "${code.typeEnum.label}: ${code.value}",
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                    softWrap = false,
-                                )
-                            },
-                            trailingIcon = if (readOnly) null else {
-                                { Icon(Icons.Default.Close, contentDescription = "Rimuovi codice", Modifier.size(16.dp)) }
-                            },
-                        )
-                    }
+    CollapsibleCard(
+        title = "Codici collegati",
+        icon = Icons.Default.QrCode2,
+        summary = when (codes.size) { 0 -> "Nessuno"; 1 -> "1 collegato"; else -> "${codes.size} collegati" },
+        collapsible = collapsible,
+    ) {
+        if (codes.isEmpty()) {
+            Text(
+                if (readOnly) "Nessun codice collegato"
+                else "Collega il barcode del prodotto, il numero di serie o un tag NFC: scansionandoli ritroverai l'oggetto.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                codes.forEach { code ->
+                    InputChip(
+                        selected = false,
+                        onClick = { if (!readOnly) confirmDelete = code },
+                        // Valori lunghi (URL, UID): una riga con i puntini, non tagliata a metà.
+                        label = {
+                            Text(
+                                "${code.typeEnum.label}: ${code.value}",
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                softWrap = false,
+                            )
+                        },
+                        trailingIcon = if (readOnly) null else {
+                            { Icon(Icons.Default.Close, contentDescription = "Rimuovi codice", Modifier.size(16.dp)) }
+                        },
+                    )
                 }
             }
-            if (!readOnly) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        enabled = activity != null,
-                        onClick = {
-                            activity?.let { act ->
-                                CodeScanner.scan(
-                                    act,
-                                    onResult = { code ->
-                                        onAdd(if (code.isQr) IdentifierType.QR else IdentifierType.BARCODE, code.raw)
-                                    },
-                                    onError = onError,
-                                )
-                            }
-                        },
-                    ) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                        Text("Scansiona")
-                    }
-                    OutlinedButton(onClick = { manualEntry = true }) {
-                        Icon(Icons.Default.Keyboard, contentDescription = null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                        Text("Scrivi")
-                    }
-                    if (hasNfc) OutlinedButton(onClick = { waitingTag = true }) {
-                        Icon(Icons.Default.Nfc, contentDescription = null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                        Text("Tag NFC")
-                    }
+        }
+        if (!readOnly) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    enabled = activity != null,
+                    onClick = {
+                        activity?.let { act ->
+                            CodeScanner.scan(
+                                act,
+                                onResult = { code ->
+                                    onAdd(if (code.isQr) IdentifierType.QR else IdentifierType.BARCODE, code.raw)
+                                },
+                                onError = onError,
+                            )
+                        }
+                    },
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text("Scansiona")
+                }
+                OutlinedButton(onClick = { manualEntry = true }) {
+                    Icon(Icons.Default.Keyboard, contentDescription = null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text("Scrivi")
+                }
+                if (hasNfc) OutlinedButton(onClick = { waitingTag = true }) {
+                    Icon(Icons.Default.Nfc, contentDescription = null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text("Tag NFC")
                 }
             }
         }

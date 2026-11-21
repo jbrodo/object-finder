@@ -180,8 +180,8 @@ A role-driven palette: on Android 12+ every role comes from the user's wallpaper
 - **Title Large** (400, 22px / 28px): the *answer* inside a panel: the place path, the borrower's name ("a Marco"), the empty-thumbnail initial.
 - **Title** (500, 16px / 24px): object names in list cards, single line with ellipsis.
 - **Title Small** (500, 14px / 20px): banner and section titles (conflict banner heading).
-- **Body Large** (400, 16px / 24px): facts in panels: distance, age of reading, loan dates.
-- **Body** (400, 14px / 20px): the default running text and the "where" line under a list card's name. The most used style.
+- **Body Large** (400, 16px / 24px): the "where" line in list cards (the answer, same size as the name and told apart by weight) and facts in panels: distance, age of reading, loan dates.
+- **Body** (400, 14px / 20px): the default running text. The most used style.
 - **Body Small** (400, 12px / 16px): precision lines, supporting detail, diff rows in the conflict banner.
 - **Label** (500, 14px / 20px): panel eyebrows (*Dove si trova*, *In prestito*, *In questo punto*), marked as semantic headings.
 
@@ -238,7 +238,7 @@ The components should feel calm and reassuring: soft tonal containers, clear ver
 - **State:** a chip is a toggle only when the choice is independent. A single choice among several (status: *Attuali / In prestito / Senza posizione / Archiviati / Tutti*) is one chip with a dropdown that shows the current value, highlighted when it differs from the default. Two or three exclusive options that are always visible (map engine, export format) are segmented buttons.
 
 ### Cards / Containers
-- **Object card:** default Material `Card`, a 64px thumbnail (12px radius) flush to a 12px start inset, then a 16px-padded text column: name (Title, one line), where-line (Body), metadata row with 18px icons. With no photo, the thumbnail shows the name's initial in Title Large on `surfaceVariant`. Selected state tints the card `secondaryContainer` and overlays a primary-tinted check on the thumbnail.
+- **Object card:** default Material `Card`, a 64px thumbnail (12px radius) flush to a 12px start inset, then a 16px-padded text column: name (Title, one line), "where" (Body Large, up to two lines), then facts in Body Small with 16px icons (distance or GPS state, loan, status, notes). With no photo, the thumbnail shows a neutral object glyph (`Category`, 28px, `onSurfaceVariant`), never the name's initial and never a box that reads as "archived". Selected state tints the card `secondaryContainer` and overlays a primary-tinted check on the thumbnail.
 - **Background / Shadow:** Material card defaults; see Elevation & Depth.
 
 ### Search
@@ -260,11 +260,14 @@ Order follows the task: photo, name, *Suggerimenti dalla foto* (right under the 
 ### Empty states
 Icon (48px, primary), title, one sentence, and the way forward. First use carries the primary *Registra oggetto* button and hides the FAB so there is one primary action; *Nessun risultato* offers *Azzera ricerca e filtri*.
 
+### Object page (consultation)
+Order follows importance: name, *Dove si trova*, the loan panel when lent, the photo strip, notes, *Presta a qualcuno*, then secondary sections. Secondary sections (*Codici collegati*, *Storico posizioni*) are `CollapsibleCard`s, closed by default: one row with icon, title and a summary ("2 collegati", "4 posizioni registrate"), announced as expanded/collapsed. Inside the registration form the same card stays open. Both labels (*Etichetta QR da stampare*, *Scrivi etichetta NFC*) are written items next to each other in the ⋮ menu, not an icon in the bar.
+
 ### Conflict Banner (signature)
 An `errorContainer` card at the top of the object page when the server version diverged: warning icon + Title Small heading, an explanation in Body, a per-field diff (Label bold field name, "Tua:" / "Server:" lines in Body Small), and a Button/Outlined pair to choose a version.
 
 ### Messages
-Short feedback goes through one Snackbar (`LocalAppMessages`), never a Toast. A message that has a remedy carries it as the action: GPS unavailable → *Impostazioni*; archive (bulk or from the object page) and *Restituito* → *Annulla*, which restores the exact previous state. Inside a dialog, a bottom sheet or the camera, where a Snackbar would sit under the scrim, the message appears inline in that surface (error color for failures, announced as a polite live region).
+Short feedback goes through one Snackbar (`LocalAppMessages`), never a Toast. A message that has a remedy carries it as the action: GPS unavailable → *Impostazioni*; archive (bulk or from the object page) and *Restituito* → *Annulla*, which restores the exact previous state. Inside a dialog, a bottom sheet or the camera, where a Snackbar would sit under the scrim, the message appears inline in that surface (error color for failures, announced as a polite live region). On forms, an error about one field sits under that field (sign-in: email already registered or unconfirmed under *Email*, password too short under *Password*); an error that cannot name the field ("Email o password non corretti") sits above the submit button. Every one is a polite live region. On the map, being offline shows a notice that the map may stay empty while pins and *Elenco* still work.
 
 ### Camera & Photo Overlays
 Full-black canvases with white controls on 45–55% black scrims, a top gradient for legibility, and a 4px white-ringed circular shutter. The only place the UI leaves the color-role system.
@@ -279,6 +282,7 @@ Full-black canvases with white controls on 45–55% black scrims, a top gradient
 - **Do** state uncertainty plainly ("±40 m", "aggiornata 3 giorni fa") and offer the correcting action right below it.
 - **Do** add every new screen or panel to `Previews.kt` and record it (`./gradlew :app:recordRoborazziDebug`), in light and dark, at phone and tablet widths.
 - **Do** give the "where" line in list cards two lines before ellipsizing; it is the answer the user is looking for.
+- **Do** put rare or destructive row actions (invites, members, leaving a project) in a ⋮ menu as written items with a leading icon; the destructive item is in `error` color and still confirms. The ⋮ button's description names its subject ("Azioni per l'invito a …").
 - **Do** keep inline icons at 18px and list thumbnails at 64px with a 12px radius so rows align with or without photos.
 
 ### Don't:
