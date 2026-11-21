@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.auth
 
+import it.objectfinder.app.ui.common.readableWidth
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -147,6 +148,7 @@ fun AuthScreen(
                 .padding(padding)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
+                .readableWidth()
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

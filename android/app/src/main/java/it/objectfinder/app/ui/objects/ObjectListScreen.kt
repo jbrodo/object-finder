@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.ui.common.ReadableMaxWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.filled.Place
 import kotlinx.coroutines.withContext
@@ -38,8 +39,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudDone
@@ -171,7 +173,7 @@ fun ObjectListScreen(
             placeholder = { Text("Cerca nome, luogo, note o codice") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).widthIn(max = ReadableMaxWidth).fillMaxWidth(),
         )
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -232,23 +234,16 @@ fun ObjectListScreen(
                     title = "Nessun risultato",
                     body = "Nessun oggetto corrisponde a ricerca e filtro selezionati.",
                 )
-                else -> LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(state.items, key = { it.id }, contentType = { "object" }) { item ->
-                        ObjectCard(
-                            item,
-                            cover = state.covers[item.id],
-                            distance = state.distanceTo(item),
-                            placePath = state.placePath(item),
-                            showSyncState = showSyncState,
-                            isSelected = { item.id in selected },
-                            onClick = { if (selecting) toggle(item.id) else onOpenObject(item.id) },
-                            onLongClick = { toggle(item.id) },
-                        )
-                    }
-                }
+                else -> ObjectGrid(
+                    items = state.items,
+                    cover = { state.covers[it.id] },
+                    distance = state::distanceTo,
+                    placePath = state::placePath,
+                    showSyncState = showSyncState,
+                    isSelected = { it.id in selected },
+                    onClick = { if (selecting) toggle(it.id) else onOpenObject(it.id) },
+                    onLongClick = { toggle(it.id) },
+                )
             }
             if (canCreate && !selecting) ExtendedFloatingActionButton(
                 onClick = onCreateObject,
@@ -259,6 +254,44 @@ fun ObjectListScreen(
         }
     }
     sheet?.let { (file, count) -> LabelSheetReady(file, count) { sheet = null } }
+}
+
+/**
+ * Elenco degli oggetti: una colonna su telefono, due o tre su tablet e pieghevoli aperti
+ * (schede di almeno 360dp: nome e "dove" restano leggibili per intero).
+ */
+@Composable
+internal fun ObjectGrid(
+    items: List<ObjectEntity>,
+    cover: (ObjectEntity) -> String?,
+    distance: (ObjectEntity) -> Double?,
+    placePath: (ObjectEntity) -> String,
+    showSyncState: Boolean,
+    isSelected: (ObjectEntity) -> Boolean,
+    onClick: (ObjectEntity) -> Unit,
+    onLongClick: (ObjectEntity) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 360.dp),
+        modifier = modifier,
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(items, key = { it.id }, contentType = { "object" }) { item ->
+            ObjectCard(
+                item,
+                cover = cover(item),
+                distance = distance(item),
+                placePath = placePath(item),
+                showSyncState = showSyncState,
+                isSelected = { isSelected(item) },
+                onClick = { onClick(item) },
+                onLongClick = { onLongClick(item) },
+            )
+        }
+    }
 }
 
 @Composable
@@ -379,7 +412,7 @@ private fun ObjectCard(
 }
 
 @Composable
-private fun EmptyState(title: String, body: String) {
+internal fun EmptyState(title: String, body: String) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,

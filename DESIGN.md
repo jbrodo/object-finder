@@ -196,6 +196,10 @@ Single-column, phone-first. List screens use a `LazyColumn` with 16px side paddi
 
 The object page is a vertical stack of sections spaced 12px apart. Inside panels and cards the rhythm is 16px padding with 4–8px between lines (6px in the answer panels). Inline icons inside buttons and metadata are 18px, separated from their label by two spaces in the text, not by a spacer.
 
+**Adaptive widths.** Forms and reading surfaces (object page, settings, projects, members, sign-in) fill the window up to 640px and then stay centered (`Modifier.readableWidth()`); the search field stops at the same width. The object list is an adaptive grid with cards at least 360px wide: one column on phones and folded devices, two or three on tablets. The map panel stops at 560px.
+
+**The Window-Class Rule.** Layout decisions read the window size class, never orientation or "is tablet". Every new screen is checked at phone (411px), foldable (673px) and tablet (1280px) widths through the screenshot previews.
+
 The map screen is a full-bleed map with filter chips overlaid at the top and the selected-group panel docked at the bottom; its item list is capped at 240px and scrolls.
 
 The spacing scale in practice: 2 / 4 / 8 / 12 / 16 / 24px (1px = 1dp). Anything else is a one-off.
@@ -223,7 +227,7 @@ The components should feel calm and reassuring: soft tonal containers, clear ver
 - **Shape:** Material default pill (fully rounded, 40px tall).
 - **Primary (Button):** the single most important action on a surface, e.g. *Portami lì* (full width, with a Directions icon) or *Tieni la mia* in a conflict.
 - **Outlined:** the frequent secondary action, e.g. *L'ho spostato qui* or *Usa quella del server*. Often full width inside panels.
-- **Filled Tonal:** confirming a state change inside a tinted panel (*Restituito* on the loan panel).
+- **Filled in panel color:** confirming a state change inside a tinted panel (*Restituito* is `tertiary` on the loan panel, `error` when overdue).
 - **Text:** the most common button. Dialog actions, low-emphasis corrections (*Correggi il punto sulla mappa*), "Modifica".
 - **Loading:** an in-progress action swaps its icon for a 16px circular indicator (2px stroke) and changes its label to describe what's happening ("Rilevo la posizione…", "Cerco un segnale migliore… ±12 m").
 
@@ -240,10 +244,10 @@ The components should feel calm and reassuring: soft tonal containers, clear ver
 - **Place selector:** an outlined button with a 4px radius, a Place icon and the current path, which opens the tree picker. It looks like a field because it acts as one.
 
 ### Navigation
-- **Style:** a Material bottom navigation bar with three labelled tabs (*Oggetti*, *Mappa*, *Impostazioni*) under a shared `TopAppBar` titled with the current project's name. On the object list the top bar carries icon actions (scan label, recognize object, sync with a pending-count badge) and an overflow menu (*Esporta inventario*). The object page, projects and members open as stacked screens with a back arrow. Creation is an Extended FAB on the list.
+- **Style:** adaptive navigation (`NavigationSuiteScaffold`) with three labelled tabs (*Oggetti*, *Mappa*, *Impostazioni*): a bottom bar on compact windows (<600dp), a navigation rail from 600dp up (tablets, open foldables, free-form windows). The choice follows the window size class, never orientation or device type. A shared `TopAppBar` carries the current project's name; on the object list it holds icon actions (scan label, recognize object, sync with a pending-count badge) and an overflow menu (*Esporta inventario*). The object page, projects and members open as stacked screens with a back arrow. Creation is an Extended FAB on the list.
 
 ### Answer Panel (signature)
-A `Surface` with a 16px radius and 16px padding, tinted by meaning: `primaryContainer` for *Dove si trova*, `tertiaryContainer` for *In prestito*, `errorContainer` when that loan is overdue. Content follows the Eyebrow-Then-Answer rule, then fact lines in Body Large / Body Small, then actions. This is the component that makes ObjectFinder recognizable: the answer is handed to you in a calm, colored slip of paper.
+A `Surface` with a 16px radius and 16px padding, tinted by meaning: `primaryContainer` for *Dove si trova*, `tertiaryContainer` for *In prestito*, `errorContainer` when that loan is overdue. Content follows the Eyebrow-Then-Answer rule, then fact lines in Body Large / Body Small, then actions. Actions take the panel's own color, not the generic ones: on the loan panel the main button is `tertiary` (`error` when overdue) and secondary text buttons use the panel's content color. This is the component that makes ObjectFinder recognizable: the answer is handed to you in a calm, colored slip of paper.
 
 ### Conflict Banner (signature)
 An `errorContainer` card at the top of the object page when the server version diverged: warning icon + Title Small heading, an explanation in Body, a per-field diff (Label bold field name, "Tua:" / "Server:" lines in Body Small), and a Button/Outlined pair to choose a version.
@@ -259,6 +263,7 @@ Full-black canvases with white controls on 45–55% black scrims, a top gradient
 - **Do** use the Answer Panel (16px radius, 16px padding, Label eyebrow + Title Large answer) for any new status-bearing summary.
 - **Do** keep tinted containers for their meanings: primary = location, tertiary = loan, error = needs a decision.
 - **Do** state uncertainty plainly ("±40 m", "aggiornata 3 giorni fa") and offer the correcting action right below it.
+- **Do** add every new screen or panel to `Previews.kt` and record it (`./gradlew :app:recordRoborazziDebug`), in light and dark, at phone and tablet widths.
 - **Do** keep inline icons at 18px and list thumbnails at 64px with a 12px radius so rows align with or without photos.
 
 ### Don't:

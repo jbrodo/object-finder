@@ -91,9 +91,14 @@ private val DarkColors = darkColorScheme(
 )
 
 @Composable
-fun ObjectFinderTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun ObjectFinderTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    // false nelle preview/screenshot: mostra lo schema di riserva invece dei colori dello sfondo.
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit,
+) {
     val colors = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }

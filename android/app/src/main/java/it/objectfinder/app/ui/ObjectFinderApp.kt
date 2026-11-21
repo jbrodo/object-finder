@@ -54,9 +54,8 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -70,7 +69,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import it.objectfinder.app.data.AppContainer
 import it.objectfinder.app.data.local.ObjectStatus
@@ -102,7 +100,7 @@ private object Routes {
     fun newObjectWithPhoto(photo: String) = "editor?photo=${android.net.Uri.encode(photo)}"
 }
 
-private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
+internal enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     OBJECTS(Routes.OBJECTS, "Oggetti", Icons.AutoMirrored.Filled.List),
     MAP(Routes.MAP, "Mappa", Icons.Default.Map),
     SETTINGS(Routes.SETTINGS, "Impostazioni", Icons.Default.Settings),
@@ -411,7 +409,6 @@ private fun MainShell(
     val project by container.settings.activeProject.collectAsStateWithLifecycle()
     val session by container.authRepository.session.collectAsStateWithLifecycle()
     val pending by container.objectRepository.observePendingCount().collectAsStateWithLifecycle(0)
-    val backStack by nav.currentBackStackEntryAsState()
     var exportOpen by rememberSaveable { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var recognizing by remember { mutableStateOf(false) }
@@ -440,6 +437,17 @@ private fun MainShell(
         }
     }
 
+    AppNavigationSuite(
+        current = current,
+        onSelect = { tab ->
+            nav.navigate(tab.route) {
+                // OBJECTS è sempre alla base dello stack (anche quando lo start è AUTH).
+                popUpTo(Routes.OBJECTS) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        },
+    ) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -479,26 +487,35 @@ private fun MainShell(
                 },
             )
         },
-        bottomBar = {
-            NavigationBar {
-                Tab.entries.forEach { tab ->
-                    NavigationBarItem(
-                        selected = backStack?.destination?.route == tab.route,
-                        onClick = {
-                            nav.navigate(tab.route) {
-                                // OBJECTS è sempre alla base dello stack (anche quando lo start è AUTH).
-                                popUpTo(Routes.OBJECTS) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(tab.label) },
-                    )
-                }
-            }
-        },
     ) { padding ->
         content(Modifier.padding(padding))
     }
+    }
+}
+
+/**
+ * Navigazione principale adattiva: barra in basso su telefono, barra laterale da 600dp in su
+ * (tablet, pieghevoli aperti, finestre libere). La scelta la fa la WindowSizeClass, mai l'orientamento.
+ */
+@Composable
+internal fun AppNavigationSuite(
+    current: Tab,
+    onSelect: (Tab) -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    NavigationSuiteScaffold(
+        navigationSuiteItems = {
+            Tab.entries.forEach { tab ->
+                item(
+                    selected = tab == current,
+                    onClick = { if (tab != current) onSelect(tab) },
+                    icon = { Icon(tab.icon, contentDescription = null) },
+                    label = { Text(tab.label) },
+                )
+            }
+        },
+        modifier = modifier,
+        content = content,
+    )
 }

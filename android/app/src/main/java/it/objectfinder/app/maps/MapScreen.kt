@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableDoubleStateOf
 import android.content.Context
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
@@ -244,7 +245,7 @@ fun ObjectMapScreen(
                     myLocation = myLocation,
                     onOpen = onOpenObject,
                     onDismiss = { selected = null; expandedKey = null },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).widthIn(max = 560.dp),
                 )
             } else if (markers.isEmpty() || withoutLocation > 0) {
                 Surface(

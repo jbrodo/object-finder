@@ -8,6 +8,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+    id("io.github.takahirom.roborazzi")
 }
 
 // Google Maps key: -PGOOGLE_MAPS_API_KEY=... (CI) oppure GOOGLE_MAPS_API_KEY in local.properties.
@@ -112,7 +113,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        // Robolectric (screenshot delle preview) legge risorse e manifest reali.
+        unitTests.isIncludeAndroidResources = true
+    }
     lint {
         // Digital Asset Links servono solo a condividere le password con un sito web dello stesso
         // dominio (Credential Manager); Object Finder non ne ha. Da riattivare se nascerà un sito.
@@ -222,6 +227,7 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.11.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)
+    testImplementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.activity:activity-compose:1.13.0")
@@ -233,6 +239,8 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // Barra in basso su telefono, barra laterale su tablet e pieghevoli (WindowSizeClass).
+    implementation("androidx.compose.material3:material3-adaptive-navigation-suite")
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
@@ -285,8 +293,20 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+
+    // Screenshot delle preview: ./gradlew :app:recordRoborazziDebug (PNG in app/src/test/screenshots),
+    // poi verifyRoborazziDebug per bloccare le regressioni.
+    testImplementation("org.robolectric:robolectric:4.18.1")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.79.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.79.0")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+}
+
+roborazzi {
+    outputDir.set(file("src/test/screenshots"))
 }

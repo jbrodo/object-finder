@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.settings
 
+import it.objectfinder.app.ui.common.readableWidth
 import it.objectfinder.app.ui.auth.NewPasswordDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -54,7 +55,7 @@ fun SettingsScreen(
     val mapEngine by container.settings.mapEngine.collectAsStateWithLifecycle()
 
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()).readableWidth().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Section("Account") {

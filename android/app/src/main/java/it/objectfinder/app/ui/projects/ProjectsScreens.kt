@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.projects
 
+import it.objectfinder.app.ui.common.readableWidth
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -98,7 +99,7 @@ fun ProjectsScreen(viewModel: ProjectsViewModel, onBack: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         // Inset in basso come contentPadding: l'elenco scorre sotto la barra di navigazione.
-        Column(Modifier.fillMaxSize().padding(padding.withoutBottom()).consumeWindowInsets(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding.withoutBottom()).consumeWindowInsets(padding).readableWidth()) {
             if (state.op.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             Text(
                 "Ogni progetto ha il suo archivio di oggetti e i suoi membri. " +
@@ -184,7 +185,7 @@ fun MembersScreen(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         // Inset in basso come contentPadding: l'elenco scorre sotto la barra di navigazione.
-        Column(Modifier.fillMaxSize().padding(padding.withoutBottom()).consumeWindowInsets(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding.withoutBottom()).consumeWindowInsets(padding).readableWidth()) {
             if (state.op.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (!canManage) {
                 Text(

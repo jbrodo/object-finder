@@ -15,11 +15,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Handshake
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -78,8 +80,19 @@ fun LoanPanel(
                 style = MaterialTheme.typography.bodyLarge,
             )
             if (!readOnly) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onReturned) { Text("Restituito") }
-                TextButton(onClick = onEdit) { Text("Modifica") }
+                // Pulsanti nei colori del riquadro (ambra o rosso), non nel blu/ardesia generici.
+                val scheme = MaterialTheme.colorScheme
+                Button(
+                    onClick = onReturned,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (overdue) scheme.error else scheme.tertiary,
+                        contentColor = if (overdue) scheme.onError else scheme.onTertiary,
+                    ),
+                ) { Text("Restituito") }
+                TextButton(
+                    onClick = onEdit,
+                    colors = ButtonDefaults.textButtonColors(contentColor = LocalContentColor.current),
+                ) { Text("Modifica") }
             }
         }
     }

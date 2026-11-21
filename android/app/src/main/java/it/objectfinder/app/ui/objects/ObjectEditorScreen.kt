@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.ui.common.readableWidth
 import androidx.compose.material.icons.filled.Place
 import it.objectfinder.app.sync.LoanReminderWorker
 import androidx.compose.material.icons.filled.Handshake
@@ -328,6 +329,7 @@ fun ObjectEditorScreen(
                 .fillMaxSize()
                 .padding(padding) // include la barra Salva, che segue già la tastiera
                 .verticalScroll(rememberScrollState())
+                .readableWidth()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -490,7 +492,7 @@ private fun ObjectHeader(state: EditorState) {
  * È l'unica superficie colorata della scheda: si trova a colpo d'occhio.
  */
 @Composable
-private fun WherePanel(
+internal fun WherePanel(
     state: EditorState,
     history: List<LocationHistoryEntity>,
     readOnly: Boolean,
