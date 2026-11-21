@@ -65,7 +65,7 @@ jobs:
           ./gradlew --no-daemon :app:assembleDebug
           -PGOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
           -PVERSION_CODE="${{ github.run_number }}"
-          -PVERSION_NAME="1.10.0-ci.${{ github.run_number }}"
+          -PVERSION_NAME="1.11.0-ci.${{ github.run_number }}"
 
       - name: Upload test and lint reports
         if: always()
