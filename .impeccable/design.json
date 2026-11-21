@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-21T20:53:44.746653+00:00",
+  "title": "Design System: ObjectFinder",
+  "extensions": {
+    "colorMeta": {
+      "survey-blue": {
+        "role": "primary",
+        "displayName": "Survey Blue",
+        "canonical": "oklch(46.7% 0.096 243.1)",
+        "tonalRamp": [
+          "#010C18",
+          "#042942",
+          "#0B4970",
+          "#2D6C98",
+          "#5290BE",
+          "#82B4DD",
+          "#B3D6F2",
+          "#DCF2FF"
+        ],
+        "purpose": "Fallback only: Android 12+ replaces every role with wallpaper-derived dynamic color."
+      },
+      "on-survey-blue": {
+        "role": "primary",
+        "displayName": "On Survey Blue"
+      },
+      "survey-blue-container": {
+        "role": "primary",
+        "displayName": "Survey Blue Container"
+      },
+      "on-survey-blue-container": {
+        "role": "primary",
+        "displayName": "On Survey Blue Container"
+      },
+      "pencil-slate": {
+        "role": "secondary",
+        "displayName": "Pencil Slate",
+        "canonical": "oklch(48.2% 0.027 246.4)",
+        "tonalRamp": [
+          "#080C0F",
+          "#20272F",
+          "#3A4752",
+          "#5A6875",
+          "#7C8B99",
+          "#A3B0BC",
+          "#C9D2DB",
+          "#E9EFF5"
+        ]
+      },
+      "brass-compass": {
+        "role": "tertiary",
+        "displayName": "Brass Compass",
+        "canonical": "oklch(50.8% 0.108 73.3)",
+        "tonalRamp": [
+          "#150800",
+          "#3A2000",
+          "#643A00",
+          "#8B5B01",
+          "#B07E36",
+          "#D0A56D",
+          "#EACCA5",
+          "#FFEBD3"
+        ]
+      },
+      "error-red": {
+        "role": "error",
+        "displayName": "Error Red",
+        "canonical": "oklch(50.6% 0.193 27.7)",
+        "tonalRamp": [
+          "#210000",
+          "#530000",
+          "#8C0000",
+          "#BB1C1B",
+          "#E64C42",
+          "#FF8274",
+          "#FFB5A9",
+          "#FFDED5"
+        ]
+      },
+      "survey-blue-night": {
+        "role": "primary",
+        "displayName": "Survey Blue Night"
+      },
+      "on-survey-blue-night": {
+        "role": "primary",
+        "displayName": "On Survey Blue Night"
+      },
+      "survey-blue-container-night": {
+        "role": "primary",
+        "displayName": "Survey Blue Container Night"
+      },
+      "on-survey-blue-container-night": {
+        "role": "primary",
+        "displayName": "On Survey Blue Container Night"
+      },
+      "pencil-slate-night": {
+        "role": "secondary",
+        "displayName": "Pencil Slate Night"
+      },
+      "brass-compass-night": {
+        "role": "tertiary",
+        "displayName": "Brass Compass Night"
+      },
+      "photo-scrim": {
+        "role": "neutral",
+        "displayName": "Photo Scrim (45–55% alpha)"
+      },
+      "photo-ink": {
+        "role": "neutral",
+        "displayName": "Photo Ink"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Rare: empty states and auth headings."
+      },
+      "title-large": {
+        "displayName": "Title Large",
+        "purpose": "The answer inside a panel; empty-thumbnail initial."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Object names in list cards."
+      },
+      "title-small": {
+        "displayName": "Title Small",
+        "purpose": "Banner and section titles."
+      },
+      "body-large": {
+        "displayName": "Body Large",
+        "purpose": "Facts inside panels."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default running text and the where-line."
+      },
+      "body-small": {
+        "displayName": "Body Small",
+        "purpose": "Precision lines and supporting detail."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Panel eyebrows, marked as semantic headings."
+      }
+    },
+    "shadows": [
+      {
+        "name": "map-panel",
+        "value": "tonalElevation 3dp + shadowElevation 6dp (Compose)",
+        "purpose": "Selected-group panel floating over map tiles; all else uses Material defaults."
+      }
+    ],
+    "motion": [
+      {
+        "name": "material-default",
+        "value": "Compose Material 3 defaults",
+        "purpose": "No custom motion; only map camera animate-to on focus/recenter."
+      }
+    ],
+    "platform": {
+      "target": "android-compose",
+      "units": "1px in tokens = 1dp (sizes) / 1sp (type)",
+      "dynamicColor": "Android 12+ uses wallpaper-derived color; tokens are the fallback scheme."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one decisive action on a surface, e.g. 'Portami lì'.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M21.71 11.29l-9-9a1 1 0 0 0-1.42 0l-9 9a1 1 0 0 0 0 1.42l9 9a1 1 0 0 0 1.42 0l9-9a1 1 0 0 0 0-1.42zM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5-3.5 3.5z\"/></svg>Portami lì</button>",
+      "css": ".ds-btn-primary{font-family: Roboto, system-ui, sans-serif;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 24px;border:none;border-radius:9999px;background:#1F5F8B;color:#fff;font-size:14px;font-weight:500;letter-spacing:.007em;cursor:pointer;transition:box-shadow .2s,background .2s}.ds-btn-primary:hover{background:#2D6C98;box-shadow:0 1px 3px rgba(0,0,0,.3)}.ds-btn-primary:focus-visible{outline:3px solid #82B4DD;outline-offset:2px}.ds-btn-primary:active{background:#0B4970}"
+    },
+    {
+      "name": "Outlined Button",
+      "kind": "button",
+      "refersTo": "button-outlined",
+      "description": "Frequent secondary action, e.g. 'L'ho spostato qui'.",
+      "html": "<button class=\"ds-btn-outlined\">L'ho spostato qui</button>",
+      "css": ".ds-btn-outlined{font-family: Roboto, system-ui, sans-serif;height:40px;padding:0 24px;border:1px solid #73777F;border-radius:9999px;background:transparent;color:#1F5F8B;font-size:14px;font-weight:500;letter-spacing:.007em;cursor:pointer;transition:background .2s}.ds-btn-outlined:hover{background:rgba(31,95,139,.08)}.ds-btn-outlined:focus-visible{outline:3px solid #82B4DD;outline-offset:2px}.ds-btn-outlined:active{background:rgba(31,95,139,.12)}"
+    },
+    {
+      "name": "Text Button",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Dialog actions and low-emphasis corrections.",
+      "html": "<button class=\"ds-btn-text\">Correggi il punto sulla mappa</button>",
+      "css": ".ds-btn-text{font-family: Roboto, system-ui, sans-serif;height:40px;padding:0 12px;border:none;border-radius:9999px;background:transparent;color:#1F5F8B;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s}.ds-btn-text:hover{background:rgba(31,95,139,.08)}.ds-btn-text:focus-visible{outline:3px solid #82B4DD;outline-offset:2px}"
+    },
+    {
+      "name": "Outlined Text Field",
+      "kind": "input",
+      "description": "Floating label, example placeholder, teaching supporting text.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Dove si trova</span><input class=\"ds-field-input\" placeholder=\"es. garage, scaffale in alto a sinistra\"><span class=\"ds-field-help\">Al chiuso il GPS sbaglia di qualche metro: una frase aiuta a ritrovarlo</span></label>",
+      "css": ".ds-field{font-family: Roboto, system-ui, sans-serif;display:flex;flex-direction:column;gap:4px;max-width:360px}.ds-field-label{font-size:12px;color:#42474E}.ds-field-input{height:56px;padding:0 16px;border:1px solid #73777F;border-radius:4px;font-size:16px;background:transparent;color:#1A1C1E}.ds-field-input:hover{border-color:#1A1C1E}.ds-field-input:focus-visible{outline:none;border:2px solid #1F5F8B;padding:0 15px}.ds-field-help{font-size:12px;color:#42474E;padding:0 16px}"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "description": "Horizontal filter row above lists and over the map.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip ds-chip-on\" aria-pressed=\"true\">✓ Vicini</button><button class=\"ds-chip\" aria-pressed=\"false\">Casa › Garage</button></div>",
+      "css": ".ds-chips{display:flex;gap:8px}.ds-chip{font-family: Roboto, system-ui, sans-serif;height:32px;padding:0 16px;border:1px solid #73777F;border-radius:8px;background:transparent;color:#42474E;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s}.ds-chip:hover{background:rgba(66,71,78,.08)}.ds-chip:focus-visible{outline:3px solid #82B4DD;outline-offset:2px}.ds-chip-on{border-color:transparent;background:#D6E4F2;color:#0F1D2A}"
+    },
+    {
+      "name": "Object Card",
+      "kind": "card",
+      "refersTo": "object-thumb",
+      "description": "List row: 64px thumbnail, name, where-line, metadata.",
+      "html": "<div class=\"ds-card\" tabindex=\"0\"><div class=\"ds-thumb\">T</div><div class=\"ds-card-body\"><div class=\"ds-card-name\">Trapano a percussione</div><div class=\"ds-card-where\">Casa › Garage · scaffale in alto</div><div class=\"ds-card-meta\">📍 120 m da te</div></div></div>",
+      "css": ".ds-card{font-family: Roboto, system-ui, sans-serif;display:flex;align-items:center;padding-left:12px;border-radius:12px;background:#F0F4FA;max-width:420px;cursor:pointer;transition:background .2s}.ds-card:hover{background:#E6ECF4}.ds-card:focus-visible{outline:3px solid #82B4DD;outline-offset:2px}.ds-thumb{flex:none;width:64px;height:64px;border-radius:12px;background:#DEE3EB;color:#42474E;display:grid;place-items:center;font-size:22px}.ds-card-body{padding:16px;display:flex;flex-direction:column;gap:4px;min-width:0}.ds-card-name{font-size:16px;font-weight:500;line-height:24px;color:#1A1C1E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ds-card-where{font-size:14px;line-height:20px;color:#1A1C1E}.ds-card-meta{font-size:12px;color:#42474E}"
+    },
+    {
+      "name": "Answer Panel — Dove si trova",
+      "kind": "custom",
+      "refersTo": "panel-where",
+      "description": "Signature: eyebrow, answer, facts, actions on a primaryContainer slip.",
+      "html": "<section class=\"ds-panel\"><h3 class=\"ds-panel-eyebrow\">Dove si trova</h3><p class=\"ds-panel-answer\">Casa › Garage</p><p class=\"ds-panel-fact\">120 m da te · aggiornata 3 giorni fa</p><p class=\"ds-panel-small\">Precisione ±8 m</p><button class=\"ds-panel-cta\">Portami lì</button></section>",
+      "css": ".ds-panel{font-family: Roboto, system-ui, sans-serif;display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:16px;background:#CDE5FF;color:#001D32;max-width:420px}.ds-panel *{margin:0}.ds-panel-eyebrow{font-size:14px;font-weight:500;line-height:20px}.ds-panel-answer{font-size:22px;line-height:28px}.ds-panel-fact{font-size:16px;line-height:24px}.ds-panel-small{font-size:12px;line-height:16px}.ds-panel-cta{margin-top:6px;height:40px;border:none;border-radius:9999px;background:#1F5F8B;color:#fff;font:500 14px Roboto,system-ui,sans-serif;cursor:pointer}.ds-panel-cta:hover{background:#2D6C98}.ds-panel-cta:focus-visible{outline:3px solid #5290BE;outline-offset:2px}"
+    },
+    {
+      "name": "Answer Panel — In prestito",
+      "kind": "custom",
+      "description": "Signature: loan state on tertiaryContainer; errorContainer when overdue.",
+      "html": "<section class=\"ds-loan\"><h3 class=\"ds-loan-eyebrow\">🤝 In prestito</h3><p class=\"ds-loan-answer\">a Marco</p><p class=\"ds-loan-fact\">dal 2 nov · scade tra 5 giorni</p><div class=\"ds-loan-actions\"><button class=\"ds-loan-tonal\">Restituito</button><button class=\"ds-loan-text\">Modifica</button></div></section>",
+      "css": ".ds-loan{font-family: Roboto, system-ui, sans-serif;display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:16px;background:#FFDDB3;color:#2C1700;max-width:420px}.ds-loan *{margin:0}.ds-loan-eyebrow{font-size:14px;font-weight:500}.ds-loan-answer{font-size:22px;line-height:28px}.ds-loan-fact{font-size:16px;line-height:24px}.ds-loan-actions{display:flex;gap:8px}.ds-loan-tonal{height:40px;padding:0 24px;border:none;border-radius:9999px;background:#8A5A00;color:#fff;font:500 14px Roboto,system-ui,sans-serif;cursor:pointer}.ds-loan-tonal:hover{background:#643A00}.ds-loan-tonal:focus-visible,.ds-loan-text:focus-visible{outline:3px solid #B07E36;outline-offset:2px}.ds-loan-text{height:40px;padding:0 12px;border:none;border-radius:9999px;background:transparent;color:#643A00;font:500 14px Roboto,system-ui,sans-serif;cursor:pointer}.ds-loan-text:hover{background:rgba(138,90,0,.1)}"
+    },
+    {
+      "name": "Bottom Navigation",
+      "kind": "nav",
+      "description": "Three labelled tabs: Oggetti, Mappa, Impostazioni.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-nav-on\" href=\"#\"><span class=\"ds-nav-pill\">☰</span>Oggetti</a><a class=\"ds-nav-item\" href=\"#\"><span class=\"ds-nav-pill\">🗺</span>Mappa</a><a class=\"ds-nav-item\" href=\"#\"><span class=\"ds-nav-pill\">⚙</span>Impostazioni</a></nav>",
+      "css": ".ds-nav{font-family: Roboto, system-ui, sans-serif;display:flex;justify-content:space-around;height:80px;align-items:center;background:#EEF1F6;max-width:420px}.ds-nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:500;color:#42474E;text-decoration:none}.ds-nav-pill{width:64px;height:32px;border-radius:16px;display:grid;place-items:center;transition:background .2s}.ds-nav-item:hover .ds-nav-pill{background:rgba(66,71,78,.08)}.ds-nav-item:focus-visible{outline:3px solid #82B4DD;outline-offset:2px;border-radius:8px}.ds-nav-on{color:#1A1C1E}.ds-nav-on .ds-nav-pill{background:#D6E4F2}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Field Notebook",
+    "overview": "**Creative North Star: \"The Field Notebook\"**\n\nObjectFinder is a surveyor's notebook for things you own: each entry records what an object is, where it was last put, how precise that fix is, and who has it now. The answer to \"where is it?\" always comes first. It is written as a plain sentence or a place path (Casa › Garage › Scaffale), followed by the distance and how old the reading is, with the next action (*Portami lì*, *L'ho spostato qui*) directly below. The tone is calm and reassuring. Someone opening the app has usually lost something, and the interface should lower that stress, not add to it.\n\nThe visual layer is deliberately stock Material 3. The app follows the phone's wallpaper colors (dynamic color on Android 12+), uses the system type scale, and draws its identity from structure, not ornament: soft tonal **answer panels** that hold the important facts, consistent photo thumbnails, honest uncertainty language (\"±40 m\"), and a status vocabulary carried by color *roles*: primary means \"here it is\", tertiary means \"it's on loan\", error means \"needs you\". Density is medium. Lists are scannable one-handed, and the object page is a vertical stack of panels.\n\nThe Survey Blue palette is the **fallback** identity for Android 11 and below and the launcher icon's ground. It is not the color users see on modern devices.",
+    "keyCharacteristics": [
+      "Wallpaper-first color: rules are written in Material color roles, never hex.",
+      "The \"where\" answer leads every surface; facts are joined with ` · `.",
+      "Tonal answer panels (16px radius) hold location, loan, and conflict states.",
+      "Only the user's own photos appear; no illustration, no stock art.",
+      "System type scale, no branded font.",
+      "Italian UI copy, sentence case, verbs on buttons."
+    ],
+    "rules": [
+      {
+        "name": "The Roles-Not-Hex Rule",
+        "body": "UI code references `MaterialTheme.colorScheme` roles only. A hex literal in a composable is a bug, except Photo Scrim/Ink over imagery and the black-on-white QR label.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Meanings Rule",
+        "body": "Primary container = where it is. Tertiary container = lent out. Error container = needs your decision. Don't spend these containers on anything else, or the status language stops working.",
+        "section": "colors"
+      },
+      {
+        "name": "The Complete Fallback Rule",
+        "body": "The fallback scheme in `Theme.kt` defines every Material role, including containers, surfaces and outlines, with tones derived from Survey Blue, Pencil Slate and Brass Compass (container = tone 90 light / 30 dark). New roles must be derived the same way; never let a role fall through to Material's baseline lavender.",
+        "section": "colors"
+      },
+      {
+        "name": "The Eyebrow-Then-Answer Rule",
+        "body": "Every answer panel opens with a Label eyebrow (semantic heading) followed by a Title Large answer. The eyebrow names the question; the title answers it.",
+        "section": "typography"
+      },
+      {
+        "name": "The Dot-Join Rule",
+        "body": "Related facts on one line are joined with ` · ` (place path · detail, distance · age), never with commas or pipes.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "**Do** reference `MaterialTheme.colorScheme` roles and `MaterialTheme.typography` styles in every composable.",
+      "**Do** lead each surface with the \"where\" answer: place path or description first, then distance · age.",
+      "**Do** use the Answer Panel (16px radius, 16px padding, Label eyebrow + Title Large answer) for any new status-bearing summary.",
+      "**Do** keep tinted containers for their meanings: primary = location, tertiary = loan, error = needs a decision.",
+      "**Do** state uncertainty plainly (\"±40 m\", \"aggiornata 3 giorni fa\") and offer the correcting action right below it.",
+      "**Do** keep inline icons at 18px and list thumbnails at 64px with a 12px radius so rows align with or without photos."
+    ],
+    "donts": [
+      "**Don't** hard-code colors in UI code; the only exceptions are photo/camera scrims and the black-on-white QR label.",
+      "**Don't** introduce custom fonts or a branded typeface; the system type scale is the voice.",
+      "**Don't** add decorative imagery: no illustrations, stock photos, or mascots. Only the user's own photos appear.",
+      "**Don't** use primary, tertiary or error containers for decoration or emphasis unrelated to their meaning.",
+      "**Don't** add a custom shadow vocabulary; Material elevation defaults cover everything except the map panel."
+    ]
+  }
+}
