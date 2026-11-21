@@ -16,6 +16,7 @@ import org.robolectric.annotation.GraphicsMode
  * Cattura le preview di Previews.kt come PNG in app/src/test/screenshots.
  *  - ./gradlew :app:recordRoborazziDebug  → aggiorna i PNG di riferimento
  *  - ./gradlew :app:verifyRoborazziDebug  → fallisce se la UI cambia rispetto ai PNG
+ * SDK 34: le API 35+ di Robolectric richiedono Java 21, la CI usa Java 17.
  * Application vuota: l'avvio reale (Room, modelli, WorkManager) non serve a disegnare la UI.
  */
 private const val Q_PHONE = "w411dp-h891dp-port-xxhdpi"
@@ -24,7 +25,7 @@ private const val Q_TABLET = "w1280dp-h800dp-land-hdpi"
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], application = Application::class, qualifiers = Q_PHONE)
+@Config(sdk = [34], application = Application::class, qualifiers = Q_PHONE)
 class PreviewScreenshotTest {
 
     private fun shot(name: String, content: @Composable () -> Unit) =
