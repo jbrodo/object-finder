@@ -235,7 +235,7 @@ The components should feel calm and reassuring: soft tonal containers, clear ver
 
 ### Chips
 - **Style:** Material `FilterChip` in a horizontal row, 8px apart, above the list: *Vicini* first (sort by distance, the most frequent question away from home), then status, then *Luogo* when places exist.
-- **State:** a chip is a toggle only when the choice is independent. A single choice among several (status: *Attuali / In prestito / Senza posizione / Archiviati / Tutti*) is one chip with a dropdown that shows the current value, highlighted when it differs from the default. Two or three exclusive options that are always visible (map engine, export format) are segmented buttons.
+- **State:** a chip is a toggle only when the choice is independent. A single choice among several (status: *Attuali / In prestito / Senza posizione / Archiviati / Tutti*) is one chip with a dropdown that shows the current value, highlighted when it differs from the default. Two or three exclusive options that are always visible (map engine, export format) are segmented buttons; longer single-choice lists (loan due date) are radio rows of 48px that show the concrete value ("Tra 2 settimane · 6 dic").
 
 ### Cards / Containers
 - **Object card:** default Material `Card`, a 64px thumbnail (12px radius) flush to a 12px start inset, then a 16px-padded text column: name (Title, one line), "where" (Body Large, up to two lines), then facts in Body Small with 16px icons (distance or GPS state, loan, status, notes). With no photo, the thumbnail shows a neutral object glyph (`Category`, 28px, `onSurfaceVariant`), never the name's initial and never a box that reads as "archived". Selected state tints the card `secondaryContainer` and overlays a primary-tinted check on the thumbnail.
@@ -262,6 +262,12 @@ Icon (48px, primary), title, one sentence, and the way forward. First use carrie
 
 ### Object page (consultation)
 Order follows importance: name, *Dove si trova*, the loan panel when lent, the photo strip, notes, *Presta a qualcuno*, then secondary sections. Secondary sections (*Codici collegati*, *Storico posizioni*) are `CollapsibleCard`s, closed by default: one row with icon, title and a summary ("2 collegati", "4 posizioni registrate"), announced as expanded/collapsed. Inside the registration form the same card stays open. Both labels (*Etichetta QR da stampare*, *Scrivi etichetta NFC*) are written items next to each other in the ⋮ menu, not an icon in the bar.
+
+### Photo viewer
+Full screen and swipeable: it opens on the tapped photo and pages through the others, with "2 di 3" at the bottom on a scrim. Each photo is described as "Foto 2 di 3 di «Nome»"; *Elimina questa foto* acts on the visible one and confirms.
+
+### One-time hints
+A feature that an icon alone cannot explain gets a single dismissible card the first time it is useful (photo search: only when some object has photos). It disappears for good when closed or when the feature is used; it is stored locally, never synced.
 
 ### Recognition results
 The action weight follows the outcome. A high-confidence match makes "Apri «Nome»" the primary button, with *Riprova* and "È un altro oggetto: registralo" as text buttons, because registering again would create a duplicate. Uncertain candidates are the action themselves (rows), so *Riprova* and *Nuovo oggetto* are equal outlined buttons. No match: *Nuovo oggetto* is primary. Failed analysis: *Riprova* is primary.

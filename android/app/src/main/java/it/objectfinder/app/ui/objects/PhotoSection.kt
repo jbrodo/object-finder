@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
@@ -67,6 +70,8 @@ fun PhotoSection(
     newCameraUri: () -> Uri,
     onAdd: (Uri) -> Unit,
     onDelete: (String) -> Unit,
+    /** Nome dell'oggetto, per descrivere le foto a TalkBack nel visore. */
+    objectName: String = "",
 ) {
     val context = LocalContext.current
     val messages = LocalAppMessages.current
@@ -156,13 +161,15 @@ fun PhotoSection(
         }
     }
 
-    val current = photos.firstOrNull { it.id == viewing }
-    if (current != null) {
+    val start = photos.indexOfFirst { it.id == viewing }
+    if (start >= 0) {
         PhotoViewer(
-            photo = current,
+            photos = photos,
+            startIndex = start,
+            objectName = objectName,
             canDelete = !readOnly,
             onDismiss = { viewing = null },
-            onDelete = { viewing = null; onDelete(current.id) },
+            onDelete = { id -> viewing = null; onDelete(id) },
         )
     }
 }
@@ -207,8 +214,20 @@ fun PhotoThumbnail(photo: PhotoEntity, size: Int, onClick: (() -> Unit)? = null)
     }
 }
 
+/**
+ * Foto a schermo intero, scorrevoli: si parte da quella toccata e si passa alle altre con un gesto.
+ * "2 di 3" in basso; TalkBack legge indice e nome dell'oggetto. Elimina agisce sulla foto visibile.
+ */
 @Composable
-private fun PhotoViewer(photo: PhotoEntity, canDelete: Boolean, onDismiss: () -> Unit, onDelete: () -> Unit) {
+private fun PhotoViewer(
+    photos: List<PhotoEntity>,
+    startIndex: Int,
+    objectName: String,
+    canDelete: Boolean,
+    onDismiss: () -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    val pager = rememberPagerState(initialPage = startIndex) { photos.size }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     if (confirmDelete) {
         AlertDialog(
@@ -216,7 +235,10 @@ private fun PhotoViewer(photo: PhotoEntity, canDelete: Boolean, onDismiss: () ->
             title = { Text("Eliminare la foto?") },
             text = { Text("La foto verrà rimossa da questo dispositivo e, dopo la sincronizzazione, dal cloud.") },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; onDelete() }) {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    photos.getOrNull(pager.currentPage)?.let { onDelete(it.id) }
+                }) {
                     Text("Elimina", color = MaterialTheme.colorScheme.error)
                 }
             },
@@ -229,13 +251,18 @@ private fun PhotoViewer(photo: PhotoEntity, canDelete: Boolean, onDismiss: () ->
             decorFitsSystemWindows = false,
         )) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            photo.localPath?.let { path ->
-                AsyncImage(
-                    model = File(path),
-                    contentDescription = "Foto oggetto",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
-                )
+            HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { photos[it].id }) { page ->
+                val photo = photos[page]
+                val description = "Foto ${page + 1} di ${photos.size}" +
+                    (objectName.takeIf { it.isNotBlank() }?.let { " di «$it»" } ?: "")
+                photo.localPath?.let { path ->
+                    AsyncImage(
+                        model = File(path),
+                        contentDescription = description,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
             val buttonColors = IconButtonDefaults.iconButtonColors(
                 containerColor = Color.Black.copy(alpha = 0.5f),
@@ -246,9 +273,22 @@ private fun PhotoViewer(photo: PhotoEntity, canDelete: Boolean, onDismiss: () ->
             }
             if (canDelete) {
                 IconButton(onClick = { confirmDelete = true }, colors = buttonColors, modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(16.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "Elimina foto")
+                    Icon(Icons.Default.Delete, contentDescription = "Elimina questa foto")
                 }
             }
+            // Con più foto: dove si è, e che ce ne sono altre.
+            if (photos.size > 1) Text(
+                "${pager.currentPage + 1} di ${photos.size}",
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .safeDrawingPadding()
+                    .padding(bottom = 24.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.small)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .clearAndSetSemantics { },
+            )
         }
     }
 }

@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.ui.common.rememberOneTimeHint
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.PlainTooltip
@@ -138,6 +139,9 @@ fun ObjectListScreen(
     }
     val context = LocalContext.current
     val messages = LocalAppMessages.current
+    val photoSearchHint = rememberOneTimeHint("photo-search")
+    // Usare la ricerca per foto chiude anche il suggerimento che la spiega.
+    val recognize = onRecognize?.let { start -> { photoSearchHint.dismiss(); start() } }
     // Selezione multipla: Set per ricerche immediate; ogni scheda legge il proprio stato in proprio.
     var selected by rememberSaveable(stateSaver = SelectionSaver) { mutableStateOf(emptySet<String>()) }
     val selecting = selected.isNotEmpty()
@@ -218,7 +222,7 @@ fun ObjectListScreen(
             placeSelected = state.placeFilter != null,
             onPlace = { choosingPlace = true },
             onScan = onScan,
-            onRecognize = onRecognize,
+            onRecognize = recognize,
         )
         if (choosingPlace) PlacePickerSheet(
             tree = state.places,
@@ -234,6 +238,10 @@ fun ObjectListScreen(
         )
       }
 
+        // Una volta sola, se c'è qualcosa con cui confrontare: la ricerca per foto non si indovina dall'icona.
+        if (recognize != null && photoSearchHint.shouldShow && !selecting && state.covers.isNotEmpty() && state.query.isEmpty()) {
+            PhotoSearchHint(onTry = recognize, onDismiss = photoSearchHint::dismiss)
+        }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
                 state.loading -> DelayedProgress()
@@ -707,5 +715,26 @@ private fun SearchShortcut(icon: ImageVector, label: String, onClick: () -> Unit
         state = rememberTooltipState(),
     ) {
         IconButton(onClick = onClick) { Icon(icon, contentDescription = label) }
+    }
+}
+
+/** Suggerimento una tantum: si può cercare un oggetto fotografandolo. */
+@Composable
+internal fun PhotoSearchHint(onTry: () -> Unit, onDismiss: () -> Unit) {
+    Card(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp).widthIn(max = ReadableMaxWidth).fillMaxWidth()) {
+        Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Puoi cercare anche con una foto", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Inquadra un oggetto e ti dico quale dei tuoi è.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = onTry, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp)) { Text("Prova ora") }
+            }
+            IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "Chiudi il suggerimento") }
+        }
     }
 }

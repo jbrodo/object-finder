@@ -77,6 +77,12 @@ class PreviewScreenshotTest {
     @Test fun noResults() = shot("no_results") { NoResultsPreview() }
 
     @Config(qualifiers = "w360dp-h640dp-port-xxhdpi")
+    @Test fun dueDateOptions() = shot("due_date_options") { DueDateOptionsPreview() }
+
+    @Config(qualifiers = "w360dp-h640dp-port-xxhdpi")
+    @Test fun photoSearchHint() = shot("photo_search_hint") { PhotoSearchHintPreview() }
+
+    @Config(qualifiers = "w360dp-h640dp-port-xxhdpi")
     @Test fun recognitionActions() = shot("recognition_actions") { RecognitionActionsPreview() }
 
     @Config(qualifiers = "w360dp-h640dp-port-xxhdpi")

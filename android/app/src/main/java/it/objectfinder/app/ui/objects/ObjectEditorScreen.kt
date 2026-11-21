@@ -416,6 +416,7 @@ fun ObjectEditorScreen(
                         newCameraUri = viewModel::newCameraUri,
                         onAdd = viewModel::addPhoto,
                         onDelete = viewModel::deletePhoto,
+                        objectName = state.name,
                     )
                     if (state.notes.isNotBlank()) {
                         Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

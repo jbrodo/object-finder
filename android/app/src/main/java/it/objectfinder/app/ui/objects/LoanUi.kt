@@ -1,5 +1,14 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,7 +31,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -147,7 +155,8 @@ fun LendDialog(
         icon = { Icon(Icons.Default.Handshake, contentDescription = null) },
         title = { Text(if (initialName.isBlank()) "Presta l'oggetto" else "Modifica prestito") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Scorrevole: nome, suggerimenti e cinque scelte non entrano su uno schermo basso.
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it.take(120) },
@@ -161,21 +170,7 @@ fun LendDialog(
                     suggestions.forEach { SuggestionChip(onClick = { name = it }, label = { Text(it) }) }
                 }
                 Text("Da restituire", style = MaterialTheme.typography.labelLarge)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(
-                        "Nessuna data" to null,
-                        "1 settimana" to today.plusWeeks(1),
-                        "2 settimane" to today.plusWeeks(2),
-                        "1 mese" to today.plusMonths(1),
-                    ).forEach { (label, day) ->
-                        FilterChip(selected = due == day, onClick = { due = day }, label = { Text(label) })
-                    }
-                    FilterChip(
-                        selected = due != null && due !in listOf(today.plusWeeks(1), today.plusWeeks(2), today.plusMonths(1)),
-                        onClick = { picking = true },
-                        label = { Text(due?.takeIf { it !in listOf(today.plusWeeks(1), today.plusWeeks(2), today.plusMonths(1)) }?.let { "Il ${LoanFormat.date(it)}" } ?: "Scegli data…") },
-                    )
-                }
+                DueDateOptions(due = due, today = today, onSelect = { due = it }, onPickDate = { picking = true })
                 if (due != null) Text(
                     "Il giorno della scadenza ti ricordo di farlo restituire.",
                     style = MaterialTheme.typography.bodySmall,
@@ -186,4 +181,45 @@ fun LendDialog(
         confirmButton = { TextButton(onClick = ::confirm, enabled = name.isNotBlank()) { Text("Salva") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
     )
+}
+
+/**
+ * Scadenza del prestito: una scelta sola, quindi pulsanti di opzione (righe da 48dp) e non chip
+ * combinabili. Ogni scorciatoia mostra anche la data esatta.
+ */
+@Composable
+internal fun DueDateOptions(
+    due: LocalDate?,
+    today: LocalDate,
+    onSelect: (LocalDate?) -> Unit,
+    onPickDate: () -> Unit,
+) {
+    val presets = listOf(
+        "Tra 1 settimana" to today.plusWeeks(1),
+        "Tra 2 settimane" to today.plusWeeks(2),
+        "Tra 1 mese" to today.plusMonths(1),
+    )
+    val custom = due?.takeIf { d -> presets.none { it.second == d } }
+    Column(Modifier.selectableGroup()) {
+        DueOption("Nessuna data", selected = due == null) { onSelect(null) }
+        presets.forEach { (label, day) ->
+            DueOption("$label · ${LoanFormat.date(day)}", selected = due == day) { onSelect(day) }
+        }
+        DueOption(custom?.let { "Il ${LoanFormat.date(it)} · cambia" } ?: "Scegli una data…", selected = custom != null, onClick = onPickDate)
+    }
+}
+
+@Composable
+private fun DueOption(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Spacer(Modifier.width(12.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
 }

@@ -1,5 +1,7 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.objects.PhotoSearchHint
+import it.objectfinder.app.ui.objects.DueDateOptions
 import it.objectfinder.app.ui.recognition.RecognitionActions
 import it.objectfinder.app.recognition.RecognitionResult
 import it.objectfinder.app.recognition.RecognitionMatch
@@ -349,4 +351,24 @@ internal fun RecognitionActionsPreview() = SampleTheme {
         Text("Analisi non riuscita", style = MaterialTheme.typography.labelLarge)
         RecognitionActions(RecognitionResult.Failed, likelyName = null, {}, {}, {})
     }
+}
+
+// --- Prestito e suggerimenti -------------------------------------------------------------
+
+@Preview(name = "Scadenza del prestito", widthDp = 360)
+@Composable
+internal fun DueDateOptionsPreview() = SampleTheme {
+    // Data fissa: le etichette mostrano la data esatta e lo screenshot resta stabile.
+    val today = LocalDate.of(2026, 11, 22)
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Da restituire", style = MaterialTheme.typography.labelLarge)
+        DueDateOptions(due = today.plusWeeks(2), today = today, onSelect = {}, onPickDate = {})
+    }
+}
+
+@Preview(name = "Suggerimento ricerca per foto", widthDp = 360)
+@Preview(name = "Suggerimento ricerca per foto · scuro", widthDp = 360, uiMode = UI_MODE_NIGHT_YES)
+@Composable
+internal fun PhotoSearchHintPreview() = SampleTheme {
+    Column(Modifier.padding(bottom = 16.dp)) { PhotoSearchHint(onTry = {}, onDismiss = {}) }
 }
