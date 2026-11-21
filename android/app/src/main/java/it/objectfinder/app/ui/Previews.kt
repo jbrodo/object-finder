@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.recognition.RecognitionActions
+import it.objectfinder.app.recognition.RecognitionResult
+import it.objectfinder.app.recognition.RecognitionMatch
 import it.objectfinder.app.ui.objects.LocationHistorySection
 import it.objectfinder.app.ui.objects.CodesSection
 import it.objectfinder.app.ui.projects.InviteRow
@@ -327,5 +330,23 @@ internal fun InviteRowsPreview() = SampleTheme {
             PendingInvite("i2", "marco@example.com", role, expiresAt = System.currentTimeMillis() - 86_400_000L),
             busy = false, onResend = {}, onShare = {}, onRevoke = {},
         )
+    }
+}
+
+// --- Riconoscimento ----------------------------------------------------------------------
+
+@Preview(name = "Azioni del riconoscimento", widthDp = 360)
+@Composable
+internal fun RecognitionActionsPreview() = SampleTheme {
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        val match = RecognitionMatch("1", similarity = 0.95f, distanceMeters = null, score = 0.95f)
+        Text("Trovato con buona sicurezza", style = MaterialTheme.typography.labelLarge)
+        RecognitionActions(RecognitionResult.Matches(listOf(match)), likelyName = "Trapano a percussione", {}, {}, {})
+        Text("Candidati incerti", style = MaterialTheme.typography.labelLarge)
+        RecognitionActions(RecognitionResult.Matches(listOf(match.copy(similarity = 0.5f))), likelyName = null, {}, {}, {})
+        Text("Nessuna corrispondenza", style = MaterialTheme.typography.labelLarge)
+        RecognitionActions(RecognitionResult.NoMatch, likelyName = null, {}, {}, {})
+        Text("Analisi non riuscita", style = MaterialTheme.typography.labelLarge)
+        RecognitionActions(RecognitionResult.Failed, likelyName = null, {}, {}, {})
     }
 }

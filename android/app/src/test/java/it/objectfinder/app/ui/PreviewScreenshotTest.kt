@@ -77,6 +77,9 @@ class PreviewScreenshotTest {
     @Test fun noResults() = shot("no_results") { NoResultsPreview() }
 
     @Config(qualifiers = "w360dp-h640dp-port-xxhdpi")
+    @Test fun recognitionActions() = shot("recognition_actions") { RecognitionActionsPreview() }
+
+    @Config(qualifiers = "w360dp-h640dp-port-xxhdpi")
     @Test fun inviteRows() = shot("invite_rows") { InviteRowsPreview() }
 
     @Config(qualifiers = "w411dp-h1180dp-port-xxhdpi")

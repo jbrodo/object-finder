@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.recognition
 
+import androidx.compose.material3.TextButton
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -180,14 +181,16 @@ fun RecognizeFlow(
                             "Non sono riuscito a leggere la foto. Riprova con più luce, inquadrando l'oggetto intero.",
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { discard(photo); step = Step.Camera }, modifier = Modifier.weight(1f)) {
-                            Text("Riprova")
-                        }
-                        Button(onClick = { onRegisterNew(photo) }, modifier = Modifier.weight(1f)) {
-                            Text("Nuovo oggetto", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
+                    val result = current.result
+                    val top = (result as? RecognitionResult.Matches)?.matches?.firstOrNull()
+                        ?.takeIf { it.confidence == Confidence.HIGH }?.let { byId[it.objectId] }
+                    RecognitionActions(
+                        result = result,
+                        likelyName = top?.name,
+                        onOpenLikely = { top?.let { discard(photo); onOpenObject(it.id) } },
+                        onRetry = { discard(photo); step = Step.Camera },
+                        onRegisterNew = { onRegisterNew(photo) },
+                    )
                 }
             }
         }
@@ -230,6 +233,51 @@ private fun MatchRow(item: ObjectEntity, cover: String?, match: RecognitionMatch
                 color = if (match.confidence == Confidence.HIGH) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/**
+ * Azioni in fondo ai risultati, con il peso che dipende dall'esito: se l'oggetto è stato trovato con
+ * buona sicurezza l'azione principale è aprirlo (registrarne uno nuovo creerebbe un doppione); con
+ * candidati incerti le righe sono l'azione e le altre due si equivalgono; senza corrispondenze si
+ * registra con questa foto; se l'analisi fallisce si riprova.
+ */
+@Composable
+internal fun RecognitionActions(
+    result: RecognitionResult,
+    likelyName: String?,
+    onOpenLikely: () -> Unit,
+    onRetry: () -> Unit,
+    onRegisterNew: () -> Unit,
+) {
+    when {
+        likelyName != null -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Button(onClick = onOpenLikely, modifier = Modifier.fillMaxWidth()) {
+                Text("Apri «$likelyName»", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(onClick = onRetry) { Text("Riprova") }
+                TextButton(onClick = onRegisterNew) { Text("È un altro oggetto: registralo") }
+            }
+        }
+        result is RecognitionResult.Matches -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onRetry, modifier = Modifier.weight(1f)) { Text("Riprova") }
+            OutlinedButton(onClick = onRegisterNew, modifier = Modifier.weight(1f)) {
+                Text("Nuovo oggetto", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        result == RecognitionResult.Failed -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onRetry, modifier = Modifier.weight(1f)) { Text("Riprova") }
+            OutlinedButton(onClick = onRegisterNew, modifier = Modifier.weight(1f)) {
+                Text("Nuovo oggetto", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        else -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onRetry, modifier = Modifier.weight(1f)) { Text("Riprova") }
+            Button(onClick = onRegisterNew, modifier = Modifier.weight(1f)) {
+                Text("Nuovo oggetto", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }

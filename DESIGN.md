@@ -242,7 +242,7 @@ The components should feel calm and reassuring: soft tonal containers, clear ver
 - **Background / Shadow:** Material card defaults; see Elevation & Depth.
 
 ### Search
-- **Style:** an `OutlinedTextField` capped at the readable width, one-line placeholder. Empty, its trailing icons search *by photo* (recognition) and *by label* (QR/NFC scan); with text, a single clear button replaces them. These shortcuts live where the user is already searching, not as mute icons in the top bar.
+- **Style:** an `OutlinedTextField` capped at the readable width, one-line placeholder. Empty, its trailing icons search *by photo* (recognition) and *by label* (QR/NFC scan); with text, a single clear button replaces them. These shortcuts live where the user is already searching, not as mute icons in the top bar; a long press shows their name in a Material plain tooltip.
 
 ### Inputs / Fields
 - **Style:** Material `OutlinedTextField` throughout, with floating label, an example placeholder ("es. garage, scaffale in alto a sinistra"), and supporting text that teaches why the field matters. A character counter appears only near the limit.
@@ -262,6 +262,12 @@ Icon (48px, primary), title, one sentence, and the way forward. First use carrie
 
 ### Object page (consultation)
 Order follows importance: name, *Dove si trova*, the loan panel when lent, the photo strip, notes, *Presta a qualcuno*, then secondary sections. Secondary sections (*Codici collegati*, *Storico posizioni*) are `CollapsibleCard`s, closed by default: one row with icon, title and a summary ("2 collegati", "4 posizioni registrate"), announced as expanded/collapsed. Inside the registration form the same card stays open. Both labels (*Etichetta QR da stampare*, *Scrivi etichetta NFC*) are written items next to each other in the ⋮ menu, not an icon in the bar.
+
+### Recognition results
+The action weight follows the outcome. A high-confidence match makes "Apri «Nome»" the primary button, with *Riprova* and "È un altro oggetto: registralo" as text buttons, because registering again would create a duplicate. Uncertain candidates are the action themselves (rows), so *Riprova* and *Nuovo oggetto* are equal outlined buttons. No match: *Nuovo oggetto* is primary. Failed analysis: *Riprova* is primary.
+
+### Place picker
+Creating, renaming and deleting places report failures inside the sheet (error color, live region, `userMessage()`); a deleted place is unselected only after the deletion succeeded. Row menus follow the app pattern: *Rinomina* with a pencil, *Elimina* in red with a bin.
 
 ### Conflict Banner (signature)
 An `errorContainer` card at the top of the object page when the server version diverged: warning icon + Title Small heading, an explanation in Body, a per-field diff (Label bold field name, "Tua:" / "Server:" lines in Body Small), and a Button/Outlined pair to choose a version.

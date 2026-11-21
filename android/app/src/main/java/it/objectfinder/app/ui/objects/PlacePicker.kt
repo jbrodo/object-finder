@@ -1,5 +1,10 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import it.objectfinder.app.data.userMessage
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
@@ -72,6 +77,8 @@ fun PlacePickerSheet(
     onDismiss: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    // Esito delle modifiche ai luoghi, nel foglio stesso: una Snackbar resterebbe sotto lo scrim.
+    var failure by remember { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var creating by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<PlaceEntity?>(null) }
@@ -84,6 +91,14 @@ fun PlacePickerSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+            failure?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
             if (tree.places.size > 6) OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
@@ -104,9 +119,14 @@ fun PlacePickerSheet(
                         onClick = { onPick(place.id) },
                         menu = if (canEdit) {
                             { close ->
-                                DropdownMenuItem(text = { Text("Rinomina") }, onClick = { close(); renaming = place })
+                                DropdownMenuItem(
+                                    text = { Text("Rinomina") },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                    onClick = { close(); renaming = place },
+                                )
                                 DropdownMenuItem(
                                     text = { Text("Elimina", color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                                     onClick = { close(); deleting = place },
                                 )
                             }
@@ -137,7 +157,12 @@ fun PlacePickerSheet(
         onDismiss = { creating = false },
         onConfirm = { name ->
             creating = false
-            scope.launch { runCatching { onCreate(name, selectedId) }.onSuccess { onPick(it.id) } }
+            failure = null
+            scope.launch {
+                runCatching { onCreate(name, selectedId) }
+                    .onSuccess { onPick(it.id) }
+                    .onFailure { failure = it.userMessage("Luogo non creato: riprova") }
+            }
         },
     )
     renaming?.let { place ->
@@ -145,7 +170,11 @@ fun PlacePickerSheet(
             title = "Rinomina luogo",
             initial = place.name,
             onDismiss = { renaming = null },
-            onConfirm = { name -> renaming = null; scope.launch { runCatching { onRename(place.id, name) } } },
+            onConfirm = { name ->
+                renaming = null
+                failure = null
+                scope.launch { runCatching { onRename(place.id, name) }.onFailure { failure = it.userMessage("Luogo non rinominato: riprova") } }
+            },
         )
     }
     deleting?.let { place ->
@@ -161,8 +190,13 @@ fun PlacePickerSheet(
             confirmButton = {
                 TextButton(onClick = {
                     deleting = null
-                    scope.launch { runCatching { onDelete(place.id) } }
-                    if (place.id == selectedId) onPick(null)
+                    failure = null
+                    scope.launch {
+                        // La scelta si toglie solo se il luogo è stato davvero eliminato.
+                        runCatching { onDelete(place.id) }
+                            .onSuccess { if (place.id == selectedId) onPick(null) }
+                            .onFailure { failure = it.userMessage("Luogo non eliminato: riprova") }
+                    }
                 }) { Text("Elimina", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(onClick = { deleting = null }) { Text("Annulla") } },

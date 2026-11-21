@@ -1,5 +1,10 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TooltipBox
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
@@ -652,12 +657,9 @@ internal fun SearchAndFilters(
             if (query.isNotEmpty()) IconButton(onClick = { onQueryChange("") }) {
                 Icon(Icons.Default.Clear, contentDescription = "Cancella la ricerca")
             } else Row {
-                onRecognize?.let {
-                    IconButton(onClick = it) { Icon(Icons.Default.PhotoCamera, contentDescription = "Cerca con una foto") }
-                }
-                onScan?.let {
-                    IconButton(onClick = it) { Icon(Icons.Default.QrCodeScanner, contentDescription = "Scansiona etichetta") }
-                }
+                // Pressione lunga: il nome dell'azione, per chi non riconosce l'icona.
+                onRecognize?.let { SearchShortcut(Icons.Default.PhotoCamera, "Cerca con una foto", it) }
+                onScan?.let { SearchShortcut(Icons.Default.QrCodeScanner, "Scansiona etichetta", it) }
             }
         },
         singleLine = true,
@@ -692,5 +694,18 @@ internal fun SearchAndFilters(
                 )
             },
         )
+    }
+}
+
+/** Icona nella barra di ricerca con il suo nome in un tooltip (pressione lunga) e per TalkBack. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchShortcut(icon: ImageVector, label: String, onClick: () -> Unit) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = rememberTooltipState(),
+    ) {
+        IconButton(onClick = onClick) { Icon(icon, contentDescription = label) }
     }
 }
