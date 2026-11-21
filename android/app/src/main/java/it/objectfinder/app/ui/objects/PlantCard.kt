@@ -36,71 +36,73 @@ import it.objectfinder.app.recognition.PlantSource
 import kotlin.math.roundToInt
 
 /**
- * "È una pianta?": fino a 5 candidati con la percentuale; un tocco ne usa uno (nome, categoria,
- * specie nelle note). Mai automatico: online consuma la quota giornaliera.
+ * Riconoscimento delle piante dentro "Suggerimenti dalla foto", solo su richiesta: un pulsante
+ * discreto finché non lo si tocca (online consuma la quota giornaliera), poi i candidati con la
+ * percentuale; un tocco ne usa uno (nome, categoria, specie nelle note).
  */
 @Composable
-fun PlantCard(
+fun PlantSuggestions(
     state: PlantUi,
     onIdentify: () -> Unit,
     onDownload: () -> Unit,
     onUse: (PlantGuess) -> Unit,
 ) {
     if (state == PlantUi.Hidden) return
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Eco, contentDescription = null, Modifier.size(18.dp))
-                Text("È una pianta?", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+    if (state == PlantUi.Idle) {
+        TextButton(onClick = onIdentify) {
+            Icon(Icons.Default.Eco, contentDescription = null, Modifier.size(18.dp))
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text("È una pianta? Riconoscila")
+        }
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Default.Eco, contentDescription = null, Modifier.size(16.dp))
+            Text("Pianta", style = MaterialTheme.typography.labelLarge, modifier = Modifier.semantics { heading() })
+        }
+        when (state) {
+            PlantUi.Hidden, PlantUi.Idle -> Unit
+            is PlantUi.NeedsModel -> {
+                state.note?.let { Muted(it) }
+                Muted(
+                    "Senza connessione riconosco piante dell'orto e del giardino (flora europea) con un modello " +
+                        "sul telefono, da scaricare una volta (50 MB). Le piante d'appartamento si riconoscono meglio online."
+                )
+                OutlinedButton(onClick = onDownload) { Text("Scarica (50 MB)") }
             }
-            when (state) {
-                PlantUi.Hidden -> Unit
-                PlantUi.Idle -> OutlinedButton(onClick = onIdentify) {
-                    Icon(Icons.Default.Eco, contentDescription = null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                    Text("Riconosci la pianta")
+            is PlantUi.Downloading -> {
+                Text("Scarico il modello… ${(state.progress * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+                LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
+            }
+            PlantUi.Identifying -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                Text("Guardo la foto…", style = MaterialTheme.typography.bodyMedium)
+            }
+            PlantUi.NotAPlant -> {
+                Muted("Non riconosco una pianta in questa foto. Prova con una foto ravvicinata di foglie o fiori.")
+                Retry(onIdentify)
+            }
+            is PlantUi.Failed -> {
+                Muted(state.message)
+                Retry(onIdentify)
+            }
+            is PlantUi.Ready -> {
+                val r = state.result
+                state.note?.let { Muted(it) }
+                if (!r.confident) Muted("Non sono sicuro: controlla prima di usare un nome.")
+                if (r.source == PlantSource.OFFLINE) {
+                    Muted("Sul telefono conosco la flora europea: piante d'appartamento e molte da orto non le riconosco.")
                 }
-                is PlantUi.NeedsModel -> {
-                    state.note?.let { Muted(it) }
-                    Muted(
-                        "Senza connessione riconosco piante dell'orto e del giardino (flora europea) con un modello " +
-                            "sul telefono, da scaricare una volta (50 MB). Le piante d'appartamento si riconoscono meglio online."
+                r.guesses.forEach { guess -> GuessRow(guess, onClick = { onUse(guess) }) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${r.source.label} · tocca per usare",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
                     )
-                    OutlinedButton(onClick = onDownload) { Text("Scarica (50 MB)") }
-                }
-                is PlantUi.Downloading -> {
-                    Text("Scarico il modello… ${(state.progress * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
-                    LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
-                }
-                PlantUi.Identifying -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Text("Guardo la foto…", style = MaterialTheme.typography.bodyMedium)
-                }
-                PlantUi.NotAPlant -> {
-                    Muted("Non riconosco una pianta in questa foto. Prova con una foto ravvicinata di foglie o fiori.")
                     Retry(onIdentify)
-                }
-                is PlantUi.Failed -> {
-                    Muted(state.message)
-                    Retry(onIdentify)
-                }
-                is PlantUi.Ready -> {
-                    val r = state.result
-                    state.note?.let { Muted(it) }
-                    if (!r.confident) Muted("Non sono sicuro: controlla prima di usare un nome.")
-                    if (r.source == PlantSource.OFFLINE) {
-                        Muted("Sul telefono conosco la flora europea: piante d'appartamento e molte da orto non le riconosco.")
-                    }
-                    r.guesses.forEach { guess -> GuessRow(guess, onClick = { onUse(guess) }) }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "${r.source.label} · tocca per usare",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Retry(onIdentify)
-                    }
                 }
             }
         }
@@ -144,5 +146,6 @@ private fun Muted(text: String) = Text(text, style = MaterialTheme.typography.bo
 @Composable
 private fun Retry(onClick: () -> Unit) = TextButton(onClick = onClick) {
     Icon(Icons.Default.Refresh, contentDescription = null, Modifier.size(18.dp))
-    Text(" Riprova")
+    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+    Text("Riprova")
 }

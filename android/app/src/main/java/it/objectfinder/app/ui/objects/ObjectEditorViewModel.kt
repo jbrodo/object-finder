@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.data.userMessage
 import it.objectfinder.app.recognition.PlantIdentification
 import it.objectfinder.app.recognition.PlantGuess
 import it.objectfinder.app.recognition.PlantOutcome
@@ -82,6 +83,8 @@ data class EditorState(
     val nameTouched: Boolean = false,
     /** true quando il salvataggio è completato e la schermata può chiudersi. */
     val finished: Boolean = false,
+    /** Chiusura dopo la registrazione di un oggetto nuovo: la lista conferma con "«Nome» registrato". */
+    val registered: Boolean = false,
     /** Oggetto esistente: si apre in consultazione, la modifica è un'azione esplicita. */
     val editing: Boolean = isNew,
     /** Posizione del telefono, per mostrare la distanza dall'oggetto (null se non disponibile). */
@@ -167,6 +170,8 @@ class ObjectEditorViewModel(
 
     /** Id stabile anche per un oggetto nuovo: le foto possono essere allegate prima del salvataggio. */
     private val effectiveId: String = objectId ?: UUID.randomUUID().toString()
+    /** Id dell'oggetto, anche nuovo (già assegnato prima del salvataggio). */
+    val currentObjectId: String get() = effectiveId
     private var saved = false
     private var locateJob: Job? = null
     /** Valori all'apertura della modifica: per sapere se ci sono cambiamenti da non perdere. */
@@ -278,7 +283,7 @@ class ObjectEditorViewModel(
         viewModelScope.launch {
             runCatching { engine.downloadModel { p -> _mirage.value = MirageUi.Downloading(p) } }
                 .onSuccess { analyzePhotos() }
-                .onFailure { e -> _mirage.value = MirageUi.Failed("Download non riuscito: ${e.message ?: "errore"}. Riprova in Wi-Fi.") }
+                .onFailure { e -> _mirage.value = MirageUi.Failed(e.userMessage("Download non riuscito: riprova in Wi-Fi")) }
         }
     }
 
@@ -311,7 +316,7 @@ class ObjectEditorViewModel(
         viewModelScope.launch {
             runCatching { model.downloadModel { p -> _plant.value = PlantUi.Downloading(p) } }
                 .onSuccess { identifyPlant() }
-                .onFailure { e -> _plant.value = PlantUi.Failed("Download non riuscito: ${e.message ?: "errore"}. Riprova in Wi-Fi.") }
+                .onFailure { e -> _plant.value = PlantUi.Failed(e.userMessage("Download non riuscito: riprova in Wi-Fi")) }
         }
     }
 
@@ -341,7 +346,7 @@ class ObjectEditorViewModel(
                     onSaved()
                     _state.update { it.copy(message = "Prestato a ${to.trim()}") }
                 }
-                .onFailure { e -> _state.update { it.copy(message = e.message ?: "Prestito non salvato") } }
+                .onFailure { e -> _state.update { it.copy(message = e.userMessage("Prestito non salvato: riprova")) } }
         }
     }
 
@@ -366,7 +371,7 @@ class ObjectEditorViewModel(
         viewModelScope.launch {
             runCatching { photoRepository.addPhoto(effectiveId, uri) }
                 .onSuccess { if (objectId != null) onLocalChange() }
-                .onFailure { e -> _state.update { it.copy(message = "Foto non salvata: ${e.message ?: "errore"}") } }
+                .onFailure { e -> _state.update { it.copy(message = e.userMessage("Foto non salvata: riprova")) } }
             _photoBusy.value = false
         }
     }
@@ -600,7 +605,7 @@ class ObjectEditorViewModel(
                     val text = when (e) {
                         is SupabaseException.NotAuthenticated -> "Accedi per eliminare un oggetto condiviso"
                         is java.io.IOException -> "Serve una connessione per eliminare un oggetto già sincronizzato"
-                        else -> e.message ?: "Eliminazione non riuscita"
+                        else -> e.userMessage("Eliminazione non riuscita: riprova")
                     }
                     _state.update { it.copy(saving = false, message = text) }
                 }
@@ -653,7 +658,7 @@ class ObjectEditorViewModel(
             if (objectId == null) {
                 repository.create(draft, effectiveId)
                 onLocalChange()
-                _state.update { it.copy(saving = false, finished = true) }
+                _state.update { it.copy(saving = false, finished = true, registered = true) }
             } else {
                 // Oggetto esistente: si torna alla scheda, dove si vede subito il risultato.
                 repository.update(objectId, draft)

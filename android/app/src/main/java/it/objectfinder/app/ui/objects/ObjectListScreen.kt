@@ -1,5 +1,20 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material3.Button
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.ui.semantics.contentDescription
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ButtonDefaults
 import it.objectfinder.app.ui.common.locationUnavailable
 import it.objectfinder.app.ui.common.LocalAppMessages
@@ -99,6 +114,9 @@ fun ObjectListScreen(
     showSyncState: Boolean = true,
     /** Dopo modifiche fatte dalla lista (archiviazione multipla): avvia la sincronizzazione. */
     onChanged: () -> Unit = {},
+    /** Scorciatoie nella barra di ricerca: si cerca anche per etichetta QR/NFC e per foto. */
+    onScan: (() -> Unit)? = null,
+    onRecognize: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -170,48 +188,21 @@ fun ObjectListScreen(
             },
         )
       } else {
-        OutlinedTextField(
-            value = state.query,
-            onValueChange = viewModel::setQuery,
-            placeholder = { Text("Cerca nome, luogo, note o codice") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            singleLine = true,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).widthIn(max = ReadableMaxWidth).fillMaxWidth(),
+        SearchAndFilters(
+            query = state.query,
+            onQueryChange = viewModel::setQuery,
+            nearby = state.origin != null,
+            locating = locating,
+            onNearby = ::toggleNearby,
+            filter = state.filter,
+            onFilter = viewModel::setFilter,
+            placeLabel = if (state.places.places.isNotEmpty() || state.placeFilter != null)
+                state.placeFilter?.let { state.places.path(it) } ?: "Luogo" else null,
+            placeSelected = state.placeFilter != null,
+            onPlace = { choosingPlace = true },
+            onScan = onScan,
+            onRecognize = onRecognize,
         )
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ObjectFilter.entries.forEach { option ->
-                FilterChip(
-                    selected = state.filter == option,
-                    onClick = { viewModel.setFilter(option) },
-                    label = { Text(option.label) },
-                )
-            }
-            FilterChip(
-                selected = state.origin != null,
-                onClick = ::toggleNearby,
-                leadingIcon = {
-                    if (locating) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    else Icon(Icons.Default.NearMe, contentDescription = null, Modifier.size(16.dp))
-                },
-                label = { Text("Vicini") },
-            )
-            if (state.places.places.isNotEmpty() || state.placeFilter != null) FilterChip(
-                selected = state.placeFilter != null,
-                onClick = { choosingPlace = true },
-                leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, Modifier.size(16.dp)) },
-                label = {
-                    Text(
-                        state.placeFilter?.let { state.places.path(it) } ?: "Luogo",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 220.dp),
-                    )
-                },
-            )
-        }
         if (choosingPlace) PlacePickerSheet(
             tree = state.places,
             selectedId = state.placeFilter,
@@ -228,14 +219,25 @@ fun ObjectListScreen(
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
-                state.loading -> Unit
+                state.loading -> DelayedProgress()
                 state.totalInProject == 0 -> EmptyState(
                     title = "Nessun oggetto registrato",
                     body = "Registra il primo oggetto: ne salveremo la posizione GPS per ritrovarlo sulla mappa.",
+                    icon = Icons.Outlined.Inventory2,
+                    actionLabel = if (canCreate) "Registra oggetto" else null,
+                    onAction = onCreateObject,
                 )
                 state.items.isEmpty() -> EmptyState(
                     title = "Nessun risultato",
                     body = "Nessun oggetto corrisponde a ricerca e filtro selezionati.",
+                    icon = Icons.Outlined.SearchOff,
+                    actionLabel = "Azzera ricerca e filtri",
+                    primary = false,
+                    onAction = {
+                        viewModel.setQuery("")
+                        viewModel.setFilter(ObjectFilter.ACTIVE)
+                        viewModel.setPlaceFilter(null)
+                    },
                 )
                 else -> ObjectGrid(
                     items = state.items,
@@ -248,7 +250,7 @@ fun ObjectListScreen(
                     onLongClick = { toggle(it.id) },
                 )
             }
-            if (canCreate && !selecting) ExtendedFloatingActionButton(
+            if (canCreate && !selecting && state.totalInProject > 0) ExtendedFloatingActionButton(
                 onClick = onCreateObject,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Registra oggetto") },
@@ -275,8 +277,14 @@ internal fun ObjectGrid(
     onLongClick: (ObjectEntity) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val gridState = rememberLazyGridState()
+    // Un oggetto appena registrato va in cima (ordine per ultima modifica): se si è già in cima lo si
+    // mostra, invece di lasciarlo sopra il bordo come fanno le liste lazy per default.
+    val first = items.firstOrNull()?.id
+    LaunchedEffect(first) { if (gridState.firstVisibleItemIndex <= 1) gridState.scrollToItem(0) }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 360.dp),
+        state = gridState,
         modifier = modifier,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -327,7 +335,7 @@ private fun ObjectCard(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
-            ) else Text(
+            ) else if (!chosen) Text(
                 item.name.trim().take(1).uppercase(),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -416,12 +424,23 @@ private fun ObjectCard(
 }
 
 @Composable
-internal fun EmptyState(title: String, body: String) {
+internal fun EmptyState(
+    title: String,
+    body: String,
+    icon: ImageVector? = null,
+    actionLabel: String? = null,
+    primary: Boolean = true,
+    onAction: () -> Unit = {},
+) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        icon?.let {
+            Icon(it, contentDescription = null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.size(16.dp))
+        }
         Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Spacer(Modifier.size(8.dp))
         Text(
@@ -430,6 +449,14 @@ internal fun EmptyState(title: String, body: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        actionLabel?.let { label ->
+            Spacer(Modifier.size(24.dp))
+            if (primary) Button(onClick = onAction) {
+                Icon(Icons.Default.Add, contentDescription = null, Modifier.size(18.dp))
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text(label)
+            } else OutlinedButton(onClick = onAction) { Text(label) }
+        }
     }
 }
 
@@ -523,4 +550,118 @@ private fun LabelSheetReady(file: java.io.File, count: Int, onDismiss: () -> Uni
             }) { Text("Condividi PDF") }
         },
     )
+}
+
+/**
+ * Caricamento dell'elenco: di solito il database risponde subito, quindi l'indicatore compare solo
+ * se l'attesa supera 400 ms (un lampo di rotellina a ogni apertura sarebbe solo rumore).
+ */
+@Composable
+private fun DelayedProgress() {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { delay(400); visible = true }
+    if (visible) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(Modifier.semantics { contentDescription = "Caricamento degli oggetti" })
+    }
+}
+
+/** Filtro di stato come chip a tendina: mostra la scelta attuale, evidenziato quando non è "Attuali". */
+@Composable
+private fun StatusFilterChip(current: ObjectFilter, onSelect: (ObjectFilter) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        FilterChip(
+            selected = current != ObjectFilter.ACTIVE,
+            onClick = { open = true },
+            label = { Text(current.label) },
+            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null, Modifier.size(18.dp)) },
+            modifier = Modifier.semantics { stateDescription = "Mostra: ${current.label}" },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            ObjectFilter.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    leadingIcon = {
+                        if (option == current) Icon(Icons.Default.Check, contentDescription = null)
+                        else Spacer(Modifier.size(24.dp))
+                    },
+                    onClick = { open = false; onSelect(option) },
+                    modifier = Modifier.semantics { selected = option == current },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Ricerca e filtri dell'elenco, senza stato (anche per le preview). Ordine dei chip: Vicini (la domanda
+ * più frequente fuori casa), stato come tendina a scelta singola, luogo se ce ne sono.
+ */
+@Composable
+internal fun SearchAndFilters(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    nearby: Boolean,
+    locating: Boolean,
+    onNearby: () -> Unit,
+    filter: ObjectFilter,
+    onFilter: (ObjectFilter) -> Unit,
+    placeLabel: String?,
+    placeSelected: Boolean,
+    onPlace: () -> Unit,
+    onScan: (() -> Unit)?,
+    onRecognize: (() -> Unit)?,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        // Una riga sola: accanto ci sono le icone di foto ed etichetta.
+        placeholder = { Text("Cerca nome, luogo, codice", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        // Vuota: si può cercare anche con una foto o con l'etichetta. Con del testo: lo si cancella.
+        trailingIcon = {
+            if (query.isNotEmpty()) IconButton(onClick = { onQueryChange("") }) {
+                Icon(Icons.Default.Clear, contentDescription = "Cancella la ricerca")
+            } else Row {
+                onRecognize?.let {
+                    IconButton(onClick = it) { Icon(Icons.Default.PhotoCamera, contentDescription = "Cerca con una foto") }
+                }
+                onScan?.let {
+                    IconButton(onClick = it) { Icon(Icons.Default.QrCodeScanner, contentDescription = "Scansiona etichetta") }
+                }
+            }
+        },
+        singleLine = true,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).widthIn(max = ReadableMaxWidth).fillMaxWidth(),
+    )
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // "Cosa ho qui intorno" per primo: è la domanda più frequente fuori casa.
+        FilterChip(
+            selected = nearby,
+            onClick = onNearby,
+            leadingIcon = {
+                if (locating) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Default.NearMe, contentDescription = null, Modifier.size(16.dp))
+            },
+            label = { Text("Vicini") },
+        )
+        // Stato: una scelta sola tra quattro, quindi un menu e non quattro chip combinabili.
+        StatusFilterChip(filter, onSelect = onFilter)
+        if (placeLabel != null) FilterChip(
+            selected = placeSelected,
+            onClick = onPlace,
+            leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, Modifier.size(16.dp)) },
+            label = {
+                Text(
+                    placeLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 220.dp),
+                )
+            },
+        )
+    }
 }

@@ -232,12 +232,15 @@ The components should feel calm and reassuring: soft tonal containers, clear ver
 - **Loading:** an in-progress action swaps its icon for a 16px circular indicator (2px stroke) and changes its label to describe what's happening ("Rilevo la posizione…", "Cerco un segnale migliore… ±12 m").
 
 ### Chips
-- **Style:** Material `FilterChip` in a horizontal row, 8px apart, above lists and over the map.
-- **State:** selected/unselected toggles filter the visible set (sort/filter options, *Vicini*, by place).
+- **Style:** Material `FilterChip` in a horizontal row, 8px apart, above the list: *Vicini* first (sort by distance, the most frequent question away from home), then status, then *Luogo* when places exist.
+- **State:** a chip is a toggle only when the choice is independent. A single choice among several (status: *Attuali / In prestito / Archiviati / Tutti*) is one chip with a dropdown that shows the current value, highlighted when it differs from the default.
 
 ### Cards / Containers
 - **Object card:** default Material `Card`, a 64px thumbnail (12px radius) flush to a 12px start inset, then a 16px-padded text column: name (Title, one line), where-line (Body), metadata row with 18px icons. With no photo, the thumbnail shows the name's initial in Title Large on `surfaceVariant`. Selected state tints the card `secondaryContainer` and overlays a primary-tinted check on the thumbnail.
 - **Background / Shadow:** Material card defaults; see Elevation & Depth.
+
+### Search
+- **Style:** an `OutlinedTextField` capped at the readable width, one-line placeholder. Empty, its trailing icons search *by photo* (recognition) and *by label* (QR/NFC scan); with text, a single clear button replaces them. These shortcuts live where the user is already searching, not as mute icons in the top bar.
 
 ### Inputs / Fields
 - **Style:** Material `OutlinedTextField` throughout, with floating label, an example placeholder ("es. garage, scaffale in alto a sinistra"), and supporting text that teaches why the field matters. A character counter appears only near the limit.
@@ -248,6 +251,12 @@ The components should feel calm and reassuring: soft tonal containers, clear ver
 
 ### Answer Panel (signature)
 A `Surface` with a 16px radius and 16px padding, tinted by meaning: `primaryContainer` for *Dove si trova*, `tertiaryContainer` for *In prestito*, `errorContainer` when that loan is overdue. Content follows the Eyebrow-Then-Answer rule, then fact lines in Body Large / Body Small, then actions. Actions take the panel's own color, not the generic ones: on the loan panel the main button is `tertiary` (`error` when overdue) and secondary text buttons use the panel's content color. This is the component that makes ObjectFinder recognizable: the answer is handed to you in a calm, colored slip of paper.
+
+### Registration form
+Order follows the task: photo, name, *Suggerimenti dalla foto* (right under the name it can fill), then one *Dove si trova* group, then details behind *Altri dettagli*. The "where" is a single card holding the place picker, the description of the spot and the GPS point (status line plus *GPS* / *Sulla mappa*): three ways to answer one question, never three separate sections. Everything learned from photos (name, read text, and plants only on request) lives in that one suggestions card. Registering confirms with a Snackbar "«Nome» registrato" and an *Apri* action.
+
+### Empty states
+Icon (48px, primary), title, one sentence, and the way forward. First use carries the primary *Registra oggetto* button and hides the FAB so there is one primary action; *Nessun risultato* offers *Azzera ricerca e filtri*.
 
 ### Conflict Banner (signature)
 An `errorContainer` card at the top of the object page when the server version diverged: warning icon + Title Small heading, an explanation in Body, a per-field diff (Label bold field name, "Tua:" / "Server:" lines in Body Small), and a Button/Outlined pair to choose a version.
@@ -276,4 +285,6 @@ Full-black canvases with white controls on 45–55% black scrims, a top gradient
 - **Don't** add decorative imagery: no illustrations, stock photos, or mascots. Only the user's own photos appear.
 - **Don't** use primary, tertiary or error containers for decoration or emphasis unrelated to their meaning.
 - **Don't** use Toasts or pad strings with spaces for layout.
+- **Don't** show exception text to users; map errors through `userMessage()` to an Italian sentence with the remedy.
+- **Don't** render a single choice among several as independent toggle chips.
 - **Don't** add a custom shadow vocabulary; Material elevation defaults cover everything except the map panel.

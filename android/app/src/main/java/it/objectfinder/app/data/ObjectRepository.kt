@@ -276,7 +276,7 @@ class ObjectRepository(
                         pulled = it.pulled + (it.photos?.downloaded ?: 0),
                     )
                 },
-                onFailure = { SyncState.Failed(now(), it.message ?: it.javaClass.simpleName) },
+                onFailure = { SyncState.Failed(now(), it.userMessage("Sincronizzazione non riuscita: riprova")) },
             )
         )
         result

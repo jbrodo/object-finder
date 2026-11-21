@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.auth
 
+import it.objectfinder.app.data.userMessage
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -69,7 +70,7 @@ fun NewPasswordDialog(
                     if (email.isNotBlank()) activity?.let { SavedCredentials.save(it, email, password) }
                     onDone("Password aggiornata")
                 }
-                .onFailure { error = it.message ?: "Password non aggiornata" }
+                .onFailure { error = it.userMessage("Password non aggiornata: riprova") }
             busy = false
         }
     }
@@ -149,7 +150,7 @@ fun ForgotPasswordDialog(
                             "telefono: tornerai nell'app per scegliere la nuova password."
                     )
                 }
-                .onFailure { error = it.message ?: "Invio non riuscito" }
+                .onFailure { error = it.userMessage("Invio non riuscito: riprova") }
             busy = false
         }
     }

@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.recognition.PlantGuess
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
@@ -46,15 +47,20 @@ fun MirageCard(
     onUseName: (String) -> Unit,
     onAddToNotes: (String) -> Unit,
     onLinkAsCode: (String) -> Unit,
+    plant: PlantUi = PlantUi.Hidden,
+    onIdentifyPlant: () -> Unit = {},
+    onDownloadPlantModel: () -> Unit = {},
+    onUsePlant: (PlantGuess) -> Unit = {},
 ) {
-    if (state == MirageUi.Hidden) return
+    // Una card sola per tutto ciò che si ricava dalle foto: nome, scritte e, su richiesta, la pianta.
+    if (state == MirageUi.Hidden && plant == PlantUi.Hidden) return
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = null, Modifier.size(18.dp))
                 Text("Suggerimenti dalla foto", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
             }
-            when (state) {
+            if (state != MirageUi.Hidden) when (state) {
                 MirageUi.Hidden -> Unit
                 MirageUi.Idle -> {
                     Text(
@@ -128,11 +134,13 @@ fun MirageCard(
                         // Ricalcolo su tutte le foto (es. dopo averne aggiunta una più nitida).
                         TextButton(onClick = onAnalyze) {
                             Icon(Icons.Default.Refresh, contentDescription = null, Modifier.size(18.dp))
-                            Text(" Rianalizza")
+                            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                            Text("Rianalizza")
                         }
                     }
                 }
             }
+            PlantSuggestions(plant, onIdentify = onIdentifyPlant, onDownload = onDownloadPlantModel, onUse = onUsePlant)
         }
     }
 }

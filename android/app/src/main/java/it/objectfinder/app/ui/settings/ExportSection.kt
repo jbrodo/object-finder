@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.settings
 
+import it.objectfinder.app.data.userMessage
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
@@ -68,7 +69,7 @@ fun ExportSection(exporter: InventoryExporter) {
                     ?: error("destinazione non scrivibile")
                 rows.size
             }.onSuccess { report("Inventario salvato ($it oggetti)") }
-                .onFailure { report("Salvataggio non riuscito: ${it.message}", error = true) }
+                .onFailure { report(it.userMessage("Salvataggio non riuscito: riprova o scegli un'altra cartella"), error = true) }
             busy = false
         }
     }
@@ -91,7 +92,7 @@ fun ExportSection(exporter: InventoryExporter) {
                         report("Nessuna app disponibile per la condivisione", error = true)
                     }
                 }
-                .onFailure { report("Export non riuscito: ${it.message}", error = true) }
+                .onFailure { report(it.userMessage("Export non riuscito: riprova"), error = true) }
             busy = false
         }
     }

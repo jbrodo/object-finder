@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.auth
 
+import it.objectfinder.app.data.userMessage
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.width
 import it.objectfinder.app.ui.common.readableWidth
@@ -120,7 +121,7 @@ fun AuthScreen(
                         mode = AuthMode.SIGN_IN
                     }
                 }
-            }.onFailure { error = it.message ?: "Accesso non riuscito" }
+            }.onFailure { error = it.userMessage("Accesso non riuscito: riprova") }
             busy = false
         }
     }

@@ -109,6 +109,9 @@ private val KNOWN_MESSAGES = listOf(
     "row-level security" to "Permessi insufficienti per questa operazione",
 )
 
+/** true se [message] è una delle traduzioni di [KNOWN_MESSAGES]: si può mostrare così com'è. */
+internal fun isLocalizedServerMessage(message: String): Boolean = KNOWN_MESSAGES.any { it.second == message }
+
 /** Messaggi server noti → italiano; gli altri restano invariati. */
 internal fun localizeServerMessage(message: String): String {
     val lower = message.lowercase()

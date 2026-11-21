@@ -1,5 +1,18 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.objects.WhereEditor
+import it.objectfinder.app.ui.objects.SearchAndFilters
+import it.objectfinder.app.ui.objects.PlantUi
+import it.objectfinder.app.ui.objects.ObjectFilter
+import it.objectfinder.app.ui.objects.MirageUi
+import it.objectfinder.app.ui.objects.MirageCard
+import it.objectfinder.app.recognition.ReadText
+import it.objectfinder.app.recognition.MirageSuggestions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.fillMaxWidth
 import it.objectfinder.app.ui.common.rememberAppMessages
 import it.objectfinder.app.ui.common.LocalAppMessages
 import androidx.compose.runtime.remember
@@ -145,7 +158,14 @@ private fun SampleGrid(modifier: Modifier = Modifier) = ObjectGrid(
 internal fun ObjectsScreenPreview() = SampleTheme {
     AppNavigationSuite(current = Tab.OBJECTS, onSelect = {}) {
         Scaffold(topBar = { TopAppBar(title = { Text("Casa") }) }) { padding ->
-            SampleGrid(Modifier.padding(padding))
+            Column(Modifier.padding(padding)) {
+                SearchAndFilters(
+                    query = "", onQueryChange = {}, nearby = false, locating = false, onNearby = {},
+                    filter = ObjectFilter.ACTIVE, onFilter = {}, placeLabel = "Luogo", placeSelected = false,
+                    onPlace = {}, onScan = {}, onRecognize = {},
+                )
+                SampleGrid()
+            }
         }
     }
 }
@@ -226,11 +246,59 @@ internal fun ConflictBannerPreview() = SampleTheme {
     }
 }
 
-@Preview(name = "Elenco vuoto", widthDp = 411, heightDp = 400)
+@Preview(name = "Elenco vuoto", widthDp = 411, heightDp = 480)
 @Composable
 internal fun EmptyStatePreview() = SampleTheme {
     EmptyState(
         title = "Nessun oggetto registrato",
         body = "Registra il primo oggetto: ne salveremo la posizione GPS per ritrovarlo sulla mappa.",
+        icon = Icons.Outlined.Inventory2,
+        actionLabel = "Registra oggetto",
     )
+}
+
+@Preview(name = "Nessun risultato", widthDp = 411, heightDp = 420)
+@Composable
+internal fun NoResultsPreview() = SampleTheme {
+    EmptyState(
+        title = "Nessun risultato",
+        body = "Nessun oggetto corrisponde a ricerca e filtro selezionati.",
+        icon = Icons.Outlined.SearchOff,
+        actionLabel = "Azzera ricerca e filtri",
+        primary = false,
+    )
+}
+
+// --- Modulo di registrazione -------------------------------------------------------------
+
+private val SampleDraft: EditorState
+    get() = EditorState(
+        isNew = true, loaded = true, name = "Trapano a percussione", nameTouched = true,
+        latitude = HOME_LAT, longitude = HOME_LNG, accuracyMeters = 6f,
+    )
+
+@Preview(name = "Registrazione", widthDp = 411, heightDp = 1180)
+@Preview(name = "Registrazione · scuro", widthDp = 411, heightDp = 1180, uiMode = UI_MODE_NIGHT_YES)
+@Composable
+internal fun RegistrationFormPreview() = SampleTheme {
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedTextField(
+            value = SampleDraft.name, onValueChange = {}, label = { Text("Nome oggetto *") },
+            singleLine = true, modifier = Modifier.fillMaxWidth(),
+        )
+        MirageCard(
+            state = MirageUi.Ready(
+                MirageSuggestions(
+                    names = listOf("Trapano a percussione", "Trapano avvitatore"),
+                    texts = listOf(ReadText("BOSCH PSB 500 RE", codeLike = true), ReadText("230 V", codeLike = false)),
+                ),
+            ),
+            onDownload = {}, onRetry = {}, onAnalyze = {}, onUseName = {}, onAddToNotes = {}, onLinkAsCode = {},
+            plant = PlantUi.Idle,
+        )
+        WhereEditor(
+            placePath = "Casa › Garage", onPickPlace = {}, onPlaceChange = {}, state = SampleDraft.copy(placeId = "garage", place = "scaffale in alto a sinistra"),
+            onCapture = {}, onPickOnMap = {}, onUseBestNow = {}, onClear = {},
+        )
+    }
 }

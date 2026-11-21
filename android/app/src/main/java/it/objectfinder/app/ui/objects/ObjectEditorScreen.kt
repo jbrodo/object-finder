@@ -1,5 +1,7 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.width
 import it.objectfinder.app.ui.common.rememberAppMessages
@@ -103,6 +105,8 @@ import it.objectfinder.app.ui.common.rememberLocationPermissionRequester
 fun ObjectEditorScreen(
     viewModel: ObjectEditorViewModel,
     onClose: () -> Unit,
+    /** Oggetto nuovo registrato: chi apre l'editor conferma e offre di riaprirlo. */
+    onRegistered: (id: String, name: String) -> Unit = { _, _ -> },
     readOnly: Boolean = false,
     objectId: String? = null,
     canDelete: Boolean = false,
@@ -131,9 +135,17 @@ fun ObjectEditorScreen(
     val messages = rememberAppMessages(snackbar)
     val permission = rememberLocationPermissionRequester()
     val editingExisting = state.editing && !state.isNew
+    // In consultazione il nome è il titolo della pagina: quando esce dallo schermo passa nella barra.
+    val scroll = rememberScrollState()
+    val nameOffscreenPx = with(LocalDensity.current) { 56.dp.toPx() }
+    val nameInBar by remember { derivedStateOf { scroll.value > nameOffscreenPx } }
     val available = state.loaded && !state.notFound
 
-    LaunchedEffect(state.finished) { if (state.finished) onClose() }
+    LaunchedEffect(state.finished) {
+        if (!state.finished) return@LaunchedEffect
+        if (state.registered) onRegistered(viewModel.currentObjectId, state.name.trim())
+        onClose()
+    }
     LaunchedEffect(state.message) {
         state.message?.let {
             snackbar.showSnackbar(it)
@@ -160,8 +172,11 @@ fun ObjectEditorScreen(
                             when {
                                 state.isNew -> "Nuovo oggetto"
                                 state.editing -> "Modifica oggetto"
+                                nameInBar -> state.name
                                 else -> ""
-                            }
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     },
                     navigationIcon = {
@@ -335,7 +350,7 @@ fun ObjectEditorScreen(
                 Modifier
                     .fillMaxSize()
                     .padding(padding) // include la barra Salva, che segue già la tastiera
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scroll)
                     .readableWidth()
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -422,22 +437,6 @@ fun ObjectEditorScreen(
                             onDelete = viewModel::deletePhoto,
                         )
                     }
-                    // Anche in modifica: nomi e testo letto si possono ricalcolare su richiesta.
-                    MirageCard(
-                        state = mirageState,
-                        onDownload = viewModel::downloadMirageModel,
-                        onRetry = viewModel::retryMirage,
-                        onAnalyze = viewModel::analyzePhotos,
-                        onUseName = viewModel::useSuggestedName,
-                        onAddToNotes = viewModel::addTextToNotes,
-                        onLinkAsCode = { viewModel.addCode(IdentifierType.SERIAL, it) },
-                    )
-                    PlantCard(
-                        state = plantState,
-                        onIdentify = viewModel::identifyPlant,
-                        onDownload = viewModel::downloadPlantModel,
-                        onUse = viewModel::usePlant,
-                    )
                     OutlinedTextField(
                         value = state.name,
                         onValueChange = viewModel::setName,
@@ -448,9 +447,25 @@ fun ObjectEditorScreen(
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    PlaceSelector(path = placeTree.path(state.placeId), onClick = { pickingPlace = true })
-                    PlaceField(state.place, viewModel::setPlace, detail = state.placeId != null)
-                    PositionEditor(
+                    // Subito sotto il nome che può riempire. Anche in modifica: si ricalcola su richiesta.
+                    MirageCard(
+                        state = mirageState,
+                        onDownload = viewModel::downloadMirageModel,
+                        onRetry = viewModel::retryMirage,
+                        onAnalyze = viewModel::analyzePhotos,
+                        onUseName = viewModel::useSuggestedName,
+                        onAddToNotes = viewModel::addTextToNotes,
+                        onLinkAsCode = { viewModel.addCode(IdentifierType.SERIAL, it) },
+                        plant = plantState,
+                        onIdentifyPlant = viewModel::identifyPlant,
+                        onDownloadPlantModel = viewModel::downloadPlantModel,
+                        onUsePlant = viewModel::usePlant,
+                    )
+                    // Un solo gruppo per il "dove": luogo, descrizione del punto e punto GPS.
+                    WhereEditor(
+                        placePath = placeTree.path(state.placeId),
+                        onPickPlace = { pickingPlace = true },
+                        onPlaceChange = viewModel::setPlace,
                         state = state,
                         onCapture = { permission.withPermission(viewModel::captureLocation) },
                         onPickOnMap = { showPicker = true },
@@ -591,7 +606,7 @@ private fun PlaceField(value: String, onChange: (String) -> Unit, detail: Boolea
         value = value,
         onValueChange = onChange,
         // Con un luogo scelto il testo diventa il dettaglio dentro quel luogo.
-        label = { Text(if (detail) "Dettaglio (facoltativo)" else "Dove si trova") },
+        label = { Text(if (detail) "Dettaglio (facoltativo)" else "Descrizione del punto") },
         placeholder = { Text(if (detail) "es. scaffale in alto a sinistra" else "es. garage, scaffale in alto a sinistra") },
         supportingText = {
             Text(
@@ -620,9 +635,15 @@ private fun PlaceSelector(path: String, onClick: () -> Unit) {
     }
 }
 
-/** Punto GPS nel modulo: stato dell'acquisizione sempre visibile. */
+/**
+ * Il "dove" nel modulo, in un gruppo solo: luogo (albero), descrizione del punto, punto GPS con lo
+ * stato dell'acquisizione sempre visibile. Tre modi di rispondere alla stessa domanda, non tre domande.
+ */
 @Composable
-private fun PositionEditor(
+internal fun WhereEditor(
+    placePath: String,
+    onPickPlace: () -> Unit,
+    onPlaceChange: (String) -> Unit,
     state: EditorState,
     onCapture: () -> Unit,
     onPickOnMap: () -> Unit,
@@ -631,7 +652,14 @@ private fun PositionEditor(
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Punto GPS", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+            Text("Dove si trova", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+            PlaceSelector(path = placePath, onClick = onPickPlace)
+            PlaceField(state.place, onPlaceChange, detail = state.placeId != null)
+            Text(
+                "Punto GPS",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(top = 8.dp).semantics { heading() },
+            )
             Text(
                 when {
                     state.locating -> locatingLabel(state)

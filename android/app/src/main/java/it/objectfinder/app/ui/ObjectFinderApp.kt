@@ -7,7 +7,6 @@ import it.objectfinder.app.ui.recognition.RecognizeFlow
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.ImageSearch
 import it.objectfinder.app.ui.auth.NewPasswordDialog
 import it.objectfinder.app.data.EmailLinkFlow
 import it.objectfinder.app.data.Pkce
@@ -241,7 +240,7 @@ fun ObjectFinderApp(
             }
             composable(Routes.OBJECTS) {
                 val vm = viewModel { ObjectListViewModel(container.objectRepository, container.photoRepository, container.identifierRepository, container.placeRepository) }
-                MainShell(container, nav, Tab.OBJECTS, requestSync, startScan) { modifier ->
+                MainShell(container, nav, Tab.OBJECTS, requestSync, startScan) { modifier, startRecognition ->
                     val active by container.settings.activeProject.collectAsStateWithLifecycle()
                     ObjectListScreen(
                         viewModel = vm,
@@ -250,6 +249,8 @@ fun ObjectFinderApp(
                         onOpenObject = { nav.navigate(Routes.editor(it)) },
                         onCreateObject = { nav.navigate(Routes.editor()) },
                         onChanged = requestSync,
+                        onScan = startScan,
+                        onRecognize = startRecognition,
                         modifier = modifier,
                     )
                 }
@@ -257,7 +258,7 @@ fun ObjectFinderApp(
             composable(Routes.MAP) {
                 val objects by container.objectRepository.observeObjects().collectAsStateWithLifecycle(emptyList())
                 val engine by container.settings.mapEngine.collectAsStateWithLifecycle()
-                MainShell(container, nav, Tab.MAP, requestSync, startScan) { modifier ->
+                MainShell(container, nav, Tab.MAP, requestSync, startScan) { modifier, _ ->
                     ObjectMapScreen(
                         objects = objects.filter { it.statusEnum != ObjectStatus.ARCHIVED },
                         preferredEngine = engine,
@@ -268,7 +269,7 @@ fun ObjectFinderApp(
                 }
             }
             composable(Routes.SETTINGS) {
-                MainShell(container, nav, Tab.SETTINGS, requestSync, startScan) { modifier ->
+                MainShell(container, nav, Tab.SETTINGS, requestSync, startScan) { modifier, _ ->
                     SettingsScreen(
                         container = container,
                         onSignIn = { nav.navigate(Routes.AUTH) },
@@ -324,6 +325,9 @@ fun ObjectFinderApp(
                     canDelete = active?.canDeleteObjects ?: true,
                     mapEngine = editorMapEngine,
                     onClose = { nav.popBackStack() },
+                    onRegistered = { newId, name ->
+                        messages.show("«$name» registrato", actionLabel = "Apri") { nav.openObject(newId) }
+                    },
                 )
             }
         }
@@ -410,7 +414,7 @@ private fun MainShell(
     current: Tab,
     onSync: () -> Unit,
     onScan: () -> Unit,
-    content: @Composable (Modifier) -> Unit,
+    content: @Composable (modifier: Modifier, startRecognition: () -> Unit) -> Unit,
 ) {
     val project by container.settings.activeProject.collectAsStateWithLifecycle()
     val session by container.authRepository.session.collectAsStateWithLifecycle()
@@ -459,15 +463,10 @@ private fun MainShell(
             TopAppBar(
                 title = { Text(if (current == Tab.SETTINGS) "Impostazioni" else project?.name ?: "Object Finder") },
                 actions = {
-                    if (current != Tab.SETTINGS) {
+                    // Sugli Oggetti scansione e riconoscimento stanno nella barra di ricerca.
+                    if (current == Tab.MAP) {
                         IconButton(onClick = onScan) {
                             Icon(Icons.Default.QrCodeScanner, contentDescription = "Scansiona etichetta")
-                        }
-                    }
-                    // Riconoscimento visivo: inquadri l'oggetto e l'app propone quale dei tuoi è.
-                    if (current == Tab.OBJECTS) {
-                        IconButton(onClick = { recognizing = true }) {
-                            Icon(Icons.Default.ImageSearch, contentDescription = "Riconosci oggetto")
                         }
                     }
                     if (session != null) {
@@ -494,7 +493,7 @@ private fun MainShell(
             )
         },
     ) { padding ->
-        content(Modifier.padding(padding))
+        content(Modifier.padding(padding)) { recognizing = true }
     }
     }
 }

@@ -65,4 +65,12 @@ class PreviewScreenshotTest {
     @Test fun conflictBanner() = shot("conflict_banner") { ConflictBannerPreview() }
 
     @Test fun emptyState() = shot("empty_state") { EmptyStatePreview() }
+
+    @Test fun noResults() = shot("no_results") { NoResultsPreview() }
+
+    @Config(qualifiers = "w411dp-h1180dp-port-xxhdpi")
+    @Test fun registrationForm() = shot("registration_form") { RegistrationFormPreview() }
+
+    @Config(qualifiers = "w411dp-h1180dp-port-night-xxhdpi")
+    @Test fun registrationFormDark() = shot("registration_form_dark") { RegistrationFormPreview() }
 }
