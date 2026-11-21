@@ -27,7 +27,7 @@ fun releaseSetting(name: String): String? =
 val releaseKeystore = releaseSetting("RELEASE_KEYSTORE_PATH")?.let { rootProject.file(it) }?.takeIf { it.exists() }
 
 // Versione: la CI la ricava dal tag (v1.2.3) e dal numero di run.
-val appVersionName = providers.gradleProperty("VERSION_NAME").orNull ?: "1.11.0-dev"
+val appVersionName = providers.gradleProperty("VERSION_NAME").orNull ?: "1.12.0-dev"
 val appVersionCode = providers.gradleProperty("VERSION_CODE").orNull?.toIntOrNull() ?: 2
 
 android {
