@@ -194,7 +194,7 @@ A role-driven palette: on Android 12+ every role comes from the user's wallpaper
 
 Single-column, phone-first. List screens use a `LazyColumn` with 16px side padding, 12px top padding and 8px between cards. Bottom padding is 96px so the last card clears the Extended FAB. Filter chips sit in a horizontal row with 8px gaps above the list.
 
-The object page is a vertical stack of sections spaced 12px apart. Inside panels and cards the rhythm is 16px padding with 4–8px between lines (6px in the answer panels). Inline icons inside buttons and metadata are 18px, separated from their label by two spaces in the text, not by a spacer.
+The object page is a vertical stack of sections spaced 12px apart. Inside panels and cards the rhythm is 16px padding with 4–8px between lines (6px in the answer panels). Inline icons inside buttons and metadata are 18px, separated from their label by `ButtonDefaults.IconSpacing` (8px), never by spaces inside the string.
 
 **Adaptive widths.** Forms and reading surfaces (object page, settings, projects, members, sign-in) fill the window up to 640px and then stay centered (`Modifier.readableWidth()`); the search field stops at the same width. The object list is an adaptive grid with cards at least 360px wide: one column on phones and folded devices, two or three on tablets. The map panel stops at 560px.
 
@@ -252,6 +252,9 @@ A `Surface` with a 16px radius and 16px padding, tinted by meaning: `primaryCont
 ### Conflict Banner (signature)
 An `errorContainer` card at the top of the object page when the server version diverged: warning icon + Title Small heading, an explanation in Body, a per-field diff (Label bold field name, "Tua:" / "Server:" lines in Body Small), and a Button/Outlined pair to choose a version.
 
+### Messages
+Short feedback goes through one Snackbar (`LocalAppMessages`), never a Toast. A message that has a remedy carries it as the action: GPS unavailable → *Impostazioni*, bulk archive → *Annulla*. Inside a dialog, a bottom sheet or the camera, where a Snackbar would sit under the scrim, the message appears inline in that surface (error color for failures, announced as a polite live region).
+
 ### Camera & Photo Overlays
 Full-black canvases with white controls on 45–55% black scrims, a top gradient for legibility, and a 4px white-ringed circular shutter. The only place the UI leaves the color-role system.
 
@@ -264,6 +267,7 @@ Full-black canvases with white controls on 45–55% black scrims, a top gradient
 - **Do** keep tinted containers for their meanings: primary = location, tertiary = loan, error = needs a decision.
 - **Do** state uncertainty plainly ("±40 m", "aggiornata 3 giorni fa") and offer the correcting action right below it.
 - **Do** add every new screen or panel to `Previews.kt` and record it (`./gradlew :app:recordRoborazziDebug`), in light and dark, at phone and tablet widths.
+- **Do** give the "where" line in list cards two lines before ellipsizing; it is the answer the user is looking for.
 - **Do** keep inline icons at 18px and list thumbnails at 64px with a 12px radius so rows align with or without photos.
 
 ### Don't:
@@ -271,4 +275,5 @@ Full-black canvases with white controls on 45–55% black scrims, a top gradient
 - **Don't** introduce custom fonts or a branded typeface; the system type scale is the voice.
 - **Don't** add decorative imagery: no illustrations, stock photos, or mascots. Only the user's own photos appear.
 - **Don't** use primary, tertiary or error containers for decoration or emphasis unrelated to their meaning.
+- **Don't** use Toasts or pad strings with spaces for layout.
 - **Don't** add a custom shadow vocabulary; Material elevation defaults cover everything except the map panel.

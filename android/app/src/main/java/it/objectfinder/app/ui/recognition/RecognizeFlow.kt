@@ -123,7 +123,6 @@ fun RecognizeFlow(
         Step.Camera -> InAppCamera(
             newTarget = container.photoRepository::newCameraUri,
             onShot = ::analyze,
-            onError = { onClose() },
             onDismiss = { if (step == Step.Camera) onClose() },
             onUnavailable = ::useSystemCamera,
             single = true,

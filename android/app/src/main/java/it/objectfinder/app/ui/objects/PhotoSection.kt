@@ -1,5 +1,9 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import it.objectfinder.app.ui.common.LocalAppMessages
 import android.content.ActivityNotFoundException
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -65,6 +69,7 @@ fun PhotoSection(
     onDelete: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    val messages = LocalAppMessages.current
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var viewing by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -86,7 +91,7 @@ fun PhotoSection(
             camera.launch(uri)
         } catch (_: ActivityNotFoundException) {
             pendingCameraUri = null
-            android.widget.Toast.makeText(context, "Nessuna app fotocamera disponibile", android.widget.Toast.LENGTH_SHORT).show()
+            messages.show("Nessuna app fotocamera disponibile")
         }
     }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -96,7 +101,6 @@ fun PhotoSection(
         InAppCamera(
             newTarget = newCameraUri,
             onShot = onAdd,
-            onError = { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show() },
             onDismiss = { inAppCamera = false },
             onUnavailable = { inAppCamera = false; systemCamera() },
         )
@@ -134,7 +138,8 @@ fun PhotoSection(
                         },
                     ) {
                         Icon(Icons.Default.PhotoCamera, contentDescription = null, Modifier.size(18.dp))
-                        Text("  Scatta")
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Scatta")
                     }
                     OutlinedButton(
                         enabled = !busy,
@@ -143,7 +148,8 @@ fun PhotoSection(
                         },
                     ) {
                         Icon(Icons.Default.PhotoLibrary, contentDescription = null, Modifier.size(18.dp))
-                        Text("  Galleria")
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Galleria")
                     }
                 }
             }

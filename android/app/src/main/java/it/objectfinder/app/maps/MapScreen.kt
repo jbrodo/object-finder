@@ -1,10 +1,14 @@
 package it.objectfinder.app.maps
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import it.objectfinder.app.ui.common.locationUnavailable
+import it.objectfinder.app.ui.common.LocalAppMessages
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableDoubleStateOf
 import android.content.Context
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -131,6 +135,7 @@ fun ObjectMapScreen(
     )
 
     val context = LocalContext.current
+    val messages = LocalAppMessages.current
     val scope = rememberCoroutineScope()
     val locationProvider = remember(context) { LocationProvider(context) }
     val permission = rememberLocationPermissionRequester()
@@ -163,7 +168,7 @@ fun ObjectMapScreen(
                     focus = MapFocus.Point(location.latitude, location.longitude)
                 }
             } else if (myLocation == null) {
-                Toast.makeText(context, "Posizione non disponibile: verifica che il GPS sia attivo", Toast.LENGTH_SHORT).show()
+                messages.locationUnavailable(context)
             }
         }
     }
@@ -571,6 +576,7 @@ private fun SelectedGroupPanel(
     modifier: Modifier,
 ) {
     val context = LocalContext.current
+    val messages = LocalAppMessages.current
     Surface(
         shape = RoundedCornerShape(16.dp),
         tonalElevation = 3.dp,
@@ -621,11 +627,12 @@ private fun SelectedGroupPanel(
                 }
             }
             Button(
-                onClick = { navigateTo(context, group.latitude, group.longitude) },
+                onClick = { if (!navigateTo(context, group.latitude, group.longitude)) messages.show("Nessuna app mappe installata") },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp),
             ) {
                 Icon(Icons.Default.Directions, contentDescription = null, Modifier.size(18.dp))
-                Text("  Portami lì")
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text("Portami lì")
             }
         }
     }

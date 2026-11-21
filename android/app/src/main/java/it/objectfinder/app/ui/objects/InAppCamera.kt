@@ -84,7 +84,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 fun InAppCamera(
     newTarget: () -> Uri,
     onShot: (Uri) -> Unit,
-    onError: (String) -> Unit,
+    /** Facoltativo: l'errore è già mostrato nella fotocamera, che resta aperta per riprovare. */
+    onError: (String) -> Unit = {},
     onDismiss: () -> Unit,
     /** La fotocamera in-app non si avvia (dispositivo, driver, emulatore): si usa quella di sistema. */
     onUnavailable: () -> Unit,
@@ -131,13 +132,14 @@ fun InAppCamera(
     }
     var shots by remember { mutableIntStateOf(0) }
     var capturing by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
     var flash by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_AUTO) }
 
     fun shoot() {
         if (capturing) return
         val target = newTarget()
         val stream = runCatching { context.contentResolver.openOutputStream(target) }.getOrNull()
-        if (stream == null) { onError("Impossibile salvare la foto"); return }
+        if (stream == null) { error = "Impossibile salvare la foto"; onError(error!!); return }
         capturing = true
         imageCapture.takePicture(
             ImageCapture.OutputFileOptions.Builder(stream).build(),
@@ -146,6 +148,7 @@ fun InAppCamera(
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     runCatching { stream.close() }
                     capturing = false
+                    error = null
                     shots++
                     onShot(target)
                     if (single) onDismiss()
@@ -154,7 +157,8 @@ fun InAppCamera(
                 override fun onError(exception: ImageCaptureException) {
                     runCatching { stream.close() }
                     capturing = false
-                    onError("Scatto non riuscito: riprova")
+                    error = "Scatto non riuscito: riprova"
+                    onError(error!!)
                 }
             },
         )
@@ -234,7 +238,7 @@ fun InAppCamera(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    hint ?: if (shots == 0) "Inquadra l'oggetto intero, con un po' di contesto attorno"
+                    error ?: hint ?: if (shots == 0) "Inquadra l'oggetto intero, con un po' di contesto attorno"
                     else "Ancora una da un altro lato, oppure Fatto",
                     color = Color.White,
                     style = MaterialTheme.typography.bodyMedium,

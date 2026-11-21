@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.settings
 
+import it.objectfinder.app.ui.common.LocalAppMessages
 import it.objectfinder.app.ui.common.readableWidth
 import it.objectfinder.app.ui.auth.NewPasswordDialog
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +48,7 @@ fun SettingsScreen(
     var confirmSignOut by remember { mutableStateOf(false) }
     var changingPassword by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val messages = LocalAppMessages.current
     val session by container.authRepository.session.collectAsStateWithLifecycle()
     val project by container.settings.activeProject.collectAsStateWithLifecycle()
     val syncState by container.settings.syncState.collectAsStateWithLifecycle()
@@ -83,7 +85,7 @@ fun SettingsScreen(
                     onSave = container.authRepository::changePassword,
                     onDone = { text ->
                         changingPassword = false
-                        android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
+                        messages.show(text)
                     },
                     onDismiss = { changingPassword = false },
                 )

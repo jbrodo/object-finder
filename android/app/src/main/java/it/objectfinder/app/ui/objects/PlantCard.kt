@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -54,7 +57,8 @@ fun PlantCard(
                 PlantUi.Hidden -> Unit
                 PlantUi.Idle -> OutlinedButton(onClick = onIdentify) {
                     Icon(Icons.Default.Eco, contentDescription = null, Modifier.size(18.dp))
-                    Text("  Riconosci la pianta")
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text("Riconosci la pianta")
                 }
                 is PlantUi.NeedsModel -> {
                     state.note?.let { Muted(it) }

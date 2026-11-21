@@ -1,5 +1,10 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.common.rememberAppMessages
+import it.objectfinder.app.ui.common.LocalAppMessages
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.SnackbarHostState
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -111,8 +116,10 @@ private val SampleHistory: List<LocationHistoryEntity>
     )
 
 @Composable
-private fun SampleTheme(content: @Composable () -> Unit) =
-    ObjectFinderTheme(dynamicColor = false) { Surface(content = content) }
+private fun SampleTheme(content: @Composable () -> Unit) = ObjectFinderTheme(dynamicColor = false) {
+    val messages = rememberAppMessages(remember { SnackbarHostState() })
+    CompositionLocalProvider(LocalAppMessages provides messages) { Surface(content = content) }
+}
 
 @Composable
 private fun SampleGrid(modifier: Modifier = Modifier) = ObjectGrid(

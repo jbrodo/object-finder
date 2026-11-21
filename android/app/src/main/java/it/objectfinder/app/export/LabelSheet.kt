@@ -18,7 +18,6 @@ import android.print.PrintDocumentInfo
 import android.print.PrintManager
 import android.text.TextPaint
 import android.text.TextUtils
-import android.widget.Toast
 import androidx.core.content.FileProvider
 import it.objectfinder.app.qr.QrCodes
 import java.io.File
@@ -130,7 +129,8 @@ object LabelSheetActions {
             .build())
     }
 
-    fun share(context: Context, pdf: File) {
+    /** false se nessuna app può ricevere il PDF: il messaggio lo mostra chi chiama. */
+    fun share(context: Context, pdf: File): Boolean {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdf)
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
@@ -140,8 +140,9 @@ object LabelSheetActions {
         }
         try {
             context.startActivity(Intent.createChooser(send, "Condividi etichette"))
+            return true
         } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, "Nessuna app disponibile per la condivisione", Toast.LENGTH_SHORT).show()
+            return false
         }
     }
 

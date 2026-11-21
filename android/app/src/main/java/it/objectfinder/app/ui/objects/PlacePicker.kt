@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -118,8 +121,9 @@ fun PlacePickerSheet(
             )
             if (canEdit) OutlinedButton(onClick = { creating = true }) {
                 Icon(Icons.Default.Add, contentDescription = null, Modifier.size(18.dp))
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                 Text(
-                    if (selectedId != null) "  Nuovo luogo dentro ${tree.get(selectedId)?.name.orEmpty()}" else "  Nuovo luogo",
+                    if (selectedId != null) "Nuovo luogo dentro ${tree.get(selectedId)?.name.orEmpty()}" else "Nuovo luogo",
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

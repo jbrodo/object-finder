@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,8 +45,9 @@ fun ConflictBanner(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Warning, contentDescription = null, Modifier.size(20.dp))
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                 Text(
-                    if (conflict.deletedOnServer) "  Eliminato da un altro membro" else "  Modificato da un altro membro",
+                    if (conflict.deletedOnServer) "Eliminato da un altro membro" else "Modificato da un altro membro",
                     style = MaterialTheme.typography.titleSmall,
                 )
             }

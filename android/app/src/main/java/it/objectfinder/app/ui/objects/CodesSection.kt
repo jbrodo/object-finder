@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import it.objectfinder.app.nfc.NfcTags
 import it.objectfinder.app.nfc.NfcSession
 import androidx.compose.runtime.DisposableEffect
@@ -115,15 +118,18 @@ fun CodesSection(
                         },
                     ) {
                         Icon(Icons.Default.QrCodeScanner, contentDescription = null, Modifier.size(18.dp))
-                        Text("  Scansiona")
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Scansiona")
                     }
                     OutlinedButton(onClick = { manualEntry = true }) {
                         Icon(Icons.Default.Keyboard, contentDescription = null, Modifier.size(18.dp))
-                        Text("  Scrivi")
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Scrivi")
                     }
                     if (hasNfc) OutlinedButton(onClick = { waitingTag = true }) {
                         Icon(Icons.Default.Nfc, contentDescription = null, Modifier.size(18.dp))
-                        Text("  Tag NFC")
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Tag NFC")
                     }
                 }
             }

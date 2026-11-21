@@ -1,10 +1,18 @@
 package it.objectfinder.app.qr
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +43,7 @@ import java.io.File
 fun QrLabelDialog(objectId: String, title: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val label = remember(objectId, title) { QrCodes.labelBitmap(objectId, title.ifBlank { "Oggetto" }) }
+    var shareFailed by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -53,18 +62,26 @@ fun QrLabelDialog(objectId: String, title: String, onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (shareFailed) Text(
+                    "Nessuna app disponibile per la condivisione: puoi stamparla.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
             }
         },
         confirmButton = {
             TextButton(onClick = { printLabel(context, label, title) }) {
                 Icon(Icons.Default.Print, contentDescription = null)
-                Text("  Stampa")
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text("Stampa")
             }
         },
         dismissButton = {
-            TextButton(onClick = { shareLabel(context, label, objectId, title) }) {
+            TextButton(onClick = { shareFailed = !shareLabel(context, label, objectId, title) }) {
                 Icon(Icons.Default.Share, contentDescription = null)
-                Text("  Condividi")
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text("Condividi")
             }
         },
     )
@@ -75,7 +92,7 @@ private fun printLabel(context: Context, label: Bitmap, title: String) {
         .printBitmap("Etichetta $title", label)
 }
 
-private fun shareLabel(context: Context, label: Bitmap, objectId: String, title: String) {
+private fun shareLabel(context: Context, label: Bitmap, objectId: String, title: String): Boolean {
     val dir = File(context.cacheDir, "labels").apply { mkdirs() }
     val file = File(dir, "etichetta-$objectId.png")
     file.outputStream().use { label.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -88,7 +105,8 @@ private fun shareLabel(context: Context, label: Bitmap, objectId: String, title:
     }
     try {
         context.startActivity(Intent.createChooser(send, "Condividi etichetta"))
+        return true
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, "Nessuna app disponibile per la condivisione", Toast.LENGTH_SHORT).show()
+        return false
     }
 }

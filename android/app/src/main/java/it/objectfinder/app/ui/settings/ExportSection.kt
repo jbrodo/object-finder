@@ -1,8 +1,14 @@
 package it.objectfinder.app.ui.settings
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.runtime.remember
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -45,7 +51,9 @@ fun ExportSection(exporter: InventoryExporter) {
     var includeArchived by rememberSaveable { mutableStateOf(false) }
     var busy by rememberSaveable { mutableStateOf(false) }
 
-    fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+    // Esito mostrato nel foglio stesso: una Snackbar resterebbe nascosta sotto il foglio modale.
+    var status by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+    fun report(text: String, error: Boolean = false) { status = text to error }
 
     // "Salva sul telefono": il selettore di sistema sceglie cartella e nome (Download, Drive…).
     val saveLauncher = rememberLauncherForActivityResult(
@@ -59,14 +67,15 @@ fun ExportSection(exporter: InventoryExporter) {
                 context.contentResolver.openOutputStream(uri)?.use { exporter.writeTo(it, format, rows) }
                     ?: error("destinazione non scrivibile")
                 rows.size
-            }.onSuccess { toast("Inventario salvato ($it oggetti)") }
-                .onFailure { toast("Salvataggio non riuscito: ${it.message}") }
+            }.onSuccess { report("Inventario salvato ($it oggetti)") }
+                .onFailure { report("Salvataggio non riuscito: ${it.message}", error = true) }
             busy = false
         }
     }
 
     fun share() {
         busy = true
+        status = null
         scope.launch {
             runCatching { exporter.exportToShareableFile(format, includeArchived) }
                 .onSuccess { (uri, count) ->
@@ -79,10 +88,10 @@ fun ExportSection(exporter: InventoryExporter) {
                     try {
                         context.startActivity(Intent.createChooser(send, "Condividi inventario"))
                     } catch (_: ActivityNotFoundException) {
-                        toast("Nessuna app disponibile per la condivisione")
+                        report("Nessuna app disponibile per la condivisione", error = true)
                     }
                 }
-                .onFailure { toast("Export non riuscito: ${it.message}") }
+                .onFailure { report("Export non riuscito: ${it.message}", error = true) }
             busy = false
         }
     }
@@ -110,11 +119,21 @@ fun ExportSection(exporter: InventoryExporter) {
         Button(onClick = ::share, enabled = !busy) {
             if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             else Icon(Icons.Default.Share, contentDescription = null, Modifier.size(18.dp))
-            Text("  Condividi")
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text("Condividi")
         }
         OutlinedButton(onClick = { saveLauncher.launch(exporter.fileName(format)) }, enabled = !busy) {
             Icon(Icons.Default.Save, contentDescription = null, Modifier.size(18.dp))
-            Text("  Salva sul telefono")
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text("Salva sul telefono")
         }
+    }
+    status?.let { (text, error) ->
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
     }
 }

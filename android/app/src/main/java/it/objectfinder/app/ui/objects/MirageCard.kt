@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -61,7 +64,8 @@ fun MirageCard(
                     )
                     OutlinedButton(onClick = onAnalyze) {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null, Modifier.size(18.dp))
-                        Text("  Analizza le foto")
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Analizza le foto")
                     }
                 }
                 MirageUi.NeedsModel -> {

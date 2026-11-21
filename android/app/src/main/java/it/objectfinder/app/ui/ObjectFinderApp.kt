@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.common.rememberAppMessages
+import it.objectfinder.app.ui.common.LocalAppMessages
+import androidx.compose.runtime.CompositionLocalProvider
 import it.objectfinder.app.ui.recognition.RecognizeFlow
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
@@ -117,6 +120,7 @@ fun ObjectFinderApp(
     val nav = rememberNavController()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val messages = rememberAppMessages(snackbar)
     val resolver = remember(container) {
         ScanResolver(
             findObject = { container.objectRepository.get(it) },
@@ -218,168 +222,170 @@ fun ObjectFinderApp(
         } }
     }
 
-    Box(Modifier.fillMaxSize()) {
-    NavHost(navController = nav, startDestination = start) {
-        composable(Routes.AUTH) {
-            AuthScreen(
-                container = container,
-                onDone = {
-                    container.settings.setOnboardingDone()
-                    requestSync()
-                    nav.leaveAuth()
-                },
-                onContinueOffline = {
-                    container.settings.setOnboardingDone()
-                    nav.leaveAuth()
-                },
-            )
-        }
-        composable(Routes.OBJECTS) {
-            val vm = viewModel { ObjectListViewModel(container.objectRepository, container.photoRepository, container.identifierRepository, container.placeRepository) }
-            MainShell(container, nav, Tab.OBJECTS, requestSync, startScan) { modifier ->
-                val active by container.settings.activeProject.collectAsStateWithLifecycle()
-                ObjectListScreen(
-                    viewModel = vm,
-                    canCreate = active?.canEditObjects ?: true,
-                    showSyncState = session != null,
-                    onOpenObject = { nav.navigate(Routes.editor(it)) },
-                    onCreateObject = { nav.navigate(Routes.editor()) },
-                    onChanged = requestSync,
-                    modifier = modifier,
-                )
-            }
-        }
-        composable(Routes.MAP) {
-            val objects by container.objectRepository.observeObjects().collectAsStateWithLifecycle(emptyList())
-            val engine by container.settings.mapEngine.collectAsStateWithLifecycle()
-            MainShell(container, nav, Tab.MAP, requestSync, startScan) { modifier ->
-                ObjectMapScreen(
-                    objects = objects.filter { it.statusEnum != ObjectStatus.ARCHIVED },
-                    preferredEngine = engine,
-                    onEngineChange = container.settings::setMapEngine,
-                    onOpenObject = { nav.navigate(Routes.editor(it)) },
-                    modifier = modifier,
-                )
-            }
-        }
-        composable(Routes.SETTINGS) {
-            MainShell(container, nav, Tab.SETTINGS, requestSync, startScan) { modifier ->
-                SettingsScreen(
+    CompositionLocalProvider(LocalAppMessages provides messages) {
+        Box(Modifier.fillMaxSize()) {
+        NavHost(navController = nav, startDestination = start) {
+            composable(Routes.AUTH) {
+                AuthScreen(
                     container = container,
-                    onSignIn = { nav.navigate(Routes.AUTH) },
-                    onSyncNow = requestSync,
-                    onOpenProjects = { nav.navigate(Routes.PROJECTS) },
-                    onOpenMembers = { nav.navigate(Routes.MEMBERS) },
-                    modifier = modifier,
-                )
-            }
-        }
-        composable(Routes.PROJECTS) {
-            val vm = viewModel {
-                ProjectsViewModel(container.projectRepository, container.settings, onProjectChanged = requestSync)
-            }
-            ProjectsScreen(viewModel = vm, onBack = { nav.popBackStack() })
-        }
-        composable(Routes.MEMBERS) {
-            val project by container.settings.activeProject.collectAsStateWithLifecycle()
-            val vm = viewModel { MembersViewModel(container.projectRepository, onProjectChanged = requestSync) }
-            MembersScreen(viewModel = vm, project = project, onBack = { nav.popBackStack() })
-        }
-        composable(Routes.EDITOR) { entry ->
-            val id = entry.arguments?.getString("id")
-            val initialPhoto = entry.arguments?.getString("photo")?.let(android.net.Uri::parse)
-            val vm = viewModel(key = "editor-$id-$initialPhoto") {
-                ObjectEditorViewModel(
-                    objectId = id,
-                    repository = container.objectRepository,
-                    photoRepository = container.photoRepository,
-                    identifierRepository = container.identifierRepository,
-                    historyRepository = container.locationHistoryRepository,
-                    refreshHistory = { objectId ->
-                        if (container.authRepository.session.value != null &&
-                            container.settings.activeProject.value?.role != null
-                        ) container.locationHistoryRepository.refresh(objectId)
+                    onDone = {
+                        container.settings.setOnboardingDone()
+                        requestSync()
+                        nav.leaveAuth()
                     },
-                    locationProvider = LocationProvider(context),
-                    appScope = container.appScope,
-                    onLocalChange = { requestSync(); container.indexPhotosInBackground() },
-                    initialPhoto = initialPhoto,
-                    mirage = container.mirageEngine,
-                    places = container.placeRepository,
-                    plants = container.plantIdentifier,
-                    plantModel = container.plantEngine,
+                    onContinueOffline = {
+                        container.settings.setOnboardingDone()
+                        nav.leaveAuth()
+                    },
                 )
             }
-            val active by container.settings.activeProject.collectAsStateWithLifecycle()
-            val editorMapEngine by container.settings.mapEngine.collectAsStateWithLifecycle()
-            ObjectEditorScreen(
-                viewModel = vm,
-                readOnly = active?.canEditObjects == false,
-                objectId = id,
-                canDelete = active?.canDeleteObjects ?: true,
-                mapEngine = editorMapEngine,
-                onClose = { nav.popBackStack() },
+            composable(Routes.OBJECTS) {
+                val vm = viewModel { ObjectListViewModel(container.objectRepository, container.photoRepository, container.identifierRepository, container.placeRepository) }
+                MainShell(container, nav, Tab.OBJECTS, requestSync, startScan) { modifier ->
+                    val active by container.settings.activeProject.collectAsStateWithLifecycle()
+                    ObjectListScreen(
+                        viewModel = vm,
+                        canCreate = active?.canEditObjects ?: true,
+                        showSyncState = session != null,
+                        onOpenObject = { nav.navigate(Routes.editor(it)) },
+                        onCreateObject = { nav.navigate(Routes.editor()) },
+                        onChanged = requestSync,
+                        modifier = modifier,
+                    )
+                }
+            }
+            composable(Routes.MAP) {
+                val objects by container.objectRepository.observeObjects().collectAsStateWithLifecycle(emptyList())
+                val engine by container.settings.mapEngine.collectAsStateWithLifecycle()
+                MainShell(container, nav, Tab.MAP, requestSync, startScan) { modifier ->
+                    ObjectMapScreen(
+                        objects = objects.filter { it.statusEnum != ObjectStatus.ARCHIVED },
+                        preferredEngine = engine,
+                        onEngineChange = container.settings::setMapEngine,
+                        onOpenObject = { nav.navigate(Routes.editor(it)) },
+                        modifier = modifier,
+                    )
+                }
+            }
+            composable(Routes.SETTINGS) {
+                MainShell(container, nav, Tab.SETTINGS, requestSync, startScan) { modifier ->
+                    SettingsScreen(
+                        container = container,
+                        onSignIn = { nav.navigate(Routes.AUTH) },
+                        onSyncNow = requestSync,
+                        onOpenProjects = { nav.navigate(Routes.PROJECTS) },
+                        onOpenMembers = { nav.navigate(Routes.MEMBERS) },
+                        modifier = modifier,
+                    )
+                }
+            }
+            composable(Routes.PROJECTS) {
+                val vm = viewModel {
+                    ProjectsViewModel(container.projectRepository, container.settings, onProjectChanged = requestSync)
+                }
+                ProjectsScreen(viewModel = vm, onBack = { nav.popBackStack() })
+            }
+            composable(Routes.MEMBERS) {
+                val project by container.settings.activeProject.collectAsStateWithLifecycle()
+                val vm = viewModel { MembersViewModel(container.projectRepository, onProjectChanged = requestSync) }
+                MembersScreen(viewModel = vm, project = project, onBack = { nav.popBackStack() })
+            }
+            composable(Routes.EDITOR) { entry ->
+                val id = entry.arguments?.getString("id")
+                val initialPhoto = entry.arguments?.getString("photo")?.let(android.net.Uri::parse)
+                val vm = viewModel(key = "editor-$id-$initialPhoto") {
+                    ObjectEditorViewModel(
+                        objectId = id,
+                        repository = container.objectRepository,
+                        photoRepository = container.photoRepository,
+                        identifierRepository = container.identifierRepository,
+                        historyRepository = container.locationHistoryRepository,
+                        refreshHistory = { objectId ->
+                            if (container.authRepository.session.value != null &&
+                                container.settings.activeProject.value?.role != null
+                            ) container.locationHistoryRepository.refresh(objectId)
+                        },
+                        locationProvider = LocationProvider(context),
+                        appScope = container.appScope,
+                        onLocalChange = { requestSync(); container.indexPhotosInBackground() },
+                        initialPhoto = initialPhoto,
+                        mirage = container.mirageEngine,
+                        places = container.placeRepository,
+                        plants = container.plantIdentifier,
+                        plantModel = container.plantEngine,
+                    )
+                }
+                val active by container.settings.activeProject.collectAsStateWithLifecycle()
+                val editorMapEngine by container.settings.mapEngine.collectAsStateWithLifecycle()
+                ObjectEditorScreen(
+                    viewModel = vm,
+                    readOnly = active?.canEditObjects == false,
+                    objectId = id,
+                    canDelete = active?.canDeleteObjects ?: true,
+                    mapEngine = editorMapEngine,
+                    onClose = { nav.popBackStack() },
+                )
+            }
+        }
+        choosing?.let { choice ->
+            AlertDialog(
+                onDismissRequest = { choosing = null },
+                title = { Text("Più oggetti con questo codice") },
+                text = {
+                    Column {
+                        choice.objects.forEach { item ->
+                            ListItem(
+                                supportingContent = { Text(categoryLabel(item.category)) },
+                                modifier = Modifier.clickable { choosing = null; nav.openObject(item.id) },
+                            ) { Text(item.name) }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { choosing = null }) { Text("Chiudi") } },
             )
         }
-    }
-    choosing?.let { choice ->
-        AlertDialog(
-            onDismissRequest = { choosing = null },
-            title = { Text("Più oggetti con questo codice") },
-            text = {
-                Column {
-                    choice.objects.forEach { item ->
-                        ListItem(
-                            supportingContent = { Text(categoryLabel(item.category)) },
-                            modifier = Modifier.clickable { choosing = null; nav.openObject(item.id) },
-                        ) { Text(item.name) }
+
+        unlinked?.let { code ->
+            val objects by container.objectRepository.observeObjects().collectAsStateWithLifecycle(emptyList())
+            val active by container.settings.activeProject.collectAsStateWithLifecycle()
+            LinkCodeDialog(
+                code = code.code,
+                type = code.type,
+                objects = objects,
+                canLink = active?.canEditObjects ?: true,
+                onPick = { item ->
+                    unlinked = null
+                    scope.launch {
+                        val text = when (container.identifierRepository.add(item.id, code.type, code.code)) {
+                            AddIdentifierResult.Added -> { requestSync(); "Collegato a «${item.name}»" }
+                            AddIdentifierResult.Duplicate -> "Già collegato a «${item.name}»"
+                            AddIdentifierResult.Invalid -> "Codice non valido"
+                        }
+                        nav.openObject(item.id)
+                        snackbar.showSnackbar(text)
                     }
-                }
-            },
-            confirmButton = { TextButton(onClick = { choosing = null }) { Text("Chiudi") } },
-        )
-    }
+                },
+                onDismiss = { unlinked = null },
+            )
+        }
 
-    unlinked?.let { code ->
-        val objects by container.objectRepository.observeObjects().collectAsStateWithLifecycle(emptyList())
-        val active by container.settings.activeProject.collectAsStateWithLifecycle()
-        LinkCodeDialog(
-            code = code.code,
-            type = code.type,
-            objects = objects,
-            canLink = active?.canEditObjects ?: true,
-            onPick = { item ->
-                unlinked = null
-                scope.launch {
-                    val text = when (container.identifierRepository.add(item.id, code.type, code.code)) {
-                        AddIdentifierResult.Added -> { requestSync(); "Collegato a «${item.name}»" }
-                        AddIdentifierResult.Duplicate -> "Già collegato a «${item.name}»"
-                        AddIdentifierResult.Invalid -> "Codice non valido"
-                    }
-                    nav.openObject(item.id)
-                    snackbar.showSnackbar(text)
-                }
-            },
-            onDismiss = { unlinked = null },
-        )
-    }
+        if (choosingPassword) {
+            NewPasswordDialog(
+                title = "Scegli una nuova password",
+                message = "Sei dentro con il link dell'email. Imposta ora la nuova password per i prossimi accessi.",
+                email = session?.email.orEmpty(),
+                onSave = container.authRepository::changePassword,
+                onDone = { text -> choosingPassword = false; scope.launch { snackbar.showSnackbar(text) } },
+                onDismiss = { choosingPassword = false },
+            )
+        }
 
-    if (choosingPassword) {
-        NewPasswordDialog(
-            title = "Scegli una nuova password",
-            message = "Sei dentro con il link dell'email. Imposta ora la nuova password per i prossimi accessi.",
-            email = session?.email.orEmpty(),
-            onSave = container.authRepository::changePassword,
-            onDone = { text -> choosingPassword = false; scope.launch { snackbar.showSnackbar(text) } },
-            onDismiss = { choosingPassword = false },
+        // Snackbar globale (scansioni/deep link) sopra qualsiasi schermata, sopra la barra di navigazione.
+        SnackbarHost(
+            snackbar,
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 80.dp),
         )
-    }
-
-    // Snackbar globale (scansioni/deep link) sopra qualsiasi schermata, sopra la barra di navigazione.
-    SnackbarHost(
-        snackbar,
-        modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 80.dp),
-    )
+        }
     }
 }
 

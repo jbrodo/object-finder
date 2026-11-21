@@ -1,5 +1,7 @@
 package it.objectfinder.app.ui.auth
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
 import it.objectfinder.app.ui.common.readableWidth
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Arrangement
@@ -247,7 +249,8 @@ fun AuthScreen(
             if (configured && mode == AuthMode.SIGN_IN) {
                 TextButton(onClick = { useSavedCredentials(auto = false) }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Key, contentDescription = null, Modifier.size(18.dp))
-                    Text("  Usa password salvata")
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text("Usa password salvata")
                 }
             }
             TextButton(onClick = onContinueOffline, modifier = Modifier.fillMaxWidth()) {

@@ -1,5 +1,8 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material3.ButtonDefaults
+import it.objectfinder.app.ui.common.locationUnavailable
+import it.objectfinder.app.ui.common.LocalAppMessages
 import it.objectfinder.app.ui.common.ReadableMaxWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.filled.Place
@@ -51,7 +54,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
-import android.widget.Toast
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -100,6 +102,7 @@ fun ObjectListScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val messages = LocalAppMessages.current
     // Selezione multipla: Set per ricerche immediate; ogni scheda legge il proprio stato in proprio.
     var selected by rememberSaveable(stateSaver = SelectionSaver) { mutableStateOf(emptySet<String>()) }
     val selecting = selected.isNotEmpty()
@@ -125,9 +128,7 @@ fun ObjectListScreen(
                 locating = false
                 when {
                     fresh != null -> viewModel.setOrigin(fresh)
-                    quick == null -> Toast.makeText(
-                        context, "Posizione non disponibile: verifica che il GPS sia attivo", Toast.LENGTH_SHORT,
-                    ).show()
+                    quick == null -> messages.locationUnavailable(context)
                 }
             }
         }
@@ -155,14 +156,16 @@ fun ObjectListScreen(
                 }
             },
             onArchive = {
-                viewModel.setArchived(selected, archived = !allArchived) {
-                    Toast.makeText(
-                        context,
-                        if (allArchived) "${selected.size} oggetti ripristinati" else "${selected.size} oggetti archiviati",
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                val ids = selected
+                viewModel.setArchived(ids, archived = !allArchived) {
                     selected = emptySet()
                     onChanged()
+                    val what = if (ids.size == 1) "1 oggetto" else "${ids.size} oggetti"
+                    // Archiviare in blocco è facile da sbagliare: si annulla dalla stessa Snackbar.
+                    messages.show(
+                        if (allArchived) "$what ripristinati" else "$what archiviati",
+                        actionLabel = "Annulla",
+                    ) { viewModel.setArchived(ids, archived = allArchived) { onChanged() } }
                 }
             },
         )
@@ -364,7 +367,8 @@ private fun ObjectCard(
                 Text(
                     where,
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
+                    // Due righe: è la risposta che si cerca, non va troncata al primo dettaglio.
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -480,14 +484,16 @@ private fun SelectionBar(
             OutlinedButton(onClick = onLabels, enabled = !preparing) {
                 if (preparing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 else Icon(Icons.Default.QrCode2, contentDescription = null, Modifier.size(18.dp))
-                Text("  Etichette QR")
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text("Etichette QR")
             }
             if (canEdit) OutlinedButton(onClick = onArchive) {
                 Icon(
                     if (archiveLabel == "Archivia") Icons.Default.Archive else Icons.Default.Unarchive,
                     contentDescription = null, Modifier.size(18.dp),
                 )
-                Text("  $archiveLabel")
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text("$archiveLabel")
             }
         }
     }
@@ -497,6 +503,7 @@ private fun SelectionBar(
 @Composable
 private fun LabelSheetReady(file: java.io.File, count: Int, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val messages = LocalAppMessages.current
     val pages = LabelSheetLayout.pageCount(count)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -509,6 +516,11 @@ private fun LabelSheetReady(file: java.io.File, count: Int, onDismiss: () -> Uni
             )
         },
         confirmButton = { TextButton(onClick = { LabelSheetActions.print(context, file, count); onDismiss() }) { Text("Stampa") } },
-        dismissButton = { TextButton(onClick = { LabelSheetActions.share(context, file); onDismiss() }) { Text("Condividi PDF") } },
+        dismissButton = {
+            TextButton(onClick = {
+                onDismiss()
+                if (!LabelSheetActions.share(context, file)) messages.show("Nessuna app disponibile per la condivisione")
+            }) { Text("Condividi PDF") }
+        },
     )
 }

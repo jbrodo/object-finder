@@ -1,5 +1,10 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import it.objectfinder.app.ui.common.rememberAppMessages
+import it.objectfinder.app.ui.common.LocalAppMessages
+import androidx.compose.runtime.CompositionLocalProvider
 import it.objectfinder.app.ui.common.readableWidth
 import androidx.compose.material.icons.filled.Place
 import it.objectfinder.app.sync.LoanReminderWorker
@@ -123,6 +128,7 @@ fun ObjectEditorScreen(
     val mirageState by viewModel.mirageState.collectAsStateWithLifecycle()
     val plantState by viewModel.plantState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val messages = rememberAppMessages(snackbar)
     val permission = rememberLocationPermissionRequester()
     val editingExisting = state.editing && !state.isNew
     val available = state.loaded && !state.notFound
@@ -145,323 +151,326 @@ fun ObjectEditorScreen(
     // Indietro durante la modifica torna alla scheda, senza perdere modifiche in silenzio.
     BackHandler(enabled = editingExisting) { leaveEditing() }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        when {
-                            state.isNew -> "Nuovo oggetto"
-                            state.editing -> "Modifica oggetto"
-                            else -> ""
-                        }
-                    )
-                },
-                navigationIcon = {
-                    if (editingExisting) IconButton(onClick = ::leaveEditing) {
-                        Icon(Icons.Default.Close, contentDescription = "Annulla modifiche")
-                    } else IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
-                    }
-                },
-                actions = {
-                    if (available && !state.editing) {
-                        if (!readOnly) IconButton(onClick = viewModel::startEditing) {
-                            Icon(Icons.Default.Edit, contentDescription = "Modifica")
-                        }
-                        if (objectId != null) IconButton(onClick = { showLabel = true }) {
-                            Icon(Icons.Default.QrCode2, contentDescription = "Etichetta QR")
-                        }
-                        Box {
-                            IconButton(onClick = { menuOpen = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Altre azioni")
+    CompositionLocalProvider(LocalAppMessages provides messages) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            when {
+                                state.isNew -> "Nuovo oggetto"
+                                state.editing -> "Modifica oggetto"
+                                else -> ""
                             }
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                // Scrivere un tag non cambia l'oggetto: possibile anche in sola lettura.
-                                if (objectId != null) DropdownMenuItem(
-                                    text = { Text("Scrivi etichetta NFC") },
-                                    leadingIcon = { Icon(Icons.Default.Nfc, contentDescription = null) },
-                                    onClick = { menuOpen = false; showNfc = true },
-                                )
-                                if (!readOnly) DropdownMenuItem(
-                                    text = { Text(if (state.isArchived) "Ripristina" else "Archivia") },
-                                    leadingIcon = {
-                                        Icon(
-                                            if (state.isArchived) Icons.Default.Unarchive else Icons.Default.Archive,
-                                            contentDescription = null,
-                                        )
-                                    },
-                                    onClick = { menuOpen = false; viewModel.toggleArchived() },
-                                )
-                                // L'azione irreversibile resta separata e chiede conferma.
-                                if (canDelete) DropdownMenuItem(
-                                    text = { Text("Elimina definitivamente", color = MaterialTheme.colorScheme.error) },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                                    },
-                                    enabled = !state.saving,
-                                    onClick = { menuOpen = false; confirmDelete = true },
-                                )
+                        )
+                    },
+                    navigationIcon = {
+                        if (editingExisting) IconButton(onClick = ::leaveEditing) {
+                            Icon(Icons.Default.Close, contentDescription = "Annulla modifiche")
+                        } else IconButton(onClick = onClose) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        }
+                    },
+                    actions = {
+                        if (available && !state.editing) {
+                            if (!readOnly) IconButton(onClick = viewModel::startEditing) {
+                                Icon(Icons.Default.Edit, contentDescription = "Modifica")
                             }
-                        }
-                    }
-                },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbar) },
-        // Salva sempre raggiungibile (anche sopra la tastiera), senza scorrere tutto il modulo.
-        bottomBar = {
-            if (state.editing && !readOnly && available) {
-                Surface(tonalElevation = 3.dp, shadowElevation = 3.dp) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .imePadding()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        // Un pulsante spento senza motivo sembra un guasto: si dice cosa manca.
-                        if (state.name.isBlank()) {
-                            Text(
-                                "Scrivi un nome per ${if (state.isNew) "registrare l'oggetto" else "salvare"}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 8.dp),
-                            )
-                        }
-                        Button(onClick = viewModel::save, enabled = state.canSave, modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                when {
-                                    state.saving && state.locating -> "Attendo la posizione…"
-                                    state.isNew -> "Registra oggetto"
-                                    else -> "Salva modifiche"
+                            if (objectId != null) IconButton(onClick = { showLabel = true }) {
+                                Icon(Icons.Default.QrCode2, contentDescription = "Etichetta QR")
+                            }
+                            Box {
+                                IconButton(onClick = { menuOpen = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "Altre azioni")
                                 }
-                            )
+                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    // Scrivere un tag non cambia l'oggetto: possibile anche in sola lettura.
+                                    if (objectId != null) DropdownMenuItem(
+                                        text = { Text("Scrivi etichetta NFC") },
+                                        leadingIcon = { Icon(Icons.Default.Nfc, contentDescription = null) },
+                                        onClick = { menuOpen = false; showNfc = true },
+                                    )
+                                    if (!readOnly) DropdownMenuItem(
+                                        text = { Text(if (state.isArchived) "Ripristina" else "Archivia") },
+                                        leadingIcon = {
+                                            Icon(
+                                                if (state.isArchived) Icons.Default.Unarchive else Icons.Default.Archive,
+                                                contentDescription = null,
+                                            )
+                                        },
+                                        onClick = { menuOpen = false; viewModel.toggleArchived() },
+                                    )
+                                    // L'azione irreversibile resta separata e chiede conferma.
+                                    if (canDelete) DropdownMenuItem(
+                                        text = { Text("Elimina definitivamente", color = MaterialTheme.colorScheme.error) },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                        },
+                                        enabled = !state.saving,
+                                        onClick = { menuOpen = false; confirmDelete = true },
+                                    )
+                                }
+                            }
+                        }
+                    },
+                )
+            },
+            snackbarHost = { SnackbarHost(snackbar) },
+            // Salva sempre raggiungibile (anche sopra la tastiera), senza scorrere tutto il modulo.
+            bottomBar = {
+                if (state.editing && !readOnly && available) {
+                    Surface(tonalElevation = 3.dp, shadowElevation = 3.dp) {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .imePadding()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            // Un pulsante spento senza motivo sembra un guasto: si dice cosa manca.
+                            if (state.name.isBlank()) {
+                                Text(
+                                    "Scrivi un nome per ${if (state.isNew) "registrare l'oggetto" else "salvare"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                            }
+                            Button(onClick = viewModel::save, enabled = state.canSave, modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    when {
+                                        state.saving && state.locating -> "Attendo la posizione…"
+                                        state.isNew -> "Registra oggetto"
+                                        else -> "Salva modifiche"
+                                    }
+                                )
+                            }
                         }
                     }
                 }
+            },
+        ) { padding ->
+            if (confirmDelete) {
+                AlertDialog(
+                    onDismissRequest = { confirmDelete = false },
+                    title = { Text("Eliminare definitivamente?") },
+                    text = {
+                        Text(
+                            "«${state.name}» verrà eliminato con foto, codici collegati e storico posizioni, " +
+                                "anche dai dispositivi degli altri membri. Non si può annullare: se vuoi solo " +
+                                "nasconderlo, usa Archivia."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { confirmDelete = false; viewModel.deletePermanently() }) {
+                            Text("Elimina", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Annulla") } },
+                )
             }
-        },
-    ) { padding ->
-        if (confirmDelete) {
-            AlertDialog(
-                onDismissRequest = { confirmDelete = false },
-                title = { Text("Eliminare definitivamente?") },
-                text = {
+            if (confirmDiscard) {
+                AlertDialog(
+                    onDismissRequest = { confirmDiscard = false },
+                    title = { Text("Scartare le modifiche?") },
+                    text = { Text("Le modifiche non salvate a «${state.name.ifBlank { "questo oggetto" }}» andranno perse.") },
+                    confirmButton = {
+                        TextButton(onClick = { confirmDiscard = false; viewModel.cancelEditing() }) { Text("Scarta") }
+                    },
+                    dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Continua a modificare") } },
+                )
+            }
+            if (showPicker) {
+                LocationPickerDialog(
+                    start = pickerStart(state),
+                    engine = mapEngine,
+                    onConfirm = { lat, lon ->
+                        showPicker = false
+                        // In consultazione si salva subito; nel modulo si salva con il resto.
+                        if (state.editing) viewModel.setManualLocation(lat, lon) else viewModel.saveManualLocation(lat, lon)
+                    },
+                    onDismiss = { showPicker = false },
+                )
+            }
+            if (pickingPlace) {
+                PlacePickerSheet(
+                    tree = placeTree,
+                    selectedId = state.placeId,
+                    canEdit = !readOnly,
+                    onPick = { viewModel.setPlaceId(it); pickingPlace = false },
+                    onCreate = viewModel::createPlace,
+                    onRename = viewModel::renamePlace,
+                    onDelete = viewModel::deletePlace,
+                    onDismiss = { pickingPlace = false },
+                )
+            }
+            if (lending) {
+                LendDialog(
+                    initialName = state.loanedTo,
+                    initialDue = state.loanDue,
+                    borrowers = borrowers,
+                    onConfirm = { to, due ->
+                        lending = false
+                        // Scadenza già oggi o passata: promemoria subito, non domani mattina.
+                        viewModel.lend(to, due) { if (due != null && !due.isAfter(java.time.LocalDate.now())) LoanReminderWorker.checkNow(appContext) }
+                    },
+                    onDismiss = { lending = false },
+                )
+            }
+            if (showNfc && objectId != null) {
+                NfcWriteDialog(objectId = objectId, title = state.name, onDismiss = { showNfc = false })
+            }
+            if (showLabel && objectId != null) {
+                QrLabelDialog(objectId = objectId, title = state.name, onDismiss = { showLabel = false })
+            }
+            if (state.notFound) {
+                Column(Modifier.padding(padding).padding(24.dp)) {
+                    Text("Oggetto non trovato.")
+                    TextButton(onClick = onClose) { Text("Torna all'elenco") }
+                }
+                return@Scaffold
+            }
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding) // include la barra Salva, che segue già la tastiera
+                    .verticalScroll(rememberScrollState())
+                    .readableWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                conflict?.let {
+                    ConflictBanner(it, readOnly, onKeepMine = viewModel::keepMine, onUseServer = viewModel::useServer)
+                }
+                if (readOnly) {
                     Text(
-                        "«${state.name}» verrà eliminato con foto, codici collegati e storico posizioni, " +
-                            "anche dai dispositivi degli altri membri. Non si può annullare: se vuoi solo " +
-                            "nasconderlo, usa Archivia."
+                        "Hai accesso in sola lettura a questo progetto.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
-                },
-                confirmButton = {
-                    TextButton(onClick = { confirmDelete = false; viewModel.deletePermanently() }) {
-                        Text("Elimina", color = MaterialTheme.colorScheme.error)
-                    }
-                },
-                dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Annulla") } },
-            )
-        }
-        if (confirmDiscard) {
-            AlertDialog(
-                onDismissRequest = { confirmDiscard = false },
-                title = { Text("Scartare le modifiche?") },
-                text = { Text("Le modifiche non salvate a «${state.name.ifBlank { "questo oggetto" }}» andranno perse.") },
-                confirmButton = {
-                    TextButton(onClick = { confirmDiscard = false; viewModel.cancelEditing() }) { Text("Scarta") }
-                },
-                dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Continua a modificare") } },
-            )
-        }
-        if (showPicker) {
-            LocationPickerDialog(
-                start = pickerStart(state),
-                engine = mapEngine,
-                onConfirm = { lat, lon ->
-                    showPicker = false
-                    // In consultazione si salva subito; nel modulo si salva con il resto.
-                    if (state.editing) viewModel.setManualLocation(lat, lon) else viewModel.saveManualLocation(lat, lon)
-                },
-                onDismiss = { showPicker = false },
-            )
-        }
-        if (pickingPlace) {
-            PlacePickerSheet(
-                tree = placeTree,
-                selectedId = state.placeId,
-                canEdit = !readOnly,
-                onPick = { viewModel.setPlaceId(it); pickingPlace = false },
-                onCreate = viewModel::createPlace,
-                onRename = viewModel::renamePlace,
-                onDelete = viewModel::deletePlace,
-                onDismiss = { pickingPlace = false },
-            )
-        }
-        if (lending) {
-            LendDialog(
-                initialName = state.loanedTo,
-                initialDue = state.loanDue,
-                borrowers = borrowers,
-                onConfirm = { to, due ->
-                    lending = false
-                    // Scadenza già oggi o passata: promemoria subito, non domani mattina.
-                    viewModel.lend(to, due) { if (due != null && !due.isAfter(java.time.LocalDate.now())) LoanReminderWorker.checkNow(appContext) }
-                },
-                onDismiss = { lending = false },
-            )
-        }
-        if (showNfc && objectId != null) {
-            NfcWriteDialog(objectId = objectId, title = state.name, onDismiss = { showNfc = false })
-        }
-        if (showLabel && objectId != null) {
-            QrLabelDialog(objectId = objectId, title = state.name, onDismiss = { showLabel = false })
-        }
-        if (state.notFound) {
-            Column(Modifier.padding(padding).padding(24.dp)) {
-                Text("Oggetto non trovato.")
-                TextButton(onClick = onClose) { Text("Torna all'elenco") }
-            }
-            return@Scaffold
-        }
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding) // include la barra Salva, che segue già la tastiera
-                .verticalScroll(rememberScrollState())
-                .readableWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            conflict?.let {
-                ConflictBanner(it, readOnly, onKeepMine = viewModel::keepMine, onUseServer = viewModel::useServer)
-            }
-            if (readOnly) {
-                Text(
-                    "Hai accesso in sola lettura a questo progetto.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            if (state.isArchived) {
-                Text(
-                    "Oggetto archiviato: non compare nell'elenco principale.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            if (!state.loaded) return@Column
+                }
+                if (state.isArchived) {
+                    Text(
+                        "Oggetto archiviato: non compare nell'elenco principale.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                if (!state.loaded) return@Column
 
-            if (!state.editing) {
-                // ---- Consultazione ----
-                ObjectHeader(state)
-                WherePanel(
-                    placePath = placeTree.path(state.placeId),
-                    state = state,
-                    history = history,
-                    readOnly = readOnly,
-                    onMoveHere = { permission.withPermission(viewModel::moveHere) },
-                    onPickOnMap = { showPicker = true },
-                    onUseBestNow = viewModel::useBestFixNow,
-                    onDescribe = viewModel::startEditing,
-                )
-                if (state.loanedTo.isNotBlank()) {
-                    LoanPanel(
-                        loanedTo = state.loanedTo,
-                        loanedAt = state.loanedAt,
-                        due = state.loanDue,
+                if (!state.editing) {
+                    // ---- Consultazione ----
+                    ObjectHeader(state)
+                    WherePanel(
+                        placePath = placeTree.path(state.placeId),
+                        state = state,
+                        history = history,
                         readOnly = readOnly,
-                        onReturned = viewModel::returnLoan,
-                        onEdit = { viewModel.loadBorrowers(); lending = true },
+                        onMoveHere = { permission.withPermission(viewModel::moveHere) },
+                        onPickOnMap = { showPicker = true },
+                        onUseBestNow = viewModel::useBestFixNow,
+                        onDescribe = viewModel::startEditing,
                     )
-                } else if (!readOnly) {
-                    TextButton(onClick = { viewModel.loadBorrowers(); lending = true }) {
-                        Icon(Icons.Default.Handshake, contentDescription = null, Modifier.size(18.dp))
-                        Text("  Presta a qualcuno")
+                    if (state.loanedTo.isNotBlank()) {
+                        LoanPanel(
+                            loanedTo = state.loanedTo,
+                            loanedAt = state.loanedAt,
+                            due = state.loanDue,
+                            readOnly = readOnly,
+                            onReturned = viewModel::returnLoan,
+                            onEdit = { viewModel.loadBorrowers(); lending = true },
+                        )
+                    } else if (!readOnly) {
+                        TextButton(onClick = { viewModel.loadBorrowers(); lending = true }) {
+                            Icon(Icons.Default.Handshake, contentDescription = null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                            Text("Presta a qualcuno")
+                        }
                     }
-                }
-                PhotoSection(
-                    photos = photos,
-                    busy = photoBusy,
-                    readOnly = readOnly,
-                    newCameraUri = viewModel::newCameraUri,
-                    onAdd = viewModel::addPhoto,
-                    onDelete = viewModel::deletePhoto,
-                )
-                if (state.notes.isNotBlank()) {
-                    Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Note", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
-                        Text(state.notes, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-                CodesSection(
-                    codes = codes,
-                    readOnly = readOnly,
-                    onAdd = viewModel::addCode,
-                    onDelete = viewModel::deleteCode,
-                    onError = viewModel::showMessage,
-                )
-                LocationHistorySection(history)
-            } else {
-                // ---- Modulo: nuovo oggetto o modifica ----
-                if (state.isNew) {
                     PhotoSection(
                         photos = photos,
                         busy = photoBusy,
-                        readOnly = false,
+                        readOnly = readOnly,
                         newCameraUri = viewModel::newCameraUri,
                         onAdd = viewModel::addPhoto,
                         onDelete = viewModel::deletePhoto,
                     )
-                }
-                // Anche in modifica: nomi e testo letto si possono ricalcolare su richiesta.
-                MirageCard(
-                    state = mirageState,
-                    onDownload = viewModel::downloadMirageModel,
-                    onRetry = viewModel::retryMirage,
-                    onAnalyze = viewModel::analyzePhotos,
-                    onUseName = viewModel::useSuggestedName,
-                    onAddToNotes = viewModel::addTextToNotes,
-                    onLinkAsCode = { viewModel.addCode(IdentifierType.SERIAL, it) },
-                )
-                PlantCard(
-                    state = plantState,
-                    onIdentify = viewModel::identifyPlant,
-                    onDownload = viewModel::downloadPlantModel,
-                    onUse = viewModel::usePlant,
-                )
-                OutlinedTextField(
-                    value = state.name,
-                    onValueChange = viewModel::setName,
-                    label = { Text("Nome oggetto *") },
-                    singleLine = true,
-                    isError = state.nameTouched && state.name.isBlank(),
-                    supportingText = { if (state.nameTouched && state.name.isBlank()) Text("Il nome è obbligatorio") },
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                PlaceSelector(path = placeTree.path(state.placeId), onClick = { pickingPlace = true })
-                PlaceField(state.place, viewModel::setPlace, detail = state.placeId != null)
-                PositionEditor(
-                    state = state,
-                    onCapture = { permission.withPermission(viewModel::captureLocation) },
-                    onPickOnMap = { showPicker = true },
-                    onUseBestNow = viewModel::useBestFixNow,
-                    onClear = viewModel::clearLocation,
-                )
-                if (state.isNew) {
-                    MoreDetails {
-                        DetailFields(state, viewModel)
-                        CodesSection(
-                            codes = codes,
+                    if (state.notes.isNotBlank()) {
+                        Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Note", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+                            Text(state.notes, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    CodesSection(
+                        codes = codes,
+                        readOnly = readOnly,
+                        onAdd = viewModel::addCode,
+                        onDelete = viewModel::deleteCode,
+                        onError = viewModel::showMessage,
+                    )
+                    LocationHistorySection(history)
+                } else {
+                    // ---- Modulo: nuovo oggetto o modifica ----
+                    if (state.isNew) {
+                        PhotoSection(
+                            photos = photos,
+                            busy = photoBusy,
                             readOnly = false,
-                            onAdd = viewModel::addCode,
-                            onDelete = viewModel::deleteCode,
-                            onError = viewModel::showMessage,
+                            newCameraUri = viewModel::newCameraUri,
+                            onAdd = viewModel::addPhoto,
+                            onDelete = viewModel::deletePhoto,
                         )
                     }
-                } else {
-                    DetailFields(state, viewModel)
+                    // Anche in modifica: nomi e testo letto si possono ricalcolare su richiesta.
+                    MirageCard(
+                        state = mirageState,
+                        onDownload = viewModel::downloadMirageModel,
+                        onRetry = viewModel::retryMirage,
+                        onAnalyze = viewModel::analyzePhotos,
+                        onUseName = viewModel::useSuggestedName,
+                        onAddToNotes = viewModel::addTextToNotes,
+                        onLinkAsCode = { viewModel.addCode(IdentifierType.SERIAL, it) },
+                    )
+                    PlantCard(
+                        state = plantState,
+                        onIdentify = viewModel::identifyPlant,
+                        onDownload = viewModel::downloadPlantModel,
+                        onUse = viewModel::usePlant,
+                    )
+                    OutlinedTextField(
+                        value = state.name,
+                        onValueChange = viewModel::setName,
+                        label = { Text("Nome oggetto *") },
+                        singleLine = true,
+                        isError = state.nameTouched && state.name.isBlank(),
+                        supportingText = { if (state.nameTouched && state.name.isBlank()) Text("Il nome è obbligatorio") },
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    PlaceSelector(path = placeTree.path(state.placeId), onClick = { pickingPlace = true })
+                    PlaceField(state.place, viewModel::setPlace, detail = state.placeId != null)
+                    PositionEditor(
+                        state = state,
+                        onCapture = { permission.withPermission(viewModel::captureLocation) },
+                        onPickOnMap = { showPicker = true },
+                        onUseBestNow = viewModel::useBestFixNow,
+                        onClear = viewModel::clearLocation,
+                    )
+                    if (state.isNew) {
+                        MoreDetails {
+                            DetailFields(state, viewModel)
+                            CodesSection(
+                                codes = codes,
+                                readOnly = false,
+                                onAdd = viewModel::addCode,
+                                onDelete = viewModel::deleteCode,
+                                onError = viewModel::showMessage,
+                            )
+                        }
+                    } else {
+                        DetailFields(state, viewModel)
+                    }
                 }
             }
         }
@@ -503,6 +512,7 @@ internal fun WherePanel(
     placePath: String = "",
 ) {
     val context = LocalContext.current
+    val messages = LocalAppMessages.current
     val since = history.maxOfOrNull { it.recordedAt }
     Surface(
         color = MaterialTheme.colorScheme.primaryContainer,
@@ -519,7 +529,8 @@ internal fun WherePanel(
                 // Allineato al resto del pannello: niente rientro del TextButton.
                 TextButton(onClick = onDescribe, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp)) {
                     Icon(Icons.Default.Add, contentDescription = null, Modifier.size(18.dp))
-                    Text("  Descrivi il punto (es. garage, scaffale alto)")
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text("Descrivi il punto (es. garage, scaffale alto)")
                 }
             }
             if (state.hasLocation) {
@@ -536,11 +547,12 @@ internal fun WherePanel(
                     )
                 }
                 Button(
-                    onClick = { navigateTo(context, state.latitude!!, state.longitude!!) },
+                    onClick = { if (!navigateTo(context, state.latitude!!, state.longitude!!)) messages.show("Nessuna app mappe installata") },
                     modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                 ) {
                     Icon(Icons.Default.Directions, contentDescription = null, Modifier.size(18.dp))
-                    Text("  Portami lì")
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text("Portami lì")
                 }
             } else {
                 Text("Posizione GPS non registrata", style = MaterialTheme.typography.bodyLarge)
@@ -553,18 +565,20 @@ internal fun WherePanel(
                 ) {
                     if (state.locating) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     else Icon(Icons.Default.MyLocation, contentDescription = null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(
                         when {
-                            state.locating -> "  " + locatingLabel(state)
-                            state.hasLocation -> "  L'ho spostato qui"
-                            else -> "  Registra la posizione qui"
+                            state.locating -> locatingLabel(state)
+                            state.hasLocation -> "L'ho spostato qui"
+                            else -> "Registra la posizione qui"
                         }
                     )
                 }
                 LocatingControls(state, onUseBestNow)
                 TextButton(onClick = onPickOnMap, enabled = !state.locating) {
                     Icon(Icons.Default.EditLocationAlt, contentDescription = null, Modifier.size(18.dp))
-                    Text(if (state.hasLocation) "  Correggi il punto sulla mappa" else "  Indica il punto sulla mappa")
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text(if (state.hasLocation) "Correggi il punto sulla mappa" else "Indica il punto sulla mappa")
                 }
             }
         }
@@ -596,8 +610,9 @@ private fun PlaceField(value: String, onChange: (String) -> Unit, detail: Boolea
 private fun PlaceSelector(path: String, onClick: () -> Unit) {
     OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(4.dp)) {
         Icon(Icons.Default.Place, contentDescription = null, Modifier.size(18.dp))
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
         Text(
-            if (path.isBlank()) "  Scegli un luogo (es. Casa › Garage)" else "  $path",
+            if (path.isBlank()) "Scegli un luogo (es. Casa › Garage)" else "$path",
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -637,11 +652,13 @@ private fun PositionEditor(
                 OutlinedButton(onClick = onCapture, enabled = !state.locating, modifier = Modifier.weight(1f)) {
                     if (state.locating) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     else Icon(Icons.Default.MyLocation, contentDescription = null, Modifier.size(18.dp))
-                    Text(if (state.hasLocation) "  GPS" else "  Usa GPS")
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text(if (state.hasLocation) "GPS" else "Usa GPS")
                 }
                 OutlinedButton(onClick = onPickOnMap, enabled = !state.locating, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.EditLocationAlt, contentDescription = null, Modifier.size(18.dp))
-                    Text("  Sulla mappa")
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text("Sulla mappa")
                 }
             }
             // Separato dai pulsanti di acquisizione: toglie un dato, non deve partire per sbaglio.
@@ -710,8 +727,9 @@ private fun MoreDetails(content: @Composable () -> Unit) {
     var open by rememberSaveable { mutableStateOf(false) }
     TextButton(onClick = { open = !open }) {
         Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null)
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
         Text(
-            if (open) "  Meno dettagli" else "  Altri dettagli: categoria, stato, note, codici",
+            if (open) "Meno dettagli" else "Altri dettagli: categoria, stato, note, codici",
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
