@@ -1,5 +1,17 @@
 package it.objectfinder.app.maps
 
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
@@ -34,7 +46,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -109,8 +120,12 @@ fun ObjectMapScreen(
     onEngineChange: (MapEngine) -> Unit,
     onOpenObject: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Apre l'elenco filtrato sugli oggetti che la mappa non può mostrare. */
+    onShowWithoutLocation: () -> Unit = {},
 ) {
     val engine = MapEngine.resolve(preferredEngine)
+    // Alternativa ai segnaposto (che TalkBack non raggiunge): elenco dei punti, per distanza.
+    var listing by remember { mutableStateOf(false) }
     val markers = remember(objects) { objects.toMarkers() }
     val withoutLocation = objects.size - markers.size
     // Raggruppamento per distanza sullo schermo: dipende dallo zoom (a mezzi livelli).
@@ -206,17 +221,14 @@ fun ObjectMapScreen(
     Column(modifier.fillMaxSize()) {
         // Il selettore compare solo se c'è davvero una scelta (build con API key Google).
         if (MapEngine.available.size > 1) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                MapEngine.available.forEach { option ->
-                    FilterChip(
+            // Scelta esclusiva: pulsanti segmentati, non chip combinabili.
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                MapEngine.available.forEachIndexed { index, option ->
+                    SegmentedButton(
                         selected = engine == option,
                         onClick = { onEngineChange(option) },
-                        label = { Text(option.label) },
-                    )
+                        shape = SegmentedButtonDefaults.itemShape(index, MapEngine.available.size),
+                    ) { Text(option.label, maxLines = 1) }
                 }
             }
         }
@@ -230,6 +242,14 @@ fun ObjectMapScreen(
                     groups.filter { it.key != expanded?.key }, expanded, legs, focus, hasPermission, pinColors, selected,
                     ::onGroupTap, ::onLegTap, { if (it != zoom) { zoom = it; if (!locating) userMovedMap = true } }, Modifier.fillMaxSize(),
                 )
+            }
+            if (markers.isNotEmpty()) FilledTonalButton(
+                onClick = { listing = true },
+                modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+            ) {
+                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, Modifier.size(18.dp))
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text("Elenco")
             }
             SmallFloatingActionButton(
                 onClick = {
@@ -253,20 +273,38 @@ fun ObjectMapScreen(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).widthIn(max = 560.dp),
                 )
             } else if (markers.isEmpty() || withoutLocation > 0) {
-                Surface(
+                val note = when {
+                    markers.isEmpty() -> "Nessun oggetto con posizione GPS"
+                    withoutLocation == 1 -> "1 oggetto senza posizione non è mostrato"
+                    else -> "$withoutLocation oggetti senza posizione non sono mostrati"
+                }
+                val noteModifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+                // Con oggetti nascosti la nota porta a vederli (e ad aggiungere la posizione).
+                if (withoutLocation > 0) Surface(
+                    onClick = onShowWithoutLocation,
                     tonalElevation = 3.dp,
                     shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                    modifier = noteModifier,
                 ) {
-                    Text(
-                        if (markers.isEmpty()) "Nessun oggetto con posizione GPS"
-                        else if (withoutLocation == 1) "1 oggetto senza posizione non è mostrato"
-                        else "$withoutLocation oggetti senza posizione non sono mostrati",
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    Row(
+                        Modifier.heightIn(min = 48.dp).padding(start = 16.dp, end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(note, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Mostrali", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                } else Surface(tonalElevation = 3.dp, shape = MaterialTheme.shapes.medium, modifier = noteModifier) {
+                    Text(note, Modifier.padding(horizontal = 16.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium)
                 }
             }
+            if (listing) MapListSheet(
+                markers = markers,
+                myLocation = myLocation,
+                onPick = { id -> listing = false; onOpenObject(id) },
+                onDismiss = { listing = false },
+            )
         }
     }
 }
@@ -633,6 +671,47 @@ private fun SelectedGroupPanel(
                 Icon(Icons.Default.Directions, contentDescription = null, Modifier.size(18.dp))
                 Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                 Text("Portami lì")
+            }
+        }
+    }
+}
+
+/**
+ * Gli oggetti della mappa come elenco, uno per riga, dal più vicino (se la posizione del telefono è
+ * nota): la stessa informazione dei segnaposto, raggiungibile con TalkBack e indipendente dallo zoom.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MapListSheet(
+    markers: List<MapMarker>,
+    myLocation: DeviceLocation?,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    fun distance(m: MapMarker) = myLocation?.let { Geo.distanceMeters(it.latitude, it.longitude, m.latitude, m.longitude) }
+    val sorted = remember(markers, myLocation) {
+        if (myLocation != null) markers.sortedBy { distance(it) } else markers.sortedBy { it.title.lowercase() }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            if (myLocation != null) "Oggetti sulla mappa, dal più vicino" else "Oggetti sulla mappa",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).semantics { heading() },
+        )
+        LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+            items(sorted, key = { it.id }) { marker ->
+                ListItem(
+                    headlineContent = { Text(marker.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = {
+                        val facts = listOfNotNull(
+                            distance(marker)?.let(PlaceFormat::distanceFromYou),
+                            marker.snippet.takeIf { it.isNotBlank() },
+                        )
+                        if (facts.isNotEmpty()) Text(facts.joinToString(" · "), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    },
+                    leadingContent = { Icon(Icons.Default.Place, contentDescription = null) },
+                    modifier = Modifier.clickable(onClickLabel = "Apri la scheda") { onPick(marker.id) },
+                )
             }
         }
     }

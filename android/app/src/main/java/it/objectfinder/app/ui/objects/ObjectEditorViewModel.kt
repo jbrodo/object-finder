@@ -85,6 +85,8 @@ data class EditorState(
     val finished: Boolean = false,
     /** Chiusura dopo la registrazione di un oggetto nuovo: la lista conferma con "«Nome» registrato". */
     val registered: Boolean = false,
+    /** Chiusura dopo "Archivia": la lista offre di annullare. */
+    val archivedOnClose: Boolean = false,
     /** Oggetto esistente: si apre in consultazione, la modifica è un'azione esplicita. */
     val editing: Boolean = isNew,
     /** Posizione del telefono, per mostrare la distanza dall'oggetto (null se non disponibile). */
@@ -350,13 +352,29 @@ class ObjectEditorViewModel(
         }
     }
 
+    /** Prestito appena chiuso, per "Annulla" (stessa persona, data e scadenza). */
+    private var lastReturned: Triple<String, Long?, java.time.LocalDate?>? = null
+
+    /** Il messaggio con "Annulla" lo mostra la schermata. */
     fun returnLoan() {
         val id = objectId ?: return
+        val s = _state.value
+        lastReturned = Triple(s.loanedTo, s.loanedAt, s.loanDue)
         viewModelScope.launch {
             repository.returnLoan(id)
             onLocalChange()
             reload()
-            _state.update { it.copy(message = "Segnato come restituito") }
+        }
+    }
+
+    fun undoReturn() {
+        val id = objectId ?: return
+        val (to, at, due) = lastReturned ?: return
+        lastReturned = null
+        viewModelScope.launch {
+            runCatching { repository.lend(id, to, due, loanedAt = at) }
+                .onSuccess { onLocalChange(); reload() }
+                .onFailure { e -> _state.update { it.copy(message = e.userMessage("Prestito non ripristinato: riprova")) } }
         }
     }
 
@@ -679,6 +697,7 @@ class ObjectEditorViewModel(
                 it.copy(
                     status = if (archive) ObjectStatus.ARCHIVED else ObjectStatus.ACTIVE,
                     finished = archive,
+                    archivedOnClose = archive,
                     message = if (archive) null else "Oggetto ripristinato",
                 )
             }

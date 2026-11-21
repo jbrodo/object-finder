@@ -144,14 +144,15 @@ class ObjectRepository(
     // ---- Prestiti ----
 
     /** Presta l'oggetto a [to], con scadenza facoltativa; sincronizzato come ogni altra modifica. */
-    suspend fun lend(id: String, to: String, due: java.time.LocalDate?) {
+    suspend fun lend(id: String, to: String, due: java.time.LocalDate?, loanedAt: Long? = null) {
         val existing = dao.getById(id) ?: return
         val name = to.trim().take(LOAN_NAME_MAX)
         require(name.isNotBlank()) { "Indica a chi è prestato" }
         dao.upsert(
             existing.copy(
                 loanedTo = name,
-                loanedAt = now(),
+                // Annulla di "Restituito": si ripristina la data originale del prestito.
+                loanedAt = loanedAt ?: now(),
                 loanDue = due?.toString(),
                 syncStatus = statusAfterLocalEdit(existing),
                 updatedAt = now(),

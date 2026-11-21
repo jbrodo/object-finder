@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui.objects
 
+import it.objectfinder.app.location.hasLocationPermission
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material3.ButtonDefaults
@@ -107,6 +108,8 @@ fun ObjectEditorScreen(
     onClose: () -> Unit,
     /** Oggetto nuovo registrato: chi apre l'editor conferma e offre di riaprirlo. */
     onRegistered: (id: String, name: String) -> Unit = { _, _ -> },
+    /** Archiviato dalla scheda (che si chiude): chi apre l'editor offre "Annulla". */
+    onArchived: (id: String, name: String) -> Unit = { _, _ -> },
     readOnly: Boolean = false,
     objectId: String? = null,
     canDelete: Boolean = false,
@@ -144,6 +147,7 @@ fun ObjectEditorScreen(
     LaunchedEffect(state.finished) {
         if (!state.finished) return@LaunchedEffect
         if (state.registered) onRegistered(viewModel.currentObjectId, state.name.trim())
+        if (state.archivedOnClose) onArchived(viewModel.currentObjectId, state.name.trim())
         onClose()
     }
     LaunchedEffect(state.message) {
@@ -152,9 +156,11 @@ fun ObjectEditorScreen(
             viewModel.consumeMessage()
         }
     }
-    // Nuovo oggetto: tenta subito l'acquisizione GPS (con il flusso permessi).
+    // Nuovo oggetto: acquisizione GPS subito solo se il permesso c'è già. Altrimenti niente dialog di
+    // sistema all'apertura: il gruppo "Dove si trova" spiega a cosa serve e lo si chiede al tocco di "Usa GPS".
+    val context = LocalContext.current
     LaunchedEffect(state.isNew) {
-        if (state.isNew) permission.withPermission(viewModel::captureLocation)
+        if (state.isNew && hasLocationPermission(context)) viewModel.captureLocation()
     }
 
     fun leaveEditing() {
@@ -393,7 +399,10 @@ fun ObjectEditorScreen(
                             loanedAt = state.loanedAt,
                             due = state.loanDue,
                             readOnly = readOnly,
-                            onReturned = viewModel::returnLoan,
+                            onReturned = {
+                                viewModel.returnLoan()
+                                messages.show("Segnato come restituito", actionLabel = "Annulla", onAction = viewModel::undoReturn)
+                            },
                             onEdit = { viewModel.loadBorrowers(); lending = true },
                         )
                     } else if (!readOnly) {
@@ -664,7 +673,7 @@ internal fun WhereEditor(
                 when {
                     state.locating -> locatingLabel(state)
                     state.hasLocation -> precisionLine(state)
-                    else -> "Nessuna posizione salvata"
+                    else -> "Nessuna posizione: tocca «Usa GPS» per salvare dove si trova adesso"
                 },
                 style = MaterialTheme.typography.bodyMedium,
             )

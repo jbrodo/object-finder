@@ -1,5 +1,10 @@
 package it.objectfinder.app.ui.settings
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SegmentedButton
 import it.objectfinder.app.ui.common.LocalAppMessages
 import it.objectfinder.app.ui.common.readableWidth
 import it.objectfinder.app.ui.auth.NewPasswordDialog
@@ -16,7 +21,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import it.objectfinder.app.ui.objects.PlaceFormat
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -154,13 +158,13 @@ fun SettingsScreen(
 
         // Scelta del motore solo se ce n'è più di uno disponibile in questo build.
         if (MapEngine.available.size > 1) Section("Mappa predefinita") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MapEngine.available.forEach { option ->
-                    FilterChip(
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                MapEngine.available.forEachIndexed { index, option ->
+                    SegmentedButton(
                         selected = MapEngine.resolve(mapEngine) == option,
                         onClick = { container.settings.setMapEngine(option) },
-                        label = { Text(option.label) },
-                    )
+                        shape = SegmentedButtonDefaults.itemShape(index, MapEngine.available.size),
+                    ) { Text(option.label, maxLines = 1) }
                 }
             }
         }
@@ -177,7 +181,7 @@ fun SettingsScreen(
 private fun Section(title: String, content: @Composable () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             content()
         }
     }

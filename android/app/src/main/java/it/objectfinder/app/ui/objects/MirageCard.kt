@@ -54,6 +54,12 @@ fun MirageCard(
 ) {
     // Una card sola per tutto ciò che si ricava dalle foto: nome, scritte e, su richiesta, la pianta.
     if (state == MirageUi.Hidden && plant == PlantUi.Hidden) return
+    // Nessun suggerimento disponibile (motore non supportato) ma c'è una foto: solo l'azione delle
+    // piante, senza una card intera che promette "Suggerimenti" per un pulsante.
+    if (state == MirageUi.Hidden) {
+        PlantSuggestions(plant, onIdentify = onIdentifyPlant, onDownload = onDownloadPlantModel, onUse = onUsePlant)
+        return
+    }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

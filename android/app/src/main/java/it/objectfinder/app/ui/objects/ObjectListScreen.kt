@@ -1,5 +1,12 @@
 package it.objectfinder.app.ui.objects
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.Button
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.outlined.SearchOff
@@ -14,7 +21,6 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.ui.semantics.contentDescription
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ButtonDefaults
 import it.objectfinder.app.ui.common.locationUnavailable
 import it.objectfinder.app.ui.common.LocalAppMessages
@@ -57,9 +63,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudDone
@@ -117,8 +120,18 @@ fun ObjectListScreen(
     /** Scorciatoie nella barra di ricerca: si cerca anche per etichetta QR/NFC e per foto. */
     onScan: (() -> Unit)? = null,
     onRecognize: (() -> Unit)? = null,
+    /** Filtro chiesto da un'altra schermata (es. "oggetti senza posizione" dalla mappa). */
+    requestedFilter: ObjectFilter? = null,
+    onRequestedFilterApplied: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(requestedFilter) {
+        requestedFilter?.let {
+            viewModel.setQuery("")
+            viewModel.setFilter(it)
+            onRequestedFilterApplied()
+        }
+    }
     val context = LocalContext.current
     val messages = LocalAppMessages.current
     // Selezione multipla: Set per ricerche immediate; ogni scheda legge il proprio stato in proprio.
@@ -277,30 +290,41 @@ internal fun ObjectGrid(
     onLongClick: (ObjectEntity) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val gridState = rememberLazyGridState()
-    // Un oggetto appena registrato va in cima (ordine per ultima modifica): se si è già in cima lo si
-    // mostra, invece di lasciarlo sopra il bordo come fanno le liste lazy per default.
-    val first = items.firstOrNull()?.id
-    LaunchedEffect(first) { if (gridState.firstVisibleItemIndex <= 1) gridState.scrollToItem(0) }
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 360.dp),
-        state = gridState,
-        modifier = modifier,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(items, key = { it.id }, contentType = { "object" }) { item ->
-            ObjectCard(
-                item,
-                cover = cover(item),
-                distance = distance(item),
-                placePath = placePath(item),
-                showSyncState = showSyncState,
-                isSelected = { isSelected(item) },
-                onClick = { onClick(item) },
-                onLongClick = { onLongClick(item) },
-            )
+    // Colonne da almeno 360dp: una su telefono e pieghevole chiuso, due o tre su tablet. Righe esplicite
+    // (non LazyVerticalGrid) perché le schede di una riga abbiano la stessa altezza.
+    BoxWithConstraints(modifier) {
+        val gap = 8.dp
+        val columns = maxOf(1, ((maxWidth - 32.dp + gap) / (360.dp + gap)).toInt())
+        val rows = remember(items, columns) { items.chunked(columns) }
+        val listState = rememberLazyListState()
+        // Un oggetto appena registrato va in cima (ordine per ultima modifica): se si è già in cima lo si
+        // mostra, invece di lasciarlo sopra il bordo come fanno le liste lazy per default.
+        val first = items.firstOrNull()?.id
+        LaunchedEffect(first) { if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0) }
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(gap),
+        ) {
+            items(rows, key = { row -> row.first().id }, contentType = { "row" }) { row ->
+                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    row.forEach { item ->
+                        ObjectCard(
+                            item,
+                            cover = cover(item),
+                            distance = distance(item),
+                            placePath = placePath(item),
+                            showSyncState = showSyncState,
+                            isSelected = { isSelected(item) },
+                            onClick = { onClick(item) },
+                            onLongClick = { onLongClick(item) },
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                    }
+                    // Ultima riga incompleta: le schede mantengono la larghezza delle altre.
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
         }
     }
 }
@@ -315,10 +339,11 @@ private fun ObjectCard(
     isSelected: () -> Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val chosen = isSelected()
     Card(
-        Modifier.fillMaxWidth()
+        modifier.fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = "Seleziona")
             .semantics { selected = chosen },
         colors = if (chosen) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)

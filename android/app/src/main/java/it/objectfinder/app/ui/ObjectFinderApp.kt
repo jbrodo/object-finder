@@ -1,5 +1,6 @@
 package it.objectfinder.app.ui
 
+import it.objectfinder.app.ui.objects.ObjectFilter
 import it.objectfinder.app.ui.common.rememberAppMessages
 import it.objectfinder.app.ui.common.LocalAppMessages
 import androidx.compose.runtime.CompositionLocalProvider
@@ -120,6 +121,8 @@ fun ObjectFinderApp(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val messages = rememberAppMessages(snackbar)
+    // Filtro da applicare all'elenco quando ci si arriva da un'altra schermata (es. dalla mappa).
+    var pendingListFilter by remember { mutableStateOf<ObjectFilter?>(null) }
     val resolver = remember(container) {
         ScanResolver(
             findObject = { container.objectRepository.get(it) },
@@ -251,6 +254,8 @@ fun ObjectFinderApp(
                         onChanged = requestSync,
                         onScan = startScan,
                         onRecognize = startRecognition,
+                        requestedFilter = pendingListFilter,
+                        onRequestedFilterApplied = { pendingListFilter = null },
                         modifier = modifier,
                     )
                 }
@@ -263,6 +268,14 @@ fun ObjectFinderApp(
                         objects = objects.filter { it.statusEnum != ObjectStatus.ARCHIVED },
                         preferredEngine = engine,
                         onEngineChange = container.settings::setMapEngine,
+                        onShowWithoutLocation = {
+                            pendingListFilter = ObjectFilter.NO_LOCATION
+                            nav.navigate(Routes.OBJECTS) {
+                                popUpTo(Routes.OBJECTS) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
                         onOpenObject = { nav.navigate(Routes.editor(it)) },
                         modifier = modifier,
                     )
@@ -327,6 +340,11 @@ fun ObjectFinderApp(
                     onClose = { nav.popBackStack() },
                     onRegistered = { newId, name ->
                         messages.show("«$name» registrato", actionLabel = "Apri") { nav.openObject(newId) }
+                    },
+                    onArchived = { archivedId, name ->
+                        messages.show("«$name» archiviato", actionLabel = "Annulla") {
+                            scope.launch { container.objectRepository.setArchived(archivedId, archived = false); requestSync() }
+                        }
                     },
                 )
             }

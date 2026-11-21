@@ -200,7 +200,9 @@ The object page is a vertical stack of sections spaced 12px apart. Inside panels
 
 **The Window-Class Rule.** Layout decisions read the window size class, never orientation or "is tablet". Every new screen is checked at phone (411px), foldable (673px) and tablet (1280px) widths through the screenshot previews.
 
-The map screen is a full-bleed map with filter chips overlaid at the top and the selected-group panel docked at the bottom; its item list is capped at 240px and scrolls.
+The map screen is a full-bleed map with the selected-group panel docked at the bottom (item list capped at 240px, scrolls). An *Elenco* button (top start) opens a sheet with every mapped object, one per row, nearest first: the same information as the pins, reachable with TalkBack and independent of zoom. When objects have no position, the bottom note says how many and *Mostrali* opens the list filtered on *Senza posizione*.
+
+The object list lays cards out in explicit rows (not a lazy grid) so cards in the same row share one height on tablets.
 
 The spacing scale in practice: 2 / 4 / 8 / 12 / 16 / 24px (1px = 1dp). Anything else is a one-off.
 
@@ -233,7 +235,7 @@ The components should feel calm and reassuring: soft tonal containers, clear ver
 
 ### Chips
 - **Style:** Material `FilterChip` in a horizontal row, 8px apart, above the list: *Vicini* first (sort by distance, the most frequent question away from home), then status, then *Luogo* when places exist.
-- **State:** a chip is a toggle only when the choice is independent. A single choice among several (status: *Attuali / In prestito / Archiviati / Tutti*) is one chip with a dropdown that shows the current value, highlighted when it differs from the default.
+- **State:** a chip is a toggle only when the choice is independent. A single choice among several (status: *Attuali / In prestito / Senza posizione / Archiviati / Tutti*) is one chip with a dropdown that shows the current value, highlighted when it differs from the default. Two or three exclusive options that are always visible (map engine, export format) are segmented buttons.
 
 ### Cards / Containers
 - **Object card:** default Material `Card`, a 64px thumbnail (12px radius) flush to a 12px start inset, then a 16px-padded text column: name (Title, one line), where-line (Body), metadata row with 18px icons. With no photo, the thumbnail shows the name's initial in Title Large on `surfaceVariant`. Selected state tints the card `secondaryContainer` and overlays a primary-tinted check on the thumbnail.
@@ -253,7 +255,7 @@ The components should feel calm and reassuring: soft tonal containers, clear ver
 A `Surface` with a 16px radius and 16px padding, tinted by meaning: `primaryContainer` for *Dove si trova*, `tertiaryContainer` for *In prestito*, `errorContainer` when that loan is overdue. Content follows the Eyebrow-Then-Answer rule, then fact lines in Body Large / Body Small, then actions. Actions take the panel's own color, not the generic ones: on the loan panel the main button is `tertiary` (`error` when overdue) and secondary text buttons use the panel's content color. This is the component that makes ObjectFinder recognizable: the answer is handed to you in a calm, colored slip of paper.
 
 ### Registration form
-Order follows the task: photo, name, *Suggerimenti dalla foto* (right under the name it can fill), then one *Dove si trova* group, then details behind *Altri dettagli*. The "where" is a single card holding the place picker, the description of the spot and the GPS point (status line plus *GPS* / *Sulla mappa*): three ways to answer one question, never three separate sections. Everything learned from photos (name, read text, and plants only on request) lives in that one suggestions card. Registering confirms with a Snackbar "«Nome» registrato" and an *Apri* action.
+Order follows the task: photo, name, *Suggerimenti dalla foto* (right under the name it can fill), then one *Dove si trova* group, then details behind *Altri dettagli*. The "where" is a single card holding the place picker, the description of the spot and the GPS point (status line plus *GPS* / *Sulla mappa*): three ways to answer one question, never three separate sections. Everything learned from photos (name, read text, and plants only on request) lives in that one suggestions card. Registering confirms with a Snackbar "«Nome» registrato" and an *Apri* action. Location is captured automatically only when the permission is already granted; otherwise the GPS line explains what *Usa GPS* does and the system dialog appears on that tap, never on opening the form. When on-device suggestions are unavailable, the plant action stands alone as a text button, without a card.
 
 ### Empty states
 Icon (48px, primary), title, one sentence, and the way forward. First use carries the primary *Registra oggetto* button and hides the FAB so there is one primary action; *Nessun risultato* offers *Azzera ricerca e filtri*.
@@ -262,7 +264,7 @@ Icon (48px, primary), title, one sentence, and the way forward. First use carrie
 An `errorContainer` card at the top of the object page when the server version diverged: warning icon + Title Small heading, an explanation in Body, a per-field diff (Label bold field name, "Tua:" / "Server:" lines in Body Small), and a Button/Outlined pair to choose a version.
 
 ### Messages
-Short feedback goes through one Snackbar (`LocalAppMessages`), never a Toast. A message that has a remedy carries it as the action: GPS unavailable → *Impostazioni*, bulk archive → *Annulla*. Inside a dialog, a bottom sheet or the camera, where a Snackbar would sit under the scrim, the message appears inline in that surface (error color for failures, announced as a polite live region).
+Short feedback goes through one Snackbar (`LocalAppMessages`), never a Toast. A message that has a remedy carries it as the action: GPS unavailable → *Impostazioni*; archive (bulk or from the object page) and *Restituito* → *Annulla*, which restores the exact previous state. Inside a dialog, a bottom sheet or the camera, where a Snackbar would sit under the scrim, the message appears inline in that surface (error color for failures, announced as a polite live region).
 
 ### Camera & Photo Overlays
 Full-black canvases with white controls on 45–55% black scrims, a top gradient for legibility, and a 4px white-ringed circular shutter. The only place the UI leaves the color-role system.

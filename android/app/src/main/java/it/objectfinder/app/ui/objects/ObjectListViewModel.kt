@@ -19,7 +19,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-enum class ObjectFilter(val label: String) { ACTIVE("Attuali"), LOANED("In prestito"), ARCHIVED("Archiviati"), ALL("Tutti") }
+enum class ObjectFilter(val label: String) {
+    ACTIVE("Attuali"), LOANED("In prestito"), NO_LOCATION("Senza posizione"), ARCHIVED("Archiviati"), ALL("Tutti")
+}
 
 data class ObjectListState(
     val items: List<ObjectEntity> = emptyList(),
@@ -121,6 +123,8 @@ internal fun filterObjects(
         val statusOk = when (filter) {
             ObjectFilter.ACTIVE -> !archived
             ObjectFilter.LOANED -> !archived && item.isLoaned
+            // Quelli che la mappa non può mostrare: da qui si aggiunge la posizione.
+            ObjectFilter.NO_LOCATION -> !archived && !item.hasLocation
             ObjectFilter.ARCHIVED -> archived
             ObjectFilter.ALL -> true
         }
