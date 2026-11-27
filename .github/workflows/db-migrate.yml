@@ -10,12 +10,20 @@ on:
     paths:
       - "backend/migrations/**"
       - "backend/scripts/migrate.sh"
+      - "backend/scripts/water_xlsx.py"
+      - "backend/scripts/water_ocr.py"
+      - "backend/scripts/water_ocr_table.py"
+      - "backend/scripts/water_stage.py"
       - "backend/tests/**"
       - ".github/workflows/db-migrate.yml"
   pull_request:
     paths:
       - "backend/migrations/**"
       - "backend/scripts/migrate.sh"
+      - "backend/scripts/water_xlsx.py"
+      - "backend/scripts/water_ocr.py"
+      - "backend/scripts/water_ocr_table.py"
+      - "backend/scripts/water_stage.py"
       - "backend/tests/**"
       - ".github/workflows/db-migrate.yml"
   workflow_dispatch:
@@ -52,6 +60,9 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v7
+
+      - name: Test water import tools
+        run: python3 -m unittest discover -s backend/tests -p 'test_water_*.py'
 
       - name: Install psql
         run: command -v psql || (sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client)

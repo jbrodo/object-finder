@@ -22,6 +22,7 @@
 - [x] Create project flow / selezione tra più progetti
 - [x] Membership flow: aggiunta per email, ruoli, rimozione, uscita (RPC migration 004)
 - [x] Inviti a email non ancora registrate (migration 007, accettazione al login con email confermata)
+- [x] Scadenza degli inviti dopo 30 giorni, con rinnovo o revoca (migration 013)
 - [x] Email di invito lato server (Edge Function `send-invite` + Resend, limiti anti-spam, migration 011)
 - [x] Conflitti multi-utente: concorrenza ottimistica su `version`, scelta guidata dall'utente
 - [x] Cifratura token con Android Keystore (AES-256-GCM)
@@ -80,13 +81,14 @@
 - [ ] Geofence evaluation and notifications
 
 ## Limiti noti
-- La finestra di ricontrollo del pull (2 minuti) copre le transazioni lente; una scrittura che resta
-  aperta più a lungo sul server potrebbe ancora sfuggire fino alla sincronizzazione completa successiva.
+- La finestra di ricontrollo del pull è di 2 minuti; una scrittura che resta aperta più a lungo sul
+  server potrebbe sfuggire ai pull incrementali. Non è prevista una sincronizzazione completa periodica.
 - Le modifiche non inviate di un account restano sul telefono dopo il logout e partono solo quando si
   rientra con lo stesso account.
 - `invite_project_member` rivela a owner/admin se un'email ha già un account ("aggiunto" vs
   "invitato"): enumerazione limitata ai gestori di progetto.
-- Gli inviti non hanno scadenza; si revocano manualmente dalla schermata Membri.
+- Gli inviti scadono dopo 30 giorni; quelli scaduti restano visibili ai gestori finché non vengono
+  rinnovati o revocati dalla schermata Membri.
 - Verifiche end-to-end contro il progetto Supabase reale (account di test, emulatore): login,
   sync con cursore composto, foto su richiesta, logout, inviti; non coperti ruoli multipli e conflitti
   tra due account reali.

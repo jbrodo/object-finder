@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Object Finder · Consumi</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Object Finder, pagina iniziale"><svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="11"/><circle cx="16" cy="16" r="4"/><path d="M16 2v5M16 25v5M2 16h5M25 16h5"/></svg><span>Object Finder</span></a>
+    <span class="product-label">Consumi</span>
+    <div class="topbar-end"><span id="account" class="account"></span><button id="logout" class="button text" hidden>Esci</button></div>
+  </header>
+  <main id="main" class="shell">
+    <section id="login-panel" class="signin" aria-labelledby="login-title">
+      <div class="signin-intro"><h1 id="login-title">Ritrova le informazioni<br>che contano.</h1><p>Consulta i consumi d’acqua dei tuoi edifici, insieme agli altri membri del progetto.</p></div>
+      <form id="login-form" class="login-form">
+        <h2>Accedi</h2><p>Usa lo stesso account di Object Finder.</p>
+        <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+        <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+        <p id="login-error" class="inline-error" role="alert" hidden></p>
+        <button id="login-button" class="button primary" type="submit">Accedi</button>
+        <p id="login-status" class="form-note" role="status" aria-live="polite" hidden></p>
+        <p class="form-note">La sessione termina alla scadenza o chiudendo la pagina.</p>
+      </form>
+    </section>
+    <section id="dashboard" hidden aria-labelledby="dashboard-title">
+      <div id="dashboard-main">
+      <div class="page-heading"><div><h1 id="dashboard-title">Consumi d’acqua</h1><p>Consulta i dati registrati per periodo e appartamento.</p></div></div>
+      <div class="filters" aria-label="Filtri dei consumi">
+        <label>Progetto<select id="project"></select></label>
+        <label>Edificio<select id="building"></select></label>
+        <label>Tipo di acqua<select id="kind" disabled><option value="all">Tutti</option><option value="cold">Acqua fredda</option><option value="hot">Acqua calda</option></select></label>
+        <label>Appartamento<select id="unit" disabled><option value="all">Tutti</option></select></label>
+        <label>Periodo<select id="period" disabled><option value="all">Tutti</option></select></label>
+      </div>
+      <div class="section-heading"><div><h2>Consumi registrati</h2><p>Consumo nell’intervallo indicato, in metri cubi. Le date provengono dai dati registrati.</p></div><span id="count" class="count"></span></div>
+      <p id="scroll-hint" class="scroll-hint" hidden>Per vedere tutte le colonne, scorri la tabella orizzontalmente.</p>
+      <div id="results" aria-live="polite"></div>
+      <div class="review-entry"><button id="open-review" class="button outlined" type="button" hidden>Rivedi importazioni</button></div>
+      </div>
+      <section id="review-panel" hidden aria-label="Revisione importazioni"></section>
+    </section>
+    <p id="notice" class="notice" role="status" hidden></p>
+  </main>
+  <footer><span>Object Finder</span><span>Oggetti e luoghi, più facili da ritrovare.</span></footer>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

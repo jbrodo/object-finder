@@ -23,16 +23,23 @@ Room is the local source of truth for the Android UI. Mutations are stored local
 Sync (`ObjectRepository.sync`):
 1. `ProjectRepository.ensureActiveProject()` — lists the user's projects, creates a default one
    if none exists, and reassigns objects created offline (`default-project`) to it.
-2. Push — every pending object is upserted (`on_conflict=id`, merge-duplicates). An object is
-   marked synced only if it was not edited locally while the request was in flight.
-3. Pull — incremental on `updated_at > cursor`, pages of 500. A pending local edit wins over the
-   server copy (it is pushed next time); otherwise the server copy replaces the local row.
+2. Sync places first, then push pending objects if the user can edit. New objects are inserted;
+   existing objects use an optimistic update against their server `version`. A mismatch is
+   reconciled when possible or recorded as a conflict for the user to resolve. An object is marked
+   synced only if it was not edited locally while the request was in flight.
+3. Pull objects in pages of 500 using a composite `(updated_at, id)` cursor and a two-minute
+   lookback. Pending local edits are preserved; open conflicts retain the local copy and update
+   the server copy shown to the user. Deletion tombstones remove synced local copies or open a
+   conflict when local changes are pending.
+4. Sync identifiers, location history and photos after objects. Viewers pull without pushing
+   changes. Photos are downloaded on demand apart from covers.
 
 Project creation uses a client-generated UUID and `Prefer: return=minimal`: the projects SELECT
 policy depends on the owner membership created by an AFTER INSERT trigger, which is not visible
 to RETURNING (verified against the migrations: `return=representation` fails RLS).
 
-For concurrent multi-user edits, add server-side version checks and mutation IDs next.
+The lookback reduces the risk of missing late commits, but transactions lasting longer than the
+window can still be missed by incremental pulls; see `NEXT_STEPS.md`.
 
 ## Android layers
 - `data/local` — Room entity/DAO/database.
