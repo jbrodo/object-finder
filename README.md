@@ -17,13 +17,12 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
    Facoltativo: aggiungere `GOOGLE_MAPS_API_KEY=...` nello stesso file.
 2. Copiare `android/app/src/main/assets/config.properties.example` in `config.properties`
    e impostare `SUPABASE_URL` e `SUPABASE_ANON_KEY` (anon/publishable key).
-3. Schema del database: automatico con la workflow *Database migrations* (vedi sotto), oppure a mano
-   da SQL Editor eseguendo in ordine:
-   `backend/migrations/001_initial_schema.sql`, `002_storage_policies.sql`, `003_sync_support.sql`,
-   `004_project_members_rpc.sql`, `005_object_photos.sql`, `006_object_identifiers.sql`,
-   `007_project_invites.sql`, `008_location_history.sql`, `009_object_deletions.sql`.
-   La 005 è necessaria per le foto: corregge le policy Storage della 002, che negavano sempre
-   lettura e upload.
+3. Schema del database: usare il workflow *Database migrations* o lo script descritto sotto. In
+   alternativa, da SQL Editor eseguire **tutti** i file `backend/migrations/[0-9]*_*.sql` in ordine
+   di versione, dalla 001 alla 021 inclusa per questa revisione. Applicare anche le eventuali
+   migrazioni successive presenti nel repository. La 005 corregge le policy Storage della 002;
+   le versioni successive aggiungono, tra l'altro, luoghi, prestiti e riconoscimento delle foto.
+   Se si passa poi allo script o al workflow, usare la baseline come descritto sotto.
 4. In Supabase → Authentication → Providers abilitare Email/Password e **lasciare attivo
    "Confirm email"**: gli inviti a progetto vengono accettati solo per email confermate; con
    l'auto-conferma chiunque potrebbe registrarsi con l'email invitata.
@@ -49,7 +48,8 @@ La workflow `Database migrations` parte quando cambia un file in `backend/migrat
 Regole (`backend/scripts/migrate.sh`, usabile anche a mano con `DATABASE_URL=... backend/scripts/migrate.sh`):
 - registro in `ops.schema_migrations` (schema non esposto dalle API);
 - ogni file gira in una transazione insieme alla sua registrazione: se fallisce non resta nulla a metà;
-- una migration già applicata non si modifica (checksum): per cambiare qualcosa si crea `008_...sql`;
+- una migration già applicata non si modifica (checksum): per cambiare qualcosa si crea un nuovo
+  file con la successiva versione disponibile;
 - niente `begin`/`commit` dentro i file e niente comandi non transazionali (es. `create index concurrently`).
 
 Configurazione:
@@ -61,10 +61,15 @@ Configurazione:
    ```
 2. **Migration già eseguite a mano** dal SQL Editor: lanciare una volta la workflow da Actions →
    *Database migrations* → *Run workflow* con `baseline` = ultima versione applicata (es. `007`) e
-   `dry_run` disattivato. Le segna come applicate senza rieseguirle. Senza baseline la workflow si
-   ferma con un messaggio invece di provare a ricreare lo schema.
+   `dry_run` disattivato. Verificare prima che tutte le versioni fino a quella indicata siano state
+   effettivamente eseguite: la baseline le registra senza rieseguirle e applica le successive
+   pendenti. Senza baseline il workflow si ferma se trova `public.objects` e il registro è vuoto.
 3. Consigliato: in Settings → Environments → `production` aggiungere un *required reviewer*, così
    ogni applicazione al database attende un'approvazione.
+
+Anche `--dry-run` crea, se mancanti, lo schema `ops` e la tabella del registro; non applica le
+migrazioni né registra la baseline. Se `SUPABASE_DB_URL` manca, il workflow segnala un avviso e
+salta l'applicazione: controllare i log prima di considerare aggiornato il database.
 
 ## Build e test
 ```bash
@@ -74,7 +79,7 @@ cd android
 ./gradlew :app:assembleDebug       # APK in app/build/outputs/apk/debug/
 ```
 Toolchain: Gradle 9.9, Android Gradle Plugin 9.5 (Kotlin integrato), Kotlin 2.4, KSP 2.3,
-Compose BOM 2026.11, Room 2.8, Ktor 3.6; compileSdk 37.1, targetSdk 36, minSdk 26.
+Compose BOM 2026.11, Room 2.8, Ktor 3.6; compileSdk 37.1, targetSdk 37, minSdk 26.
 Le versioni che devono restare allineate sono raggruppate in `.github/dependabot.yml`.
 
 ## Build APK con GitHub Actions
@@ -245,5 +250,5 @@ workflow. Non serve una nuova release dell'app.
 - `MapEngine` consente di aggiungere MapLibre come provider OSM avanzato in una milestone successiva.
 
 ## Stato e prossimi step
-Vedi `docs/NEXT_STEPS.md`. In breve: fotocamera in-app (CameraX), riconoscimento visivo degli oggetti,
-distribuzione su Google Play/Firebase, tracker BLE/GPS e geofence.
+Vedi `docs/NEXT_STEPS.md` per le verifiche ancora aperte su dispositivi reali, la distribuzione su
+Google Play e il backlog di tracker BLE/GPS e geofence.

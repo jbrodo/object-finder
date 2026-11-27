@@ -26,3 +26,7 @@ hide
 
 # Supabase CLI (file locali)
 backend/supabase/.temp/
+
+# Configurazione locale della web app (solo chiavi pubbliche)
+/web/config.js
+/web/dist/
