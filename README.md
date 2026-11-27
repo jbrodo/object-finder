@@ -19,7 +19,7 @@ Google Maps / OpenStreetMap tramite provider intercambiabili.
    e impostare `SUPABASE_URL` e `SUPABASE_ANON_KEY` (anon/publishable key).
 3. Schema del database: usare il workflow *Database migrations* o lo script descritto sotto. In
    alternativa, da SQL Editor eseguire **tutti** i file `backend/migrations/[0-9]*_*.sql` in ordine
-   di versione, dalla 001 alla 021 inclusa per questa revisione. Applicare anche le eventuali
+   di versione, dalla 001 alla 022 inclusa per questa revisione. Applicare anche le eventuali
    migrazioni successive presenti nel repository. La 005 corregge le policy Storage della 002;
    le versioni successive aggiungono, tra l'altro, luoghi, prestiti e riconoscimento delle foto.
    Se si passa poi allo script o al workflow, usare la baseline come descritto sotto.

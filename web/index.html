@@ -27,6 +27,7 @@
       </form>
     </section>
     <section id="dashboard" hidden aria-labelledby="dashboard-title">
+      <div id="dashboard-main">
       <div class="page-heading"><div><h1 id="dashboard-title">Consumi d’acqua</h1><p>Consulta i dati registrati per periodo e appartamento.</p></div></div>
       <div class="filters" aria-label="Filtri dei consumi">
         <label>Progetto<select id="project"></select></label>
@@ -38,6 +39,9 @@
       <div class="section-heading"><div><h2>Consumi registrati</h2><p>Consumo nell’intervallo indicato, in metri cubi. Le date provengono dai dati registrati.</p></div><span id="count" class="count"></span></div>
       <p id="scroll-hint" class="scroll-hint" hidden>Per vedere tutte le colonne, scorri la tabella orizzontalmente.</p>
       <div id="results" aria-live="polite"></div>
+      <div class="review-entry"><button id="open-review" class="button outlined" type="button" hidden>Rivedi importazioni</button></div>
+      </div>
+      <section id="review-panel" hidden aria-label="Revisione importazioni"></section>
     </section>
     <p id="notice" class="notice" role="status" hidden></p>
   </main>

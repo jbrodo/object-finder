@@ -1,7 +1,13 @@
 import { canViewWater, formatAmount, formatDate, isPublicKey } from './domain.js';
+import { createReview } from './review.js';
+import { canReview } from './review-domain.js';
 
 const $ = id => document.getElementById(id);
 const state = { token: null, user: null, projects: [], buildings: [], features: [], grants: [], rows: [], units: [], sourceRows: [], imports: [], generation: 0 };
+const review = createReview({ root: $('review-panel'), context: () => ({ projectId: $('project').value, buildingId: $('building').value,
+  userId: state.user.id, grants: state.grants }), allRows, request, close: () => {
+    $('review-panel').hidden = true; $('dashboard-main').hidden = false; run(loadConsumption);
+  } });
 let config;
 try { config = await import('./config.js'); } catch { config = null; }
 
@@ -63,6 +69,7 @@ async function allRows(table, filters = {}) {
   throw new Error('Questo edificio ha troppi dati da caricare. Seleziona un altro edificio o contatta un amministratore.');
 }
 function signOut() {
+  review.invalidate(); $('review-panel').hidden = true; $('dashboard-main').hidden = false; $('open-review').hidden = true;
   state.generation++; Object.assign(state, { token: null, user: null, projects: [], buildings: [], features: [], grants: [], rows: [], units: [], sourceRows: [], imports: [] });
   $('password').value = ''; $('account').textContent = ''; $('results').replaceChildren(); showAuth(false);
 }
@@ -82,6 +89,7 @@ async function loadProjects() {
 async function loadBuildings() {
   const generation = ++state.generation; const projectId = $('project').value;
   setFiltersReady(false);
+  $('open-review').hidden = true;
   state.rows = []; state.units = []; state.buildings = []; state.sourceRows = []; state.imports = [];
   populate($('building'), [], 'Caricamento…');
   if (!canViewWater(state.features, state.grants, projectId, state.user.id)) {
@@ -117,6 +125,7 @@ async function loadConsumption() {
   }
   if (generation !== state.generation || !state.token) return;
   Object.assign(state, { units, rows, sourceRows, imports });
+  $('open-review').hidden = !canReview(state.grants, projectId, state.user.id, 'import');
   populateFilters(); setFiltersReady(rows.length > 0); renderRows();
 }
 function populateFilters() {
@@ -184,6 +193,8 @@ $('login-form').addEventListener('submit', event => {
   })().catch(error => { $('login-error').textContent = error.message || 'Accesso non riuscito. Riprova.'; $('login-error').hidden = false; });
 });
 $('logout').addEventListener('click', async () => {
+  if (review.isBusy()) { notify('Attendi il termine dell’operazione prima di uscire.'); return; }
+  if (review.hasUnsaved() && !globalThis.confirm('Ci sono modifiche non salvate. Vuoi uscire?')) return;
   const token = state.token; signOut(); notify();
   if (!token) return;
   try {
@@ -198,4 +209,6 @@ $('building').addEventListener('change', () => run(loadConsumption));
 $('kind').addEventListener('change', renderRows);
 $('unit').addEventListener('change', renderRows);
 $('period').addEventListener('change', renderRows);
+$('open-review').addEventListener('click', () => { $('dashboard-main').hidden = true; $('review-panel').hidden = false; review.open(); });
+globalThis.addEventListener?.('beforeunload', event => { if (review.hasUnsaved() || review.isBusy()) event.preventDefault(); });
 if (!validConfig()) notify('La connessione non è configurata. Contatta chi gestisce l’app.');

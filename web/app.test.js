@@ -19,9 +19,9 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 15));
 test('sign in, load authorized consumption, sign out and deny unauthorized project', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'objectfinder-web-test-'));
   try {
-    for (const file of ['app.js', 'domain.js', 'package.json']) await writeFile(join(dir, file), await readFile(new URL(file, import.meta.url)));
+    for (const file of ['app.js', 'domain.js', 'review.js', 'review-domain.js', 'package.json']) await writeFile(join(dir, file), await readFile(new URL(file, import.meta.url)));
     await writeFile(join(dir, 'config.js'), "export const supabaseUrl='https://test.supabase.co'; export const supabaseAnonKey='public-key';");
-    const ids = ['login-panel', 'dashboard', 'logout', 'account', 'notice', 'results', 'count', 'project', 'building', 'kind', 'unit', 'period', 'scroll-hint', 'password', 'email', 'login-form', 'login-button', 'login-status', 'login-error'];
+    const ids = ['login-panel', 'dashboard', 'dashboard-main', 'review-panel', 'open-review', 'logout', 'account', 'notice', 'results', 'count', 'project', 'building', 'kind', 'unit', 'period', 'scroll-hint', 'password', 'email', 'login-form', 'login-button', 'login-status', 'login-error'];
     const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
     elements.kind.value = 'all'; elements.email.value = 'test@example.com'; elements.password.value = 'password';
     globalThis.document = { getElementById: id => elements[id], createElement: () => new Element() };

@@ -154,8 +154,17 @@ Per una futura distribuzione Vercel collegata al repository: impostare Root Dire
 Command `npm run build` e Output Directory `dist`, con le variabili pubbliche `PUBLIC_SUPABASE_URL`
 e `PUBLIC_SUPABASE_ANON_KEY`. La build incorpora questi valori nel sito visibile ai visitatori:
 non usare credenziali privilegiate. Non è ancora stata effettuata una distribuzione né una prova
-end-to-end con Supabase reale. Importazione, revisione, grafici e gestione permessi non sono ancora
+end-to-end con Supabase reale. Grafici, caricamento dei documenti e gestione permessi non sono ancora
 disponibili nell'interfaccia web.
+
+La revisione web elenca le bozze già create per l'edificio: chi le ha create può correggere ogni
+riga, creare gli appartamenti mancanti (con `water/edit`), escludere righe e contrassegnarle come
+controllate. La conferma richiede `water/view`, `water/import` e `water/edit`; gli altri membri
+autorizzati alle importazioni vedono le bozze altrui in sola lettura. La migration 022 verifica
+atomicamente che i valori confermati siano quelli revisionati, anche se un'altra scheda li modifica.
+La schermata mostra il testo estratto ma non ancora l'immagine o il file originale: per il confronto
+occorre avere il documento a disposizione separatamente. La creazione delle bozze avviene ancora
+tramite gli strumenti locali documentati sotto; la revisione non avvia direttamente Excel o OCR.
 
 ## Fasi di realizzazione
 
@@ -163,8 +172,8 @@ disponibili nell'interfaccia web.
 opzionali con permessi espliciti per membro. Le funzionalità nuove sono disattivate finché non vengono
 abilitate; anche owner e admin devono ricevere il permesso specifico per usarle. Owner e admin possono
 gestire abilitazioni e permessi. L'inventario esistente mantiene le proprie policy. Gli edifici sono
-visibili ai membri del progetto; eliminare il luogo associato non elimina l'edificio. Non sono ancora
-disponibili schermate, importazione o OCR. Le decisioni sotto restano aperte.
+visibili ai membri del progetto; eliminare il luogo associato non elimina l'edificio. Le decisioni
+sotto restano aperte.
 
 La migration 019 aggiunge unità immobiliari e consumi confermati di acqua fredda e calda in metri
 cubi, per intervalli di date, con controllo dei duplicati. La lettura richiede `water/view`, la
@@ -177,9 +186,8 @@ definita e implementata la restrizione per unità. I permessi sono indipendenti:
 La migration 020 aggiunge bozze di importazione e righe modificabili con nome della fonte e
 riferimento alla riga. `confirm_water_import` verifica i permessi `view`, `import` ed `edit` e
 conferma atomicamente tutte le righe complete, mantenendo il collegamento ai consumi creati. Un
-duplicato annulla la conferma; le righe confermate restano immutabili. È solo la base dati: non sono
-ancora implementati caricamento dei file, riconoscimento OCR, estrazione Excel o schermate. Il nome
-del file non equivale alla conservazione del documento originale.
+duplicato annulla la conferma; le righe confermate restano immutabili. La migration fornisce solo
+la base dati: il nome del file non equivale alla conservazione del documento originale.
 
 È disponibile un primo estrattore locale per il formato Excel del repository di riferimento:
 
